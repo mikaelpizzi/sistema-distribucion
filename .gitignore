@@ -1,0 +1,37 @@
+# Dependencias y entornos
+.env
+.env.local
+
+# Archivos del Sistema Operativo
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+Desktop.ini
+[Dd]esktop.ini
+.DS_Store
+.Spotlight-V100
+.Trashes
+
+# Editores e IDEs
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*~
+
+# Logs y temporales
+*.log
+*.tmp
+temp/
+tmp/
+
+# Base de datos persistente (Docker volumes locales si se montan fuera)
+docker/data/
+db_data/
+*.sql.gz
+*.backup
