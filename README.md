@@ -110,3 +110,4 @@ docker exec salud_php_apache php /var/www/html/scripts/poblar_medicamentos.php -
 ## 6. Licencia y Uso Académico
 
 Proyecto desarrollado con fines académicos para la materia de **Bases de Datos**. Código bajo licencia MIT.
+
