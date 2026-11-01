@@ -102,17 +102,9 @@ if (!empty($centros)) {
     }
 }
 
-// Iconografía para recursos operativos
+// Iconografía limpia sin emojis
 function getRecursoIcon(string $codigo): string {
-    return match ($codigo) {
-        'CADENA_FRIO'   => '❄️',
-        'PLANTA_ELEC'   => '⚡',
-        'AMBULANCIA'    => '🚑',
-        'ESTERILIZACION'=> '🧪',
-        'FARMACIA_24H'  => '🕒',
-        'BANCO_SANGRE'  => '🩸',
-        default         => '🔹'
-    };
+    return '';
 }
 
 $mensajeExito = $_GET['msg'] ?? null;
@@ -211,9 +203,9 @@ $mensajeError = $_GET['error'] ?? null;
             <span class="fw-bold tracking-wide text-info fs-6">SICM-RED</span>
             <span class="text-white-50">|</span>
             <nav class="d-flex gap-1">
-                <a href="index.php" class="nav-link-tech active">🏢 Red de Centros</a>
-                <a href="../maestras/index.php" class="nav-link-tech">⚙️ Tablas Maestras</a>
-                <a href="../auditoria/index.php" class="nav-link-tech">🛡️ Auditoría Forense</a>
+                <a href="index.php" class="nav-link-tech active">Red de Centros</a>
+                <a href="../maestras/index.php" class="nav-link-tech">Tablas Maestras</a>
+                <a href="../auditoria/index.php" class="nav-link-tech">Auditoría Forense</a>
             </nav>
         </div>
         <div class="text-white-50 font-monospace small" style="font-size: 0.76rem;">
@@ -247,8 +239,8 @@ $mensajeError = $_GET['error'] ?? null;
             <div class="col-xl-4 col-lg-4">
                 <div class="card border">
                     <div class="card-header bg-white text-dark fw-bold border-bottom py-2 px-3 d-flex justify-content-between align-items-center">
-                        <span><?= $centroEdicion ? '✏️ Modificar Ambulatorio #' . (int)$centroEdicion['id'] : '➕ Registrar Nuevo Ambulatorio' ?></span>
-                        <a href="../maestras/index.php" class="badge bg-light text-primary text-decoration-none border" title="Administrar clasificaciones y recursos">⚙️ Configurar Maestras</a>
+                        <span><?= $centroEdicion ? 'Modificar Ambulatorio #' . (int)$centroEdicion['id'] : 'Registrar Nuevo Ambulatorio' ?></span>
+                        <a href="../maestras/index.php" class="badge bg-light text-primary text-decoration-none border" title="Administrar clasificaciones y recursos">Configurar Ficha Maestra</a>
                     </div>
                     <div class="card-body p-3">
                         <form id="form-centro" action="procesar.php" method="POST" novalidate>
@@ -324,8 +316,8 @@ $mensajeError = $_GET['error'] ?? null;
                             <!-- CAPACIDADES OPERATIVAS (Catálogo Maestro N:M) -->
                             <div class="mb-3 p-2 bg-light border rounded">
                                 <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <span class="small fw-bold text-dark">⚙️ Capacidades y Recursos (N:M)</span>
-                                    <a href="../maestras/index.php?tab=recursos" class="badge bg-secondary text-decoration-none" style="font-size: 0.65rem;">+ Gestionar</a>
+                                    <span class="small fw-bold text-dark">Capacidades y Recursos (N:M)</span>
+                                    <a href="../maestras/index.php" class="badge bg-secondary text-decoration-none" style="font-size: 0.65rem;">Configurar</a>
                                 </div>
                                 <div class="text-muted small mb-2" style="font-size: 0.72rem;">
                                     Catálogo dinámico desde <code>recursos_operativos</code> adaptable a cualquier empresa.
@@ -437,11 +429,11 @@ $mensajeError = $_GET['error'] ?? null;
                                                     <div class="fw-semibold text-dark"><?= htmlspecialchars($c['nombre']) ?></div>
                                                     <div class="text-muted small" style="font-size: 0.74rem;">
                                                         <?php if (!empty($c['medico_director'])): ?>
-                                                            <span>👨‍⚕️ <?= htmlspecialchars($c['medico_director']) ?></span> | 
+                                                            <span>Director: <?= htmlspecialchars($c['medico_director']) ?></span> | 
                                                         <?php endif; ?>
-                                                        <span>📍 <?= htmlspecialchars($c['direccion']) ?></span>
+                                                        <span><?= htmlspecialchars($c['direccion']) ?></span>
                                                         <?php if (!empty($c['horario_atencion'])): ?>
-                                                            | <span>🕒 <?= htmlspecialchars($c['horario_atencion']) ?></span>
+                                                            | <span>Horario: <?= htmlspecialchars($c['horario_atencion']) ?></span>
                                                         <?php endif; ?>
                                                     </div>
                                                 </td>
@@ -455,7 +447,7 @@ $mensajeError = $_GET['error'] ?? null;
                                                         <div class="d-flex flex-wrap gap-1">
                                                             <?php foreach ($recCentro as $r): ?>
                                                                 <span class="badge badge-resource rounded-pill" title="<?= htmlspecialchars($r['detalle_capacidad'] ?? $r['nombre']) ?>">
-                                                                    <?= getRecursoIcon($r['codigo']) ?> <?= htmlspecialchars($r['nombre']) ?>
+                                                                    <?= htmlspecialchars($r['nombre']) ?>
                                                                 </span>
                                                             <?php endforeach; ?>
                                                         </div>
@@ -470,7 +462,7 @@ $mensajeError = $_GET['error'] ?? null;
                                                 </td>
                                                 <td class="text-end pe-3">
                                                     <div class="d-flex justify-content-end align-items-center gap-1">
-                                                        <!-- BOTÓN CONTEXTUAL PRO: HISTORIAL POR FILA (Misión 2 desacoplada) -->
+                                                        <!-- BOTON CONTEXTUAL: HISTORIAL POR FILA (Misión 2 desacoplada) -->
                                                         <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 btn-historial-centro"
                                                                 data-centro-id="<?= (int)$c['id'] ?>"
                                                                 data-centro-nombre="<?= htmlspecialchars($c['nombre']) ?>"
@@ -478,7 +470,7 @@ $mensajeError = $_GET['error'] ?? null;
                                                                 data-centro-logs="<?= htmlspecialchars(json_encode($logsEsteCentro, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>"
                                                                 title="Ver trazabilidad de este registro"
                                                                 style="font-size: 0.74rem;">
-                                                            🕒 Historial (<?= count($logsEsteCentro) ?>)
+                                                            Historial (<?= count($logsEsteCentro) ?>)
                                                         </button>
 
                                                         <a href="index.php?editar=<?= (int)$c['id'] ?>&estado=<?= htmlspecialchars($filtroEstado) ?>" 
@@ -506,7 +498,7 @@ $mensajeError = $_GET['error'] ?? null;
                     </div>
                     <div class="card-footer bg-light py-2 px-3 text-muted small d-flex justify-content-between align-items-center border-top">
                         <span><strong>Consulta Desacoplada:</strong> Pantalla alimentada por <code>vw_centros_salud</code>. Cero contaminación con logs globales.</span>
-                        <a href="../auditoria/index.php" class="text-decoration-none fw-semibold">🛡️ Ir a Consola Forense Global &rarr;</a>
+                        <a href="../auditoria/index.php" class="text-decoration-none fw-semibold">Ir a Consola Forense Global &rarr;</a>
                     </div>
                 </div>
             </div>
@@ -521,7 +513,7 @@ $mensajeError = $_GET['error'] ?? null;
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header bg-dark text-white py-2 px-3">
                     <h6 class="modal-title font-monospace" id="modalHistorialLabel">
-                        🕒 Historial Quirúrgico de Auditoría: <span id="modal-hist-codigo" class="text-info"></span>
+                        Historial Quirúrgico de Auditoría: <span id="modal-hist-codigo" class="text-info"></span>
                     </h6>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>

@@ -85,7 +85,18 @@ INSERT INTO centro_recursos (centro_salud_id, recurso_id, operativo, detalle_cap
 ON DUPLICATE KEY UPDATE operativo = VALUES(operativo), detalle_capacidad = VALUES(detalle_capacidad);
 
 -- ============================================================================
--- 8. USUARIO INICIAL PARA TRAZABILIDAD (admin@salud.gob.ve / admin123)
+-- 8. CAMPOS CONFIGURABLES DINÁMICOS (Modelo EAV - Adaptabilidad Empresarial)
+-- ============================================================================
+INSERT INTO campos_configurables (id, nombre, clave, tipo_dato, activo) VALUES
+(1, 'Director Médico', 'director_medico', 'texto', 1),
+(2, 'Camas de Observación', 'camas_observacion', 'numero', 1),
+(3, 'Helipuerto', 'helipuerto', 'booleano', 0),
+(4, 'Área de Cobertura (Km)', 'area_cobertura', 'numero', 1),
+(5, 'Capacidad de Ambulancias', 'capacidad_ambulancias', 'numero', 1)
+ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), tipo_dato = VALUES(tipo_dato), activo = VALUES(activo);
+
+-- ============================================================================
+-- 9. USUARIO INICIAL PARA TRAZABILIDAD (admin@salud.gob.ve / admin123)
 -- ============================================================================
 INSERT INTO usuarios (id, nombre, email, password_hash, rol_id, centro_salud_id, activo) VALUES 
 (1, 'Administrador Municipal', 'admin@salud.gob.ve', '$2y$10$eA0Nwf1yvG8s1rE4E2C7l.qQ2bWd1vT2N5U9xR4K8yP0J5Z3W7Y4q', 1, NULL, 1)

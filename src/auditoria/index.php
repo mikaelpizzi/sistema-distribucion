@@ -119,9 +119,9 @@ $totalLogs = $pdo->query("SELECT COUNT(*) FROM logs_auditoria")->fetchColumn();
             <span class="fw-bold tracking-wide text-info fs-6">SICM-RED</span>
             <span class="text-white-50">|</span>
             <nav class="d-flex gap-1">
-                <a href="../centros/index.php" class="nav-link-tech">🏢 Red de Centros</a>
-                <a href="../maestras/index.php" class="nav-link-tech">⚙️ Tablas Maestras</a>
-                <a href="index.php" class="nav-link-tech active">🛡️ Auditoría Forense</a>
+                <a href="../centros/index.php" class="nav-link-tech">Red de Centros</a>
+                <a href="../maestras/index.php" class="nav-link-tech">Tablas Maestras</a>
+                <a href="index.php" class="nav-link-tech active">Auditoría Forense</a>
             </nav>
         </div>
         <div class="text-white-50 font-monospace small" style="font-size: 0.76rem;">
@@ -134,7 +134,6 @@ $totalLogs = $pdo->query("SELECT COUNT(*) FROM logs_auditoria")->fetchColumn();
         <!-- Banner Explicativo de Auditoría Forense y RBAC -->
         <div class="alert alert-dark border shadow-sm py-2 px-3 mb-3 d-flex justify-content-between align-items-center">
             <div class="d-flex align-items-center gap-2 small">
-                <span class="fs-5">🛡️</span>
                 <div>
                     <strong>Consola Central de Seguridad y Auditoría Forense:</strong> Esta pantalla está reservada exclusivamente para el <code>rol_admin</code> / Auditoría Municipal. Permite la investigación de eventos históricos, peritaje de IP, verificación de deltas JSON y trazabilidad inmutable de toda la red.
                 </div>
@@ -233,7 +232,7 @@ $totalLogs = $pdo->query("SELECT COUNT(*) FROM logs_auditoria")->fetchColumn();
                                                     data-log-ip="<?= htmlspecialchars($l['ip_origen']) ?>"
                                                     data-log-json="<?= htmlspecialchars($l['detalles_json'] ?? '{}', ENT_QUOTES, 'UTF-8') ?>"
                                                     style="font-size: 0.74rem;">
-                                                🔍 Ver Delta JSON
+                                                Ver Delta JSON
                                             </button>
                                         </td>
                                     </tr>
@@ -257,7 +256,7 @@ $totalLogs = $pdo->query("SELECT COUNT(*) FROM logs_auditoria")->fetchColumn();
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header bg-dark text-white py-2 px-3">
                     <h6 class="modal-title font-monospace" id="modalAuditoriaLabel">
-                        🔍 Peritaje Forense de Log <span id="modal-log-id" class="text-info">#</span>
+                        Peritaje Forense de Log <span id="modal-log-id" class="text-info">#</span>
                     </h6>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -376,3 +375,4 @@ $totalLogs = $pdo->query("SELECT COUNT(*) FROM logs_auditoria")->fetchColumn();
 </body>
 
 </html>
+

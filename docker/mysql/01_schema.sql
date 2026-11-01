@@ -74,6 +74,25 @@ CREATE TABLE centro_recursos (
     CONSTRAINT fk_cr_recurso FOREIGN KEY (recurso_id) REFERENCES recursos_operativos(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB;
 
+-- 1.5 Modelo EAV: Campos Dinámicos Parametrizables (Cero ALTER TABLE)
+CREATE TABLE campos_configurables (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(60) NOT NULL,
+    clave VARCHAR(50) NOT NULL UNIQUE,
+    tipo_dato ENUM('texto', 'numero', 'booleano') NOT NULL DEFAULT 'texto',
+    activo TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE centro_valores_eav (
+    centro_salud_id INT NOT NULL,
+    campo_id INT NOT NULL,
+    valor TEXT NULL,
+    PRIMARY KEY (centro_salud_id, campo_id),
+    CONSTRAINT fk_cve_centro FOREIGN KEY (centro_salud_id) REFERENCES centros_salud(id) ON DELETE CASCADE,
+    CONSTRAINT fk_cve_campo FOREIGN KEY (campo_id) REFERENCES campos_configurables(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 -- ============================================================================
 -- 2. SEGURIDAD Y OPERADORES (Fiel a tu diccionario de datos)
 -- ============================================================================

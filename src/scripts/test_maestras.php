@@ -45,3 +45,4 @@ $logsEnVista = $pdo->query("SELECT COUNT(*) FROM vw_logs_auditoria")->fetchColum
 echo "3. Vistas SQL operativas: Centros en vw_centros_salud={$centroEnVista}, Logs en vw_logs_auditoria={$logsEnVista}\n";
 
 echo "=== TEST DE ADAPTABILIDAD EXITOSO ===\n";
+
