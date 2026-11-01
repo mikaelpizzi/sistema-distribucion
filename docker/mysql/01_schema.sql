@@ -191,3 +191,45 @@ CREATE TABLE logs_auditoria (
     INDEX idx_logs_tabla_registro (tabla_afectada, registro_id),
     CONSTRAINT fk_logs_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
 ) ENGINE=InnoDB;
+
+-- ============================================================================
+-- 6. VISTAS SQL DESACOPLADAS (CREATE VIEW - Exigencia académica)
+-- ============================================================================
+
+-- Vista Operativa 1: Catálogo de Centros con datos de su tabla maestra
+CREATE OR REPLACE VIEW vw_centros_salud AS
+SELECT 
+    c.id,
+    c.codigo_sicm,
+    c.nombre,
+    c.tipo_centro_id,
+    t.codigo AS tipo_codigo,
+    t.nombre AS tipo_nombre,
+    c.medico_director,
+    c.horario_atencion,
+    c.direccion,
+    c.telefono_principal,
+    c.activo,
+    c.created_at,
+    c.updated_at
+FROM centros_salud c
+INNER JOIN tipos_centro_salud t ON t.id = c.tipo_centro_id;
+
+-- Vista Forense 2: Auditoría desacoplada con resolución de operadores
+CREATE OR REPLACE VIEW vw_logs_auditoria AS
+SELECT 
+    l.id AS log_id,
+    l.fecha_hora,
+    l.usuario_id,
+    COALESCE(u.nombre, 'Sistema / Central') AS operador,
+    COALESCE(r.nombre, 'Sin Rol') AS rol_operador,
+    u.email AS email_operador,
+    l.accion,
+    l.tabla_afectada,
+    l.registro_id,
+    l.ip_origen,
+    l.detalles_json
+FROM logs_auditoria l
+LEFT JOIN usuarios u ON u.id = l.usuario_id
+LEFT JOIN roles r ON r.id = u.rol_id;
+

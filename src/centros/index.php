@@ -1,13 +1,13 @@
 <?php
 // src/centros/index.php
-// Vista y Controlador de interfaz en PHP puro para la Red de Ambulatorios Municipales y Auditoría Forense
+// Vista y Controlador Operativo para la Red de Ambulatorios Municipales (Usa vw_centros_salud)
 declare(strict_types=1);
 
 require_once __DIR__ . '/../config/database.php';
 $pdo = getDB();
 
 // ----------------------------------------------------------------------------
-// 1. FILTROS Y CONSULTA DE CENTROS DE SALUD
+// 1. FILTROS Y CONSULTA USANDO LA VISTA OPERATIVA (vw_centros_salud)
 // ----------------------------------------------------------------------------
 $filtroEstado = $_GET['estado'] ?? 'activos';
 $busquedaCentro = trim($_GET['q'] ?? '');
@@ -33,12 +33,12 @@ if ($busquedaCentro !== '') {
 
 $whereCentros = !empty($condicionesCentros) ? 'WHERE ' . implode(' AND ', $condicionesCentros) : '';
 
+// Consulta directa a la VISTA SQL (3FN)
 $sqlCentros = "SELECT c.id, c.codigo_sicm, c.nombre, c.tipo_centro_id, 
-                      t.nombre AS tipo_nombre, t.codigo AS tipo_codigo,
+                      c.tipo_nombre, c.tipo_codigo,
                       c.medico_director, c.horario_atencion,
-                      c.direccion, c.telefono_principal, c.activo, c.created_at
-               FROM centros_salud c
-               INNER JOIN tipos_centro_salud t ON t.id = c.tipo_centro_id
+                      c.direccion, c.telefono_principal, c.activo, c.created_at, c.updated_at
+               FROM vw_centros_salud c
                {$whereCentros}
                ORDER BY c.id DESC";
 
@@ -49,7 +49,6 @@ $centros = $stmtCentros->fetchAll();
 // ----------------------------------------------------------------------------
 // 2. RECURSOS OPERATIVOS POR CENTRO (Relación N:M)
 // ----------------------------------------------------------------------------
-// Obtenemos los recursos asignados a cada centro de forma relacional y óptima
 $sqlRecursosAsignados = "SELECT cr.centro_salud_id, ro.id AS recurso_id, ro.codigo, ro.nombre, cr.detalle_capacidad
                          FROM centro_recursos cr
                          INNER JOIN recursos_operativos ro ON ro.id = cr.recurso_id
@@ -62,7 +61,7 @@ while ($row = $stmtRA->fetch()) {
 }
 
 // ----------------------------------------------------------------------------
-// 3. CATÁLOGOS MAESTROS (3FN Parametrizables - Misión 1)
+// 3. CATÁLOGOS MAESTROS PARA POBLAR SELECTS Y CHECKBOXES DINÁMICOS
 // ----------------------------------------------------------------------------
 $tiposCentro = $pdo->query("SELECT id, codigo, nombre FROM tipos_centro_salud ORDER BY id ASC")->fetchAll();
 $catalogoRecursos = $pdo->query("SELECT id, codigo, nombre, descripcion FROM recursos_operativos WHERE activo = 1 ORDER BY id ASC")->fetchAll();
@@ -87,47 +86,23 @@ if ($editarId) {
 }
 
 // ----------------------------------------------------------------------------
-// 5. BITÁCORA FORENSE DE AUDITORÍA (Misión 2 - logs_auditoria)
+// 5. HISTORIAL CONTEXTUAL DE LOGS (Solo para centros visibles en pantalla)
 // ----------------------------------------------------------------------------
-$filtroAccionLog = $_GET['log_accion'] ?? 'todas';
-$busquedaLog = trim($_GET['log_q'] ?? '');
-
-$condicionesLogs = [];
-$paramsLogs = [];
-
-if ($filtroAccionLog !== 'todas' && $filtroAccionLog !== '') {
-    $condicionesLogs[] = 'l.accion = :accion_filtro';
-    $paramsLogs[':accion_filtro'] = $filtroAccionLog;
+$logsPorCentro = [];
+if (!empty($centros)) {
+    $ids = array_column($centros, 'id');
+    $inClause = implode(',', array_map('intval', $ids));
+    $sqlContextLogs = "SELECT log_id, fecha_hora, operador, rol_operador, accion, registro_id, detalles_json, ip_origen
+                       FROM vw_logs_auditoria
+                       WHERE tabla_afectada = 'centros_salud' AND registro_id IN ({$inClause})
+                       ORDER BY log_id DESC";
+    $stmtCtx = $pdo->query($sqlContextLogs);
+    while ($l = $stmtCtx->fetch()) {
+        $logsPorCentro[(int)$l['registro_id']][] = $l;
+    }
 }
 
-if ($busquedaLog !== '') {
-    $condicionesLogs[] = '(l.accion LIKE :lq1 OR l.tabla_afectada LIKE :lq2 OR l.ip_origen LIKE :lq3 OR u.nombre LIKE :lq4 OR CAST(l.registro_id AS CHAR) = :lq5)';
-    $paramsLogs[':lq1'] = '%' . $busquedaLog . '%';
-    $paramsLogs[':lq2'] = '%' . $busquedaLog . '%';
-    $paramsLogs[':lq3'] = '%' . $busquedaLog . '%';
-    $paramsLogs[':lq4'] = '%' . $busquedaLog . '%';
-    $paramsLogs[':lq5'] = $busquedaLog;
-}
-
-$whereLogs = !empty($condicionesLogs) ? 'WHERE ' . implode(' AND ', $condicionesLogs) : '';
-
-$sqlLogs = "SELECT l.id, l.usuario_id, u.nombre AS usuario_nombre, r.nombre AS rol_nombre,
-                   l.accion, l.tabla_afectada, l.registro_id, l.detalles_json, l.ip_origen, l.fecha_hora
-            FROM logs_auditoria l
-            LEFT JOIN usuarios u ON u.id = l.usuario_id
-            LEFT JOIN roles r ON r.id = u.rol_id
-            {$whereLogs}
-            ORDER BY l.id DESC
-            LIMIT 25";
-
-$stmtLogs = $pdo->prepare($sqlLogs);
-$stmtLogs->execute($paramsLogs);
-$logs = $stmtLogs->fetchAll();
-
-// Acciones únicas disponibles para el selector de filtro
-$accionesDisponibles = $pdo->query("SELECT DISTINCT accion FROM logs_auditoria ORDER BY accion ASC")->fetchAll(PDO::FETCH_COLUMN);
-
-// Mapeo visual de iconos para recursos
+// Iconografía para recursos operativos
 function getRecursoIcon(string $codigo): string {
     return match ($codigo) {
         'CADENA_FRIO'   => '❄️',
@@ -149,8 +124,7 @@ $mensajeError = $_GET['error'] ?? null;
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SICM | Red Asistencial y Auditoría Forense</title>
-    <!-- Bootstrap 5 CSS -->
+    <title>SICM | Red de Ambulatorios y Centros de Salud</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
@@ -168,6 +142,25 @@ $mensajeError = $_GET['error'] ?? null;
         .card {
             border-radius: 6px;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07);
+        }
+
+        .nav-link-tech {
+            color: #94a3b8;
+            font-size: 0.82rem;
+            text-decoration: none;
+            padding: 0.25rem 0.65rem;
+            border-radius: 4px;
+        }
+
+        .nav-link-tech:hover {
+            color: #ffffff;
+            background-color: #1e293b;
+        }
+
+        .nav-link-tech.active {
+            color: #38bdf8;
+            background-color: #1e293b;
+            font-weight: 600;
         }
 
         .sicm-code {
@@ -196,7 +189,7 @@ $mensajeError = $_GET['error'] ?? null;
             color: #e2e8f0;
             font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
             font-size: 0.8rem;
-            max-height: 380px;
+            max-height: 350px;
             overflow-y: auto;
             border-radius: 5px;
             padding: 1rem;
@@ -212,17 +205,19 @@ $mensajeError = $_GET['error'] ?? null;
 
 <body>
 
-    <!-- Header Técnico de Alta Densidad -->
+    <!-- Header Técnico de Navegación Unificada -->
     <header class="header-slim text-white py-2 px-3 d-flex justify-content-between align-items-center shadow-sm">
         <div class="d-flex align-items-center gap-3">
             <span class="fw-bold tracking-wide text-info fs-6">SICM-RED</span>
             <span class="text-white-50">|</span>
-            <span class="text-light fw-medium">Sistema Municipal de Salud</span>
-            <span class="badge bg-primary text-uppercase" style="font-size: 0.68rem;">Misión 1: Tablas Maestras N:M</span>
-            <span class="badge bg-success text-uppercase" style="font-size: 0.68rem;">Misión 2: Auditoría Forense</span>
+            <nav class="d-flex gap-1">
+                <a href="index.php" class="nav-link-tech active">🏢 Red de Centros</a>
+                <a href="../maestras/index.php" class="nav-link-tech">⚙️ Tablas Maestras</a>
+                <a href="../auditoria/index.php" class="nav-link-tech">🛡️ Auditoría Forense</a>
+            </nav>
         </div>
         <div class="text-white-50 font-monospace small" style="font-size: 0.76rem;">
-            DB: <span class="text-white">control_medicamentos_red</span> | Motor: <span class="text-white">InnoDB 16KB</span> | Normalización: <span class="text-white">3FN Estricta</span>
+            Vista: <span class="text-white">vw_centros_salud</span> | Arquitectura: <span class="text-white">3FN Relacional N:M</span>
         </div>
     </header>
 
@@ -246,9 +241,6 @@ $mensajeError = $_GET['error'] ?? null;
         <!-- Alerta Dinámica de Validación JS -->
         <div id="alerta-js" class="d-none mb-3"></div>
 
-        <!-- ================================================================ -->
-        <!-- SECCIÓN PRINCIPAL: GESTIÓN DE AMBULATORIOS Y CAPACIDADES N:M    -->
-        <!-- ================================================================ -->
         <div class="row g-3">
             
             <!-- FORMULARIO DE REGISTRO / EDICIÓN -->
@@ -256,7 +248,7 @@ $mensajeError = $_GET['error'] ?? null;
                 <div class="card border">
                     <div class="card-header bg-white text-dark fw-bold border-bottom py-2 px-3 d-flex justify-content-between align-items-center">
                         <span><?= $centroEdicion ? '✏️ Modificar Ambulatorio #' . (int)$centroEdicion['id'] : '➕ Registrar Nuevo Ambulatorio' ?></span>
-                        <span class="badge bg-light text-secondary border">3FN + N:M</span>
+                        <a href="../maestras/index.php" class="badge bg-light text-primary text-decoration-none border" title="Administrar clasificaciones y recursos">⚙️ Configurar Maestras</a>
                     </div>
                     <div class="card-body p-3">
                         <form id="form-centro" action="procesar.php" method="POST" novalidate>
@@ -281,7 +273,10 @@ $mensajeError = $_GET['error'] ?? null;
 
                             <!-- Clasificación Sanitaria (Tabla Maestra 1) -->
                             <div class="mb-2">
-                                <label for="tipo_centro_id" class="form-label small fw-semibold mb-1">Clasificación Sanitaria (Tabla Maestra)</label>
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <label for="tipo_centro_id" class="form-label small fw-semibold mb-0">Clasificación Sanitaria (Tabla Maestra)</label>
+                                    <a href="../maestras/index.php?tab=tipos" class="small text-decoration-none" style="font-size: 0.72rem;">+ Nueva</a>
+                                </div>
                                 <select class="form-select form-select-sm" id="tipo_centro_id" name="tipo_centro_id" required>
                                     <option value="">-- Seleccionar Tipo --</option>
                                     <?php foreach ($tiposCentro as $t): ?>
@@ -330,10 +325,10 @@ $mensajeError = $_GET['error'] ?? null;
                             <div class="mb-3 p-2 bg-light border rounded">
                                 <div class="d-flex justify-content-between align-items-center mb-1">
                                     <span class="small fw-bold text-dark">⚙️ Capacidades y Recursos (N:M)</span>
-                                    <span class="badge bg-secondary" style="font-size: 0.65rem;">Catálogo Dinámico</span>
+                                    <a href="../maestras/index.php?tab=recursos" class="badge bg-secondary text-decoration-none" style="font-size: 0.65rem;">+ Gestionar</a>
                                 </div>
-                                <div class="text-muted small mb-2" style="font-size: 0.74rem;">
-                                    Generado dinámicamente desde <code>recursos_operativos</code> sin tocar código PHP.
+                                <div class="text-muted small mb-2" style="font-size: 0.72rem;">
+                                    Catálogo dinámico desde <code>recursos_operativos</code> adaptable a cualquier empresa.
                                 </div>
                                 
                                 <div class="row g-1">
@@ -376,11 +371,10 @@ $mensajeError = $_GET['error'] ?? null;
                 <div class="card border">
                     <div class="card-header bg-white d-flex justify-content-between align-items-center py-2 px-3 border-bottom">
                         <div class="d-flex align-items-center gap-2">
-                            <span class="fw-bold text-dark fs-6">Red de Ambulatorios Municipales</span>
+                            <span class="fw-bold text-dark fs-6">Red Asistencial Municipal</span>
                             <span class="badge bg-primary rounded-pill"><?= count($centros) ?> centros</span>
                         </div>
                         <div class="d-flex align-items-center gap-2">
-                            <!-- Conmutador de Filtro de Estado -->
                             <div class="btn-group btn-group-sm nav-status" role="group">
                                 <a href="index.php?estado=activos<?= $busquedaCentro !== '' ? '&q=' . urlencode($busquedaCentro) : '' ?>" 
                                    class="btn btn-sm btn-outline-secondary <?= $filtroEstado === 'activos' ? 'active' : '' ?>">
@@ -388,7 +382,7 @@ $mensajeError = $_GET['error'] ?? null;
                                 </a>
                                 <a href="index.php?estado=inactivos<?= $busquedaCentro !== '' ? '&q=' . urlencode($busquedaCentro) : '' ?>" 
                                    class="btn btn-sm btn-outline-secondary <?= $filtroEstado === 'inactivos' ? 'active' : '' ?>">
-                                    Desactivados (Soft Delete)
+                                    Desactivados
                                 </a>
                                 <a href="index.php?estado=todos<?= $busquedaCentro !== '' ? '&q=' . urlencode($busquedaCentro) : '' ?>" 
                                    class="btn btn-sm btn-outline-secondary <?= $filtroEstado === 'todos' ? 'active' : '' ?>">
@@ -396,10 +390,9 @@ $mensajeError = $_GET['error'] ?? null;
                                 </a>
                             </div>
 
-                            <!-- Buscador en Servidor -->
                             <form method="GET" action="index.php" class="d-flex m-0">
                                 <input type="hidden" name="estado" value="<?= htmlspecialchars($filtroEstado) ?>">
-                                <input type="text" name="q" class="form-control form-control-sm" style="width: 180px;"
+                                <input type="text" name="q" class="form-control form-control-sm" style="width: 170px;"
                                     placeholder="Buscar..." value="<?= htmlspecialchars($busquedaCentro) ?>">
                                 <?php if ($busquedaCentro !== ''): ?>
                                     <a href="index.php?estado=<?= htmlspecialchars($filtroEstado) ?>" class="btn btn-outline-secondary btn-sm ms-1" title="Limpiar búsqueda">✕</a>
@@ -414,12 +407,12 @@ $mensajeError = $_GET['error'] ?? null;
                                 <thead class="table-light text-muted small text-uppercase" style="font-size: 0.73rem;">
                                     <tr>
                                         <th style="width: 45px;">ID</th>
-                                        <th style="width: 125px;">Código SICM</th>
+                                        <th style="width: 120px;">Código SICM</th>
                                         <th>Centro y Responsable Sanitario</th>
                                         <th style="width: 140px;">Clasificación</th>
                                         <th>Capacidades Operativas (N:M)</th>
-                                        <th style="width: 90px;">Estado</th>
-                                        <th style="width: 130px;" class="text-end pe-3">Acciones</th>
+                                        <th style="width: 85px;">Estado</th>
+                                        <th style="width: 155px;" class="text-end pe-3">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -433,6 +426,7 @@ $mensajeError = $_GET['error'] ?? null;
                                         <?php foreach ($centros as $c): ?>
                                             <?php 
                                                 $recCentro = $recursosPorCentro[(int)$c['id']] ?? [];
+                                                $logsEsteCentro = $logsPorCentro[(int)$c['id']] ?? [];
                                             ?>
                                             <tr>
                                                 <td class="text-muted fw-bold">#<?= (int)$c['id'] ?></td>
@@ -471,22 +465,33 @@ $mensajeError = $_GET['error'] ?? null;
                                                     <?php if ((int)$c['activo'] === 1): ?>
                                                         <span class="badge bg-success">Operativo</span>
                                                     <?php else: ?>
-                                                        <span class="badge bg-secondary">Inactivo (Soft)</span>
+                                                        <span class="badge bg-secondary">Inactivo</span>
                                                     <?php endif; ?>
                                                 </td>
                                                 <td class="text-end pe-3">
                                                     <div class="d-flex justify-content-end align-items-center gap-1">
+                                                        <!-- BOTÓN CONTEXTUAL PRO: HISTORIAL POR FILA (Misión 2 desacoplada) -->
+                                                        <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2 btn-historial-centro"
+                                                                data-centro-id="<?= (int)$c['id'] ?>"
+                                                                data-centro-nombre="<?= htmlspecialchars($c['nombre']) ?>"
+                                                                data-centro-codigo="<?= htmlspecialchars($c['codigo_sicm']) ?>"
+                                                                data-centro-logs="<?= htmlspecialchars(json_encode($logsEsteCentro, JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') ?>"
+                                                                title="Ver trazabilidad de este registro"
+                                                                style="font-size: 0.74rem;">
+                                                            🕒 Historial (<?= count($logsEsteCentro) ?>)
+                                                        </button>
+
                                                         <a href="index.php?editar=<?= (int)$c['id'] ?>&estado=<?= htmlspecialchars($filtroEstado) ?>" 
-                                                           class="btn btn-outline-primary btn-sm py-0 px-2" style="font-size: 0.78rem;">Editar</a>
+                                                           class="btn btn-outline-primary btn-sm py-0 px-2" style="font-size: 0.74rem;">Editar</a>
                                                         
                                                         <?php if ((int)$c['activo'] === 1): ?>
                                                             <a href="procesar.php?accion=cambiar_estado&id=<?= (int)$c['id'] ?>&estado=0" 
                                                                class="btn btn-link text-danger p-0 small text-decoration-none ms-1"
                                                                onclick="return confirm('¿Desactivar ambulatorio mediante Soft Delete?')"
-                                                               title="Desactivar">Desactivar</a>
+                                                               title="Desactivar">✕</a>
                                                         <?php else: ?>
                                                             <a href="procesar.php?accion=cambiar_estado&id=<?= (int)$c['id'] ?>&estado=1" 
-                                                               class="btn btn-outline-success btn-sm py-0 px-2 ms-1" style="font-size: 0.78rem;"
+                                                               class="btn btn-outline-success btn-sm py-0 px-1 ms-1" style="font-size: 0.74rem;"
                                                                onclick="return confirm('¿Reactivar centro en la red municipal?')"
                                                                title="Reactivar">Reactivar</a>
                                                         <?php endif; ?>
@@ -500,257 +505,139 @@ $mensajeError = $_GET['error'] ?? null;
                         </div>
                     </div>
                     <div class="card-footer bg-light py-2 px-3 text-muted small d-flex justify-content-between align-items-center border-top">
-                        <span><strong>Arquitectura Senior:</strong> Normalización 3FN con tablas maestras dinámicas (<code>tipos_centro_salud</code>, <code>recursos_operativos</code>, <code>centro_recursos</code>).</span>
-                        <span><strong>Integridad:</strong> Cero borrado físico en centros operativos.</span>
+                        <span><strong>Consulta Desacoplada:</strong> Pantalla alimentada por <code>vw_centros_salud</code>. Cero contaminación con logs globales.</span>
+                        <a href="../auditoria/index.php" class="text-decoration-none fw-semibold">🛡️ Ir a Consola Forense Global &rarr;</a>
                     </div>
                 </div>
             </div>
 
-        </div>
-
-        <!-- ================================================================ -->
-        <!-- SECCIÓN INFERIOR: BITÁCORA FORENSE DE AUDITORÍA (MISIÓN 2)       -->
-        <!-- ================================================================ -->
-        <div class="row mt-4">
-            <div class="col-12">
-                <div class="card border border-dark-subtle shadow-sm">
-                    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center py-2 px-3">
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="fs-6 fw-bold">🛡️ Misión 2: Bitácora Forense de Auditoría en Tiempo Real (<code>logs_auditoria</code>)</span>
-                            <span class="badge bg-info text-dark rounded-pill"><?= count($logs) ?> registros recientes</span>
-                        </div>
-                        <div class="d-flex align-items-center gap-2">
-                            <!-- Filtro de Acción -->
-                            <form method="GET" action="index.php" class="d-flex align-items-center gap-1 m-0">
-                                <input type="hidden" name="estado" value="<?= htmlspecialchars($filtroEstado) ?>">
-                                <select name="log_accion" class="form-select form-select-sm" style="width: 170px;" onchange="this.form.submit()">
-                                    <option value="todas">-- Todas las acciones --</option>
-                                    <?php foreach ($accionesDisponibles as $acc): ?>
-                                        <option value="<?= htmlspecialchars($acc) ?>" <?= $filtroAccionLog === $acc ? 'selected' : '' ?>>
-                                            <?= htmlspecialchars($acc) ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                                <input type="text" name="log_q" class="form-control form-control-sm" style="width: 150px;" 
-                                       placeholder="Buscar en logs..." value="<?= htmlspecialchars($busquedaLog) ?>">
-                                <button type="submit" class="btn btn-outline-light btn-sm py-0 px-2">Filtrar</button>
-                                <?php if ($filtroAccionLog !== 'todas' || $busquedaLog !== ''): ?>
-                                    <a href="index.php?estado=<?= htmlspecialchars($filtroEstado) ?>" class="btn btn-outline-secondary btn-sm py-0 px-2 text-white" title="Limpiar filtro">✕</a>
-                                <?php endif; ?>
-                            </form>
-                        </div>
-                    </div>
-
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-hover table-sm align-middle mb-0">
-                                <thead class="table-secondary text-dark small text-uppercase" style="font-size: 0.72rem;">
-                                    <tr>
-                                        <th style="width: 60px;"># Log</th>
-                                        <th style="width: 145px;">Fecha / Hora</th>
-                                        <th style="width: 180px;">Operador Responsable</th>
-                                        <th style="width: 160px;">Acción Auditada</th>
-                                        <th style="width: 140px;">Tabla / ID Afectado</th>
-                                        <th style="width: 110px;">IP Origen</th>
-                                        <th>Snapshot Forense (JSON Estructurado)</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php if (empty($logs)): ?>
-                                        <tr>
-                                            <td colspan="7" class="text-center text-muted py-4">
-                                                No se registraron eventos de auditoría bajo el criterio de búsqueda.
-                                            </td>
-                                        </tr>
-                                    <?php else: ?>
-                                        <?php foreach ($logs as $l): ?>
-                                            <?php 
-                                                // Determinación de badge para la acción
-                                                $accionBadge = match($l['accion']) {
-                                                    'CREAR_CENTRO'      => 'bg-success',
-                                                    'EDITAR_CENTRO'     => 'bg-primary',
-                                                    'DESACTIVAR_CENTRO' => 'bg-danger',
-                                                    'REACTIVAR_CENTRO'  => 'bg-warning text-dark',
-                                                    'INICIALIZAR_SISTEMA' => 'bg-secondary',
-                                                    default             => 'bg-dark'
-                                                };
-                                            ?>
-                                            <tr>
-                                                <td class="font-monospace text-muted fw-bold">#<?= (int)$l['id'] ?></td>
-                                                <td class="small font-monospace"><?= htmlspecialchars($l['fecha_hora']) ?></td>
-                                                <td>
-                                                    <div class="fw-semibold text-dark small"><?= htmlspecialchars($l['usuario_nombre'] ?? 'Sistema Central') ?></div>
-                                                    <span class="badge bg-light text-muted border" style="font-size: 0.65rem;">
-                                                        <?= htmlspecialchars($l['rol_nombre'] ?? 'Trazabilidad Base') ?>
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <span class="badge <?= $accionBadge ?>" style="font-size: 0.72rem;">
-                                                        <?= htmlspecialchars($l['accion']) ?>
-                                                    </span>
-                                                </td>
-                                                <td class="small">
-                                                    <code><?= htmlspecialchars($l['tabla_afectada']) ?></code> 
-                                                    <span class="badge bg-dark-subtle text-dark">#<?= (int)$l['registro_id'] ?></span>
-                                                </td>
-                                                <td>
-                                                    <span class="badge bg-light text-dark font-monospace border"><?= htmlspecialchars($l['ip_origen']) ?></span>
-                                                </td>
-                                                <td>
-                                                    <button type="button" class="btn btn-outline-dark btn-sm py-0 px-2 btn-ver-json"
-                                                            data-log-id="<?= (int)$l['id'] ?>"
-                                                            data-log-accion="<?= htmlspecialchars($l['accion']) ?>"
-                                                            data-log-fecha="<?= htmlspecialchars($l['fecha_hora']) ?>"
-                                                            data-log-ip="<?= htmlspecialchars($l['ip_origen']) ?>"
-                                                            data-log-json="<?= htmlspecialchars($l['detalles_json'] ?? '{}', ENT_QUOTES, 'UTF-8') ?>"
-                                                            style="font-size: 0.74rem;">
-                                                        🔍 Inspeccionar Delta / JSON
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    <div class="card-footer bg-light py-2 px-3 text-muted small d-flex justify-content-between align-items-center border-top">
-                        <span><strong>Principio Forense:</strong> Los logs de auditoría son inmutables (WORM: <em>Write Once, Read Many</em>). No admiten borrado ni edición bajo ningún rol.</span>
-                        <span><strong>JSON Nativo:</strong> Almacena deltas comparativos de estado (antes y después) para peritaje informático.</span>
-                    </div>
-                </div>
-            </div>
         </div>
 
     </div>
 
-    <!-- MODAL DE INSPECCIÓN FORENSE JSON -->
-    <div class="modal fade" id="modalAuditoria" tabindex="-1" aria-labelledby="modalAuditoriaLabel" aria-hidden="true">
+    <!-- MODAL CONTEXTUAL: HISTORIAL FORENSE POR CENTRO (Misión 2 Desacoplada) -->
+    <div class="modal fade" id="modalHistorialCentro" tabindex="-1" aria-labelledby="modalHistorialLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header bg-dark text-white py-2 px-3">
-                    <h6 class="modal-title font-monospace" id="modalAuditoriaLabel">
-                        🔍 Peritaje Forense de Log <span id="modal-log-id" class="text-info">#</span>
+                    <h6 class="modal-title font-monospace" id="modalHistorialLabel">
+                        🕒 Historial Quirúrgico de Auditoría: <span id="modal-hist-codigo" class="text-info"></span>
                     </h6>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-3">
-                    <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
-                        <div>
-                            <span class="text-muted small">Acción:</span> <strong id="modal-log-accion" class="badge bg-primary"></strong>
-                        </div>
-                        <div>
-                            <span class="text-muted small">Fecha / Hora:</span> <code id="modal-log-fecha" class="text-dark"></code>
-                        </div>
-                        <div>
-                            <span class="text-muted small">IP Origen:</span> <code id="modal-log-ip" class="text-dark"></code>
-                        </div>
+                    <div class="mb-2 pb-2 border-bottom">
+                        <span class="text-muted small">Ambulatorio:</span> <strong id="modal-hist-nombre" class="text-dark"></strong>
                     </div>
 
-                    <!-- Pestañas de Vista: Vista Amigable / JSON Crudo -->
-                    <ul class="nav nav-pills mb-2" id="pills-tab" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link active py-1 px-3 small" id="tab-resumen-btn" data-bs-toggle="pill" data-bs-target="#tab-resumen" type="button" role="tab">Resumen Delta</button>
-                        </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link py-1 px-3 small" id="tab-json-btn" data-bs-toggle="pill" data-bs-target="#tab-json" type="button" role="tab">Payload JSON Crudo</button>
-                        </li>
-                    </ul>
+                    <div id="modal-hist-vacio" class="text-center text-muted py-3 d-none">
+                        No hay eventos registrados aún para este ambulatorio.
+                    </div>
 
-                    <div class="tab-content" id="pills-tabContent">
-                        <!-- Pestaña 1: Resumen Delta -->
-                        <div class="tab-pane fade show active" id="tab-resumen" role="tabpanel">
-                            <div id="modal-delta-content" class="p-2 border rounded bg-light" style="max-height: 380px; overflow-y: auto;">
+                    <div id="modal-hist-lista" class="table-responsive">
+                        <table class="table table-bordered table-hover table-sm bg-white mb-0">
+                            <thead class="table-light small text-uppercase" style="font-size: 0.72rem;">
+                                <tr>
+                                    <th style="width: 55px;"># Log</th>
+                                    <th style="width: 145px;">Fecha / Hora</th>
+                                    <th>Operador</th>
+                                    <th style="width: 150px;">Acción</th>
+                                    <th style="width: 110px;">IP Origen</th>
+                                    <th>Detalles / Delta</th>
+                                </tr>
+                            </thead>
+                            <tbody id="modal-hist-tbody">
                                 <!-- Se llena dinámicamente con JS -->
-                            </div>
-                        </div>
-
-                        <!-- Pestaña 2: JSON Crudo -->
-                        <div class="tab-pane fade" id="tab-json" role="tabpanel">
-                            <pre id="modal-log-pre" class="json-preview mb-0"></pre>
-                        </div>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-                <div class="modal-footer py-1 px-3 bg-light">
-                    <span class="text-muted small me-auto">Registro firmado inmutablemente en MariaDB 11.4 InnoDB</span>
+                <div class="modal-footer py-1 px-3 bg-light d-flex justify-content-between">
+                    <a href="../auditoria/index.php" class="small text-decoration-none">Ver auditoría completa de toda la red municipal &rarr;</a>
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- JavaScript Nativo en Cliente para Validación (Sin jQuery, Sin frameworks) -->
+    <!-- JavaScript Nativo -->
     <script src="../public/js/validaciones.js"></script>
-    <!-- Bootstrap 5 Bundle JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Script para el Visor Forense de Logs JSON -->
+    <!-- Script del Modal Contextual de Historial por Fila -->
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const modalEl = document.getElementById('modalAuditoria');
+            const modalEl = document.getElementById('modalHistorialCentro');
             const bsModal = new bootstrap.Modal(modalEl);
 
-            const modalLogId = document.getElementById('modal-log-id');
-            const modalLogAccion = document.getElementById('modal-log-accion');
-            const modalLogFecha = document.getElementById('modal-log-fecha');
-            const modalLogIp = document.getElementById('modal-log-ip');
-            const modalLogPre = document.getElementById('modal-log-pre');
-            const modalDeltaContent = document.getElementById('modal-delta-content');
+            const modalCodigo = document.getElementById('modal-hist-codigo');
+            const modalNombre = document.getElementById('modal-hist-nombre');
+            const tbody = document.getElementById('modal-hist-tbody');
+            const vacioMsg = document.getElementById('modal-hist-vacio');
+            const listaTabla = document.getElementById('modal-hist-lista');
 
-            document.querySelectorAll('.btn-ver-json').forEach(btn => {
+            document.querySelectorAll('.btn-historial-centro').forEach(btn => {
                 btn.addEventListener('click', () => {
-                    const id = btn.getAttribute('data-log-id');
-                    const accion = btn.getAttribute('data-log-accion');
-                    const fecha = btn.getAttribute('data-log-fecha');
-                    const ip = btn.getAttribute('data-log-ip');
-                    const rawJson = btn.getAttribute('data-log-json');
+                    const nombre = btn.getAttribute('data-centro-nombre');
+                    const codigo = btn.getAttribute('data-centro-codigo');
+                    const rawLogs = btn.getAttribute('data-centro-logs');
 
-                    modalLogId.textContent = '#' + id;
-                    modalLogAccion.textContent = accion;
-                    modalLogFecha.textContent = fecha;
-                    modalLogIp.textContent = ip;
+                    modalCodigo.textContent = codigo;
+                    modalNombre.textContent = nombre;
+                    tbody.innerHTML = '';
 
-                    let parsed = {};
+                    let logs = [];
                     try {
-                        parsed = JSON.parse(rawJson);
-                        modalLogPre.textContent = JSON.stringify(parsed, null, 2);
+                        logs = JSON.parse(rawLogs);
                     } catch (e) {
-                        modalLogPre.textContent = rawJson;
+                        logs = [];
                     }
 
-                    // Renderizar Resumen Delta Inteligente
-                    let deltaHtml = '';
-                    if (parsed.evento) {
-                        deltaHtml += `<div class="mb-2"><strong>Descripción del Evento:</strong> <span class="text-primary">${parsed.evento}</span></div>`;
-                    }
-
-                    if (parsed.delta_especifico && Object.keys(parsed.delta_especifico).length > 0) {
-                        deltaHtml += `<div class="table-responsive"><table class="table table-bordered table-sm bg-white mb-2">
-                            <thead class="table-light"><tr><th>Campo Alterado</th><th>Valor Previo</th><th>Nuevo Valor</th></tr></thead><tbody>`;
-                        for (const [campo, vals] of Object.entries(parsed.delta_especifico)) {
-                            deltaHtml += `<tr>
-                                <td><code>${campo}</code></td>
-                                <td class="text-danger">${JSON.stringify(vals.antes)}</td>
-                                <td class="text-success">${JSON.stringify(vals.despues)}</td>
-                            </tr>`;
-                        }
-                        deltaHtml += `</tbody></table></div>`;
-                    } else if (parsed.datos_creados) {
-                        deltaHtml += `<div class="table-responsive"><table class="table table-bordered table-sm bg-white mb-2">
-                            <thead class="table-light"><tr><th>Campo Inicial</th><th>Valor Registrado</th></tr></thead><tbody>`;
-                        for (const [campo, val] of Object.entries(parsed.datos_creados)) {
-                            deltaHtml += `<tr><td><code>${campo}</code></td><td>${JSON.stringify(val)}</td></tr>`;
-                        }
-                        deltaHtml += `</tbody></table></div>`;
-                    } else if (parsed.estado_anterior !== undefined && parsed.nuevo_estado !== undefined) {
-                        deltaHtml += `<div class="alert alert-secondary py-2 small mb-0">
-                            <strong>Cambio de Estado:</strong> Pasó de <code>activo = ${parsed.estado_anterior}</code> a <code>activo = ${parsed.nuevo_estado}</code>.
-                        </div>`;
+                    if (!logs || logs.length === 0) {
+                        vacioMsg.classList.remove('d-none');
+                        listaTabla.classList.add('d-none');
                     } else {
-                        deltaHtml += `<pre class="mb-0 bg-white p-2 border rounded font-monospace small">${JSON.stringify(parsed, null, 2)}</pre>`;
+                        vacioMsg.classList.add('d-none');
+                        listaTabla.classList.remove('d-none');
+
+                        logs.forEach(l => {
+                            let badgeAccion = 'bg-dark';
+                            if (l.accion === 'CREAR_CENTRO') badgeAccion = 'bg-success';
+                            else if (l.accion === 'EDITAR_CENTRO') badgeAccion = 'bg-primary';
+                            else if (l.accion === 'DESACTIVAR_CENTRO') badgeAccion = 'bg-danger';
+                            else if (l.accion === 'REACTIVAR_CENTRO') badgeAccion = 'bg-warning text-dark';
+
+                            let detalles = {};
+                            try {
+                                detalles = JSON.parse(l.detalles_json);
+                            } catch (e) {
+                                detalles = {};
+                            }
+
+                            let infoHtml = '';
+                            if (detalles.evento) {
+                                infoHtml += `<div class="fw-semibold text-primary small">${detalles.evento}</div>`;
+                            }
+                            if (detalles.campos_alterados && detalles.campos_alterados.length > 0) {
+                                infoHtml += `<div class="text-muted small">Campos alterados: <code>${detalles.campos_alterados.join(', ')}</code></div>`;
+                            }
+
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `
+                                <td class="font-monospace fw-bold text-muted">#${l.log_id}</td>
+                                <td class="small font-monospace">${l.fecha_hora}</td>
+                                <td class="small">
+                                    <strong>${l.operador}</strong>
+                                    <span class="badge bg-light text-muted border d-block" style="font-size: 0.65rem;">${l.rol_operador}</span>
+                                </td>
+                                <td><span class="badge ${badgeAccion}" style="font-size: 0.70rem;">${l.accion}</span></td>
+                                <td class="font-monospace small">${l.ip_origen}</td>
+                                <td>${infoHtml || '<span class="text-muted small">Registro estándar</span>'}</td>
+                            `;
+                            tbody.appendChild(tr);
+                        });
                     }
 
-                    modalDeltaContent.innerHTML = deltaHtml;
                     bsModal.show();
                 });
             });
