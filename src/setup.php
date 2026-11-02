@@ -442,13 +442,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
 
             <!-- Opción de Carga de Datos de Demostración (Quick Start) -->
-            <div class="mb-4 p-3 rounded" style="background-color: rgba(30, 41, 59, 0.6); border: 1px solid var(--border-subtle);">
+            <div class="mb-4 p-3 rounded" style="background-color: #1e293b; border: 1px solid #334155;">
                 <div class="form-check m-0">
                     <input class="form-check-input" type="checkbox" name="cargar_demo" id="cargar_demo" checked>
                     <label class="form-check-label text-start" for="cargar_demo">
-                        <span class="d-block fw-semibold text-light" style="font-size: 0.8125rem;">Cargar datos de prueba de la red asistencial</span>
-                        <span class="d-block text-muted mt-1" style="font-size: 0.72rem; line-height: 1.35;">
-                            Puebla 3 ambulatorios iniciales en Mérida y la cuenta de farmaceuta (<span class="font-monospace text-info">farmacia.llano@salud.gob.ve</span> / <span class="font-monospace text-info">farmacia123</span>) para verificar el control de acceso (RBAC).
+                        <span class="d-block fw-semibold" style="color: #f8fafc; font-size: 0.825rem;">Cargar datos de prueba de la red asistencial</span>
+                        <span class="d-block mt-1" style="color: #cbd5e1; font-size: 0.74rem; line-height: 1.4;">
+                            Puebla 3 ambulatorios iniciales en Mérida y la cuenta de farmaceuta (<span class="font-monospace" style="color: #38bdf8; font-weight: 600;">farmacia.llano@salud.gob.ve</span> / <span class="font-monospace" style="color: #38bdf8; font-weight: 600;">farmacia123</span>) para verificar el control de acceso (RBAC).
                         </span>
                     </label>
                 </div>
