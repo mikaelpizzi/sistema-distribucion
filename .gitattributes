@@ -1,0 +1,4 @@
+# Normalización de saltos de línea para interoperabilidad multiplataforma (Windows / Linux / Docker)
+*.sh text eol=lf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
