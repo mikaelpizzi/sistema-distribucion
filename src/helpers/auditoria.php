@@ -39,3 +39,33 @@ function registrarAuditoria(
     }
 }
 
+/**
+ * Genera un resumen legible del Agente de Usuario (Navegador y Sistema Operativo).
+ */
+function resumirUserAgent(?string $ua): string
+{
+    if (!$ua || in_array($ua, ['CLI / Local', 'CLI/Cron'], true)) {
+        return 'Consola / CLI';
+    }
+
+    $os = 'SO';
+    if (str_contains($ua, 'Windows NT 10.0')) $os = 'Windows 10/11';
+    elseif (str_contains($ua, 'Windows')) $os = 'Windows';
+    elseif (str_contains($ua, 'Macintosh') || str_contains($ua, 'Mac OS')) $os = 'macOS';
+    elseif (str_contains($ua, 'Android')) $os = 'Android';
+    elseif (str_contains($ua, 'iPhone') || str_contains($ua, 'iPad')) $os = 'iOS';
+    elseif (str_contains($ua, 'Linux')) $os = 'Linux';
+
+    $browser = 'Navegador';
+    if (str_contains($ua, 'Edg/')) $browser = 'Edge';
+    elseif (str_contains($ua, 'Chrome/') && !str_contains($ua, 'Edg/')) $browser = 'Chrome';
+    elseif (str_contains($ua, 'Firefox/')) $browser = 'Firefox';
+    elseif (str_contains($ua, 'Safari/') && !str_contains($ua, 'Chrome')) $browser = 'Safari';
+    elseif (str_contains($ua, 'curl/')) $browser = 'cURL';
+    elseif (str_contains($ua, 'Postman')) $browser = 'Postman';
+    elseif (str_contains($ua, 'python')) $browser = 'Python';
+
+    return "{$browser} ({$os})";
+}
+
+

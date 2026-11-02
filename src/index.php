@@ -5,6 +5,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/helpers/auth.php';
+require_once __DIR__ . '/helpers/auditoria.php';
 
 $pdo = getDB();
 $usuario = requerirAutenticacion($pdo);
@@ -948,7 +949,7 @@ if ($tabActiva === 'centros') {
             <div class="row g-2 mb-3">
                 <div class="col-6 col-md-3">
                     <div class="card-sicm p-2 text-center">
-                        <span class="text-muted small" style="font-size: 0.72rem;">Total Registros WORM</span>
+                        <span class="text-muted small" style="font-size: 0.72rem;">Total Registros</span>
                         <div class="fs-5 fw-bold text-dark font-monospace"><?= number_format((int)$kpisLogs['total']) ?></div>
                     </div>
                 </div>
@@ -1047,7 +1048,6 @@ if ($tabActiva === 'centros') {
                         <span>Bitácora de Trazabilidad</span>
                         <span class="text-muted small fw-normal ms-2">(Mostrando <?= count($logs) ?> de <?= number_format($totalFiltrados) ?> eventos)</span>
                     </div>
-                    <span class="badge bg-secondary-subtle text-secondary small font-monospace" style="font-size: 0.68rem;">WORM Inmutable</span>
                 </div>
                 <div class="table-responsive">
                     <table class="table table-hover table-sm table-sicm mb-0">
@@ -1128,9 +1128,18 @@ if ($tabActiva === 'centros') {
                                         </td>
                                         <td><span class="code-tag"><?= htmlspecialchars($l['ip_origen']) ?></span></td>
                                         <td>
-                                            <span class="text-truncate d-inline-block small text-muted font-monospace" style="max-width: 150px;" title="<?= htmlspecialchars($l['user_agent'] ?? '') ?>">
-                                                <?= htmlspecialchars($l['user_agent'] ?? 'CLI / Local') ?>
-                                            </span>
+                                            <?php
+                                            $uaRaw = $l['user_agent'] ?? 'CLI / Local';
+                                            $uaResumen = resumirUserAgent($uaRaw);
+                                            ?>
+                                            <div class="d-flex flex-column" title="<?= htmlspecialchars($uaRaw) ?>">
+                                                <span class="fw-semibold text-dark" style="font-size: 0.76rem;">
+                                                    <?= htmlspecialchars($uaResumen) ?>
+                                                </span>
+                                                <span class="text-muted text-truncate font-monospace" style="max-width: 220px; font-size: 0.68rem;" title="<?= htmlspecialchars($uaRaw) ?>">
+                                                    <?= htmlspecialchars($uaRaw) ?>
+                                                </span>
+                                            </div>
                                         </td>
                                         <td class="text-end pe-3">
                                             <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2 btn-ver-json"
@@ -1244,8 +1253,17 @@ if ($tabActiva === 'centros') {
                                 <span class="text-muted">Acción:</span> <span id="mj-badge-accion" class="badge bg-primary"></span>
                                 <span class="text-muted ms-2">Tabla:</span> <code id="mj-tabla"></code> <span id="mj-registro" class="text-muted"></span>
                             </div>
-                            <div class="col-sm-6 text-truncate" id="mj-ua-wrap">
-                                <span class="text-muted">IP / Cliente:</span> <code id="mj-ip"></code> &bull; <span id="mj-ua" class="text-muted font-monospace"></span>
+                            <div class="col-sm-6">
+                                <span class="text-muted">Dirección IP:</span> <code id="mj-ip" class="font-monospace fw-semibold"></code>
+                            </div>
+                            <div class="col-12 mt-2 pt-2 border-top">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="text-muted fw-semibold" style="font-size: 0.72rem;">Agente de Usuario / Cliente (Navegador):</span>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" id="btn-copy-ua" style="font-size: 0.68rem;" title="Copiar User-Agent completo">
+                                        Copiar
+                                    </button>
+                                </div>
+                                <div id="mj-ua" class="p-2 bg-white border rounded font-monospace small text-break user-select-all" style="font-size: 0.74rem; max-height: 80px; overflow-y: auto; color: #1e293b; line-height: 1.4;"></div>
                             </div>
                         </div>
                     </div>
@@ -1283,7 +1301,7 @@ if ($tabActiva === 'centros') {
                     <!-- Acordeón para Inspeccionar JSON Crudo -->
                     <details class="mt-2">
                         <summary class="text-muted small cursor-pointer user-select-none" style="cursor: pointer;">
-                            &#9654; Inspeccionar Payload JSON Crudo (Almacenado en MariaDB)
+                            &#9654; Inspeccionar Payload JSON Crudo
                         </summary>
                         <pre id="mj-contenido" class="json-viewer mt-2 p-2 bg-dark text-light rounded small font-monospace" style="max-height: 220px; overflow-y: auto;"></pre>
                     </details>
@@ -1371,8 +1389,17 @@ if ($tabActiva === 'centros') {
                         document.getElementById('mj-tabla').textContent = tabla;
                         document.getElementById('mj-registro').textContent = registro ? `(ID #${registro})` : '';
                         document.getElementById('mj-ip').textContent = ip;
-                        document.getElementById('mj-ua').textContent = ua.length > 35 ? ua.substring(0, 35) + '...' : ua;
-                        document.getElementById('mj-ua-wrap').setAttribute('title', ua);
+                        const uaElem = document.getElementById('mj-ua');
+                        uaElem.textContent = ua || 'CLI / Local';
+                        const copyUaBtn = document.getElementById('btn-copy-ua');
+                        if (copyUaBtn) {
+                            copyUaBtn.onclick = () => {
+                                navigator.clipboard.writeText(uaElem.textContent);
+                                const orig = copyUaBtn.textContent;
+                                copyUaBtn.textContent = '¡Copiado!';
+                                setTimeout(() => { copyUaBtn.textContent = orig; }, 1500);
+                            };
+                        }
 
                         const badge = document.getElementById('mj-badge-accion');
                         badge.textContent = accion;
