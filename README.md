@@ -64,9 +64,7 @@ sistema-distribucion/
 │   │   └── js/
 │   │       └── validaciones.js       # Validaciones nativas en cliente (Vanilla JS)
 │   ├── scripts/
-│   │   ├── test_auth.php             # Test automatizado de hashing Bcrypt, login y RBAC
-│   │   ├── test_crud.php             # Test unitario idempotente del flujo CRUD + logs
-│   │   ├── test_maestras.php         # Test unitario de parametrización en 3FN
+│   │   ├── reset_quickstart.php      # Reinicio de entorno para demostraciones del Quick Start
 │   │   └── poblar_medicamentos.php   # Generador masivo por lotes (Batch Multi-Row)
 │   ├── index.php                     # Dashboard Unificado (Ambulatorios, Catálogos, Operadores y Bitácora)
 │   ├── login.php                     # Inicio de sesión sobrio con selector de seed bajo demanda
@@ -141,33 +139,26 @@ Si durante el Quick Start mantuviste activa la casilla de datos de prueba (o car
 
 ---
 
-## 5. Batería de Pruebas Automatizadas
+## 5. Herramientas de Carga Masiva y Demostración
 
-El sistema incluye scripts de verificación idempotentes para certificar la autenticación, integridad referencial y auditoría:
+El sistema incluye utilidades CLI para pruebas de rendimiento y restablecimiento de entornos de demostración:
 
-### 1. Test de Autenticación, Hashing Bcrypt y Aislamiento RBAC:
-```bash
-docker exec salud_php_apache php /var/www/html/scripts/test_auth.php
-```
-
-### 2. Test del Flujo CRUD y Auditoría Forense:
-```bash
-docker exec salud_php_apache php /var/www/html/scripts/test_crud.php
-```
-
-### 3. Test de Catálogos Maestros (3FN):
-```bash
-docker exec salud_php_apache php /var/www/html/scripts/test_maestras.php
-```
-
-### 4. Generación Masiva por Lotes (Prueba de Carga en InnoDB):
+### 1. Generación Masiva por Lotes (Prueba de Rendimiento e I/O en InnoDB 16 KB):
+Inserta medicamentos en bloques transaccionales de 500 registros con `INSERT ... VALUES (...), (...)` para medir velocidad de inserción y densidad por página:
 ```bash
 docker exec salud_php_apache php /var/www/html/scripts/poblar_medicamentos.php 1000
 ```
 
-### 5. Limpieza de Registros de Prueba:
+### 2. Limpieza de Registros de Prueba:
+Elimina los datos generados durante pruebas de carga y restablece el contador de autoincremento:
 ```bash
 docker exec salud_php_apache php /var/www/html/scripts/poblar_medicamentos.php --limpiar
+```
+
+### 3. Restablecimiento para Demostración en Vivo (Quick Start):
+Vacia la base de datos a 0 usuarios y restaura los catálogos maestros canónicos para ejecutar el Asistente de Primer Arranque (`setup.php`):
+```powershell
+.\reset_quickstart.bat
 ```
 
 ---

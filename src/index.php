@@ -370,7 +370,7 @@ if ($tabActiva === 'centros') {
                                     </div>
 
                                     <div class="mb-2">
-                                        <label for="tipo_centro_id" class="form-label small fw-semibold mb-1">Clasificación Asistencial (3FN)</label>
+                                        <label for="tipo_centro_id" class="form-label small fw-semibold mb-1">Clasificación Asistencial</label>
                                         <select class="form-select form-select-sm" id="tipo_centro_id" name="tipo_centro_id" required>
                                             <option value="">-- Seleccionar --</option>
                                             <?php foreach ($tiposCentro as $t): ?>
@@ -794,7 +794,7 @@ if ($tabActiva === 'centros') {
                                 </div>
 
                                 <div class="mb-2">
-                                    <label for="u_rol_id" class="form-label small fw-semibold mb-1">Rol Operativo (3FN)</label>
+                                    <label for="u_rol_id" class="form-label small fw-semibold mb-1">Rol Operativo</label>
                                     <select class="form-select form-select-sm" id="u_rol_id" name="rol_id" required>
                                         <option value="">-- Seleccionar Rol --</option>
                                         <?php foreach ($rolesCatalogo as $ro): ?>
@@ -987,8 +987,8 @@ if ($tabActiva === 'centros') {
             <div class="card-sicm mb-3 p-3 bg-light border">
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                     <div>
-                        <span class="fw-bold text-dark fs-6">Continuidad Operativa y Copias de Seguridad</span>
-                        <div class="text-muted small">Política de resguardo continuo y recuperación ante incidentes de la red municipal de salud.</div>
+                        <span class="fw-bold text-dark fs-6">Copias de Seguridad y Resguardo</span>
+                        <div class="text-muted small">Generación y descarga de respaldos de la red asistencial municipal para continuidad del servicio.</div>
                     </div>
                     <div class="d-flex gap-2">
                         <a href="procesar.php?accion=descargar_respaldo" class="btn btn-primary btn-sm px-3 shadow-sm fw-medium">
@@ -998,16 +998,16 @@ if ($tabActiva === 'centros') {
                 </div>
                 <div class="row g-2 pt-2 border-top small text-secondary">
                     <div class="col-md-4">
-                        <strong class="d-block text-dark mb-1">Respaldo en Caliente</strong>
-                        Generación transaccional completa sin interrupción del servicio en los ambulatorios ni bloqueo de operaciones.
+                        <strong class="d-block text-dark mb-1">Disponibilidad Continua</strong>
+                        Generación transaccional sin interrumpir la atención médica ni bloquear consultas en los ambulatorios.
                     </div>
                     <div class="col-md-4">
-                        <strong class="d-block text-dark mb-1">Automatización y Resguardo</strong>
-                        Rutinas programadas con verificación de integridad SHA-256 y política de retención para resguardo forense.
+                        <strong class="d-block text-dark mb-1">Copia Integral Comprimida</strong>
+                        Descarga inmediata de toda la información histórica, configuraciones y registros de la red de salud.
                     </div>
                     <div class="col-md-4">
-                        <strong class="d-block text-dark mb-1">Auditoría de Descarga</strong>
-                        Cada exportación manual o programada queda registrada con operador, marca temporal e IP en la bitácora inmutable.
+                        <strong class="d-block text-dark mb-1">Trazabilidad de Resguardo</strong>
+                        Cada descarga queda registrada con fecha, hora y funcionario responsable en la bitácora institucional.
                     </div>
                 </div>
             </div>

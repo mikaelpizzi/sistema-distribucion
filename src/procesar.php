@@ -186,7 +186,7 @@ try {
                 ]);
 
                 $pdo->commit();
-                header('Location: index.php?tab=centros&msg=' . urlencode("Ambulatorio #{$id} actualizado con trazabilidad forense."));
+                header('Location: index.php?tab=centros&msg=' . urlencode("Ambulatorio #{$id} actualizado."));
                 exit;
             }
             break;
@@ -474,7 +474,7 @@ try {
                 ]);
 
                 $pdo->commit();
-                header('Location: index.php?tab=usuarios&msg=' . urlencode("Perfil del operador #{$id} actualizado con trazabilidad forense."));
+                header('Location: index.php?tab=usuarios&msg=' . urlencode("Perfil del operador #{$id} actualizado."));
                 exit;
             }
             break;
