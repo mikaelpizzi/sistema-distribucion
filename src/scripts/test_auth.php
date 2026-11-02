@@ -115,7 +115,10 @@ echo "6. [OK] Aislamiento de Jurisdicción (RBAC): El farmaceuta solo tiene visi
 
 // Limpieza de prueba
 $pdo->prepare("DELETE FROM usuarios WHERE id = :id")->execute([':id' => $newUserId]);
-echo "7. [OK] Limpieza: Usuario de prueba temporal eliminado.\n";
+if ($creoFarmaTemp) {
+    $pdo->prepare("DELETE FROM usuarios WHERE email = :e")->execute([':e' => 'farmacia.test@salud.prueba.ve']);
+}
+echo "7. [OK] Limpieza: Usuarios de prueba temporales eliminados.\n";
 
 echo "=================================================================\n";
 echo "  RESULTADO: 100% DE PRUEBAS DE AUTENTICACIÓN COMPLETADAS         \n";
