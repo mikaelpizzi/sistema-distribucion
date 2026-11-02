@@ -1,37 +1,127 @@
 # Sistema Integrado de Control de Medicamentos
 
-> **Red Municipal de Salud | Proyecto de Bases de Datos**  
+> **Red de Salud Pública Municipal | Proyecto de Bases de Datos**  
 > **Estudiante:** Mikael Pizzi (C.I. 27.777.243)  
-> **Motor RDBMS:** MariaDB 11.4 / MySQL 8.0 (Storage Engine: InnoDB)  
-> **Stack Tecnológico:** PHP 8.3 (Nativo / PDO) + Vanilla JavaScript (ES6+) + CSS3 / Bootstrap 5 + Docker  
+> **Base de Datos:** `control_medicamentos_red`  
+> **Motor RDBMS:** MariaDB 11.4 / MySQL 8.0 (Motor de Almacenamiento: InnoDB)  
+> **Stack de Desarrollo:** PHP 8.3 (Nativo / PDO) + Vanilla JavaScript (ES6+) + CSS3 / Bootstrap 5 + Docker  
 
 ---
 
 ## 1. Descripción del Proyecto
 
-El **Sistema Integrado de Control de Medicamentos** es una plataforma de ingeniería de datos y salud pública diseñada para regular y auditar la dispensación de tratamientos crónicos en la red de ambulatorios municipales.
+El **Sistema Integrado de Control de Medicamentos** es una solución de ingeniería de datos y salud pública concebida para regular, auditar y fiscalizar la distribución de medicamentos para patologías crónicas en la red de ambulatorios municipales.
 
-El sistema resuelve tres desafíos críticos mediante restricciones y arquitectura en el motor de base de datos:
-1. **Control de merma por caducidad (Estrategia FEFO):** Despacho obligatorio del lote con fecha de vencimiento más próxima (*First Expired, First Out*).
-2. **Candado transaccional contra retiros duplicados:** Bloqueo a nivel de motor RDBMS mediante clave única compuesta (`UNIQUE KEY (tratamiento_id, periodo_mes_anio)`), inmune a condiciones de carrera (*Race Conditions*) entre sedes.
-3. **Trazabilidad sanitaria sin borrado destructivo:** Prohibición estricta de *Hard Delete* en entidades operativas y transaccionales, implementando *Soft Delete* (`activo = 0`) y auditoría forense inmutable (`logs_auditoria`).
+El sistema fue diseñado respondiendo a tres problemáticas críticas detectadas en la gestión sanitaria municipal:
+1. **Control de merma por caducidad (Estrategia FEFO):** Despacho obligatorio del lote con fecha de caducidad más cercana (*First Expired, First Out*) para evitar pérdidas de insumos en los depósitos de los ambulatorios.
+2. **Bloqueo transaccional contra doble retiro mensual:** Restricción a nivel de motor de base de datos que impide de forma estricta que un paciente retire dos veces su tratamiento en el mismo mes calendario en centros de salud diferentes.
+3. **Trazabilidad sanitaria sin borrado destructivo:** Prohibición absoluta de eliminación física (*Hard Delete*), implementando borrado lógico (*Soft Delete*) en entidades operativas y bitácora forense estrictamente inmutable (*WORM*) para auditoría de contraloría sanitaria.
 
 ---
 
-## 2. Decisiones de Arquitectura de Datos (ADR)
+## 2. Implementación del Esquema de Datos y Correspondencia con la Propuesta
 
-* **Normalización en Tercera Forma Normal (3FN):**  
-  Se eliminaron dependencias transitivas y multivaluadas mediante catálogos maestros (`tipos_centro_salud`, `recursos_operativos`, `formas_farmaceuticas`, `tipos_documento`, `roles`). Se prohíbe el uso de tipos `ENUM` para clasificaciones operativas, evitando bloqueos físicos de tabla (*Metadata Locks / ALTER TABLE*) en producción.
-* **Eficiencia en Páginas de Disco (InnoDB 16 KB):**  
-  Ancho de fila compacto y tipos atómicos para maximizar la densidad de tuplas por página en el *Buffer Pool* y minimizar operaciones de Entrada/Salida (I/O).
-* **Vistas SQL como Capa de Abstracción:**  
-  Las consultas se exponen mediante vistas desacopladas (`vw_centros_salud`, `vw_logs_auditoria`), permitiendo al backend consultar directamente tablas virtuales sin acoplarse al DDL físico.
-* **Índice Compuesto FEFO (Regla de Izquierda a Derecha):**  
-  Índice en árbol B+ `(centro_salud_id, medicamento_id, fecha_vencimiento ASC)` para resolver la selección del lote en tiempo logarítmico $\mathcal{O}(\log N)$, evitando escaneo secuencial (*Full Table Scan*).
-* **Auditoría Forense Integral (No Repudio):**  
-  Cada mutación (`CREAR`, `EDITAR`, `DESACTIVAR`, `REACTIVAR`) almacena operador responsable, IP de origen, timestamp y snapshot JSON con el delta de los campos alterados.
-* **Política de Auto-Registro:**  
-  **Deshabilitada por diseño.** Al tratarse de un sistema cerrado municipal para fiscalización de recursos públicos, el alta de operadores es potestad exclusiva del Administrador Central.
+El esquema DDL implementado en [`docker/mysql/01_schema.sql`](file:///c:/Users/mikae/OneDrive/Documentos/GitHub/sistema-distribucion/docker/mysql/01_schema.sql) sigue con exactitud la propuesta arquitectónica original, cumpliendo con la Tercera Forma Normal (3FN), integridad referencial y las políticas forenses definidas para el proyecto.
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│ 1. CATÁLOGOS MAESTROS 3FN                                                  │
+│ roles ── tipos_documento ── formas_farmaceuticas ── tipos_centro_salud    │
+└──────────────┬─────────────────────────────────────────────┬───────────────┘
+               │                                             │
+               ▼                                             ▼
+┌──────────────────────────────┐              ┌──────────────────────────────┐
+│ 2. SEGURIDAD Y OPERADORES    │              │ 3. RED DE AMBULATORIOS       │
+│ usuarios                     │              │ centros_salud ◄─► recursos   │
+│ (RBAC / Jurisdicción)        │              │ (Relación N:M centro_recursos│
+└──────────────┬───────────────┘              └──────────────┬───────────────┘
+               │                                             │
+               │         ┌───────────────────────────────────┤
+               │         ▼                                   │
+┌──────────────┴────────────────────────┐                    │
+│ 4. CATÁLOGO FARMACÉUTICO Y ALMACÉN    │                    │
+│ medicamentos ◄─── lotes_inventario ───┼────────────────────┘
+│                   (Índice FEFO B+)    │
+└────────────────────────┬──────────────┘
+                         │
+                         ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│ 5. DISPENSACIÓN Y CANDADO TRANSACCIONAL                                    │
+│ pacientes ──► tratamientos_autorizados ──► despachos ──► despacho_detalles │
+│ (Padrón Único)  (Cuota Mensual Récipe)      (UNIQUE KEY)  (Desglose 1FN)   │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 2.1. Módulo de Catálogos Maestros y Parametrización (3FN)
+* **Tablas:** `roles`, `tipos_documento`, `formas_farmaceuticas`, `tipos_centro_salud`, `recursos_operativos`.
+* **Criterio adoptado:** Se normalizó la clasificación asistencial y los tipos de documentos en tablas independientes.
+* **Alternativa descartada:** Uso de columnas estáticas tipo `ENUM('admin', 'farmaceuta')` o `ENUM('Ambulatorio I', 'Ambulatorio II')`.
+* **Justificación técnica:** Los `ENUM` queman la estructura relacional. Incorporar una nueva clasificación o rol en un entorno en producción exigiría ejecutar un `ALTER TABLE`, bloqueando la tabla físicamente (*Metadata Lock*). La normalización en 3FN permite incorporar clasificaciones en caliente mediante simples sentencias `INSERT`.
+
+### 2.2. Módulo de Seguridad, Operadores y Acceso RBAC
+* **Tabla:** `usuarios`.
+* **Columnas clave:** `id` (PK), `email` (UNIQUE), `password_hash`, `rol_id` (FK), `centro_salud_id` (FK, NULLable), `activo` (TINYINT).
+* **Criterio adoptado:** Cada despacho y lote almacena el identificador del operador responsable (`usuario_id`). La columna `centro_salud_id` actúa como delimitador de jurisdicción: es `NULL` para el Administrador Central (acceso global a la red) y toma un valor entero no nulo para el Farmaceuta, restringiendo sus consultas estrictamente a su ambulatorio de adscripción.
+* **Política de borrado:** Borrado lógico (*Soft Delete*) mediante `activo = 0` para preservar la auditoría histórica de los despachos despachados por dicho operador.
+
+### 2.3. Módulo de Red de Ambulatorios y Relación N:M
+* **Tablas:** `centros_salud`, `centro_recursos`, `recursos_operativos`.
+* **Criterio adoptado:** Separación de las capacidades e instalaciones técnicas (cadena de frío, generador eléctrico, farmacia 24h, ambulancia) a través de la tabla puente `centro_recursos` con clave primaria compuesta `(centro_salud_id, recurso_id)`.
+* **Justificación técnica:** Cumplimiento de la 1FN al evitar columnas multivaluadas o banderas booleanas agregadas horizontalmente en la tabla principal del centro de salud.
+
+### 2.4. Módulo de Almacén y Control de Mermas (Estrategia FEFO)
+* **Tablas:** `medicamentos` y `lotes_inventario`.
+* **Columnas clave:** `centro_salud_id`, `medicamento_id`, `numero_lote`, `fecha_vencimiento`, `cantidad_actual` con restricción `CHECK (cantidad_actual >= 0)`.
+* **Índice B+ Tree compuesto:**
+  ```sql
+  INDEX idx_inventario_fefo (centro_salud_id, medicamento_id, fecha_vencimiento ASC);
+  ```
+* **Criterio adoptado:** Existencias descentralizadas por centro y segregadas por lote físico. El índice compuesto permite resolver la consulta del lote con caducidad más cercana en tiempo logarítmico $\mathcal{O}(\log N)$, cumpliendo la regla de izquierda a derecha sin escaneo secuencial (*Full Table Scan*).
+* **Alternativa descartada:** Manejar una columna acumulativa `stock_total INT` en la tabla de medicamentos.
+* **Justificación técnica:** Un número acumulado destruye la trazabilidad por lote, imposibilitando identificar cuáles frascos vencen primero y generando pérdidas millonarias por caducidad en anaqueles.
+
+### 2.5. Módulo de Récipes y Delimitación de Alcance
+* **Tablas:** `pacientes` y `tratamientos_autorizados`.
+* **Criterio adoptado:** Conecta al paciente con su fármaco prescrito y fija una cuota mensual estricta (`dosis_mensual INT NOT NULL CHECK (dosis_mensual > 0)`), además de la vigencia del récipe físico (`fecha_vencimiento_recipe DATE`).
+* **Delimitación:** El sistema acota su alcance a la transcripción del récipe presentado para el suministro equitativo de recursos. Se descartó modelar historias clínicas completas o consultas médicas complejas para evitar sobredimensionar el proyecto y desviar el objetivo de control de suministros.
+
+### 2.6. Módulo de Entrega y Bloqueo de Doble Retiro (1FN)
+* **Tablas:** `despachos` (Cabecera) y `despacho_detalles` (Desglose de Lotes).
+* **Restricción de integridad clave:**
+  ```sql
+  UNIQUE KEY uk_retiro_mensual (tratamiento_id, periodo_mes_anio);
+  ```
+* **Criterio adoptado:**
+  1. **Bloqueo a nivel de base de datos:** La clave única compuesta `(tratamiento_id, periodo_mes_anio)` impide físicamente que un paciente retire dos veces en el mismo período mensual (ej. `'2026-11'`), incluso si acude a ambulatorios distintos de la red.
+  2. **Cumplimiento de 1FN:** Una entrega puede requerir unidades de dos lotes distintos para completar la dosis mensual autorizada (ej. 10 tabletas de un lote por caducar y 20 de un lote nuevo). La división en cabecera y detalle garantiza atomicidad sin listas concatenadas.
+* **Alternativa descartada:** Validar el doble retiro únicamente mediante código backend (PHP).
+* **Justificación técnica:** La validación en software es susceptible a condiciones de carrera (*Race Conditions*): si dos ambulatorios registran peticiones simultáneas, ambas superarían la verificación de software antes de guardar. Al delegar la restricción al motor RDBMS, la consistencia transaccional ACID es absoluta.
+
+### 2.7. Módulo de Auditoría Forense Inmutable (WORM)
+* **Tabla:** `logs_auditoria`.
+* **Triggers de seguridad a nivel de motor:**
+  ```sql
+  DELIMITER $$
+  CREATE TRIGGER trg_bloquear_update_logs
+  BEFORE UPDATE ON logs_auditoria FOR EACH ROW
+  BEGIN
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Integridad Forense Violada: La tabla logs_auditoria es estrictamente inmutable (WORM). No se permiten modificaciones.';
+  END$$
+
+  CREATE TRIGGER trg_bloquear_delete_logs
+  BEFORE DELETE ON logs_auditoria FOR EACH ROW
+  BEGIN
+      SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Integridad Forense Violada: La tabla logs_auditoria es estrictamente inmutable (WORM). No se permiten eliminaciones físicas.';
+  END$$
+  DELIMITER ;
+  ```
+* **Criterio adoptado:** Modelo *Write Once, Read Many*. Cada mutación en la base de datos almacena el operador, dirección IP, agente de usuario y un delta estructurado en formato JSON con los valores anteriores y posteriores. Ningún usuario ni proceso tiene privilegios para alterar o purgar esta bitácora.
+
+### 2.8. Vistas SQL como Capa de Abstracción
+* **Vistas implementadas:** `vw_centros_salud` y `vw_logs_auditoria`.
+* **Criterio adoptado:** El backend consulta directamente estas tablas virtuales, desacoplando la lógica de negocio de los `JOIN` relacionales subyacentes.
 
 ---
 
@@ -41,56 +131,61 @@ El sistema resuelve tres desafíos críticos mediante restricciones y arquitectu
 sistema-distribucion/
 ├── docker/
 │   ├── mysql/
-│   │   ├── 01_schema.sql             # Esquema DDL en 3FN, vistas e índices B+
-│   │   └── 02_seeders.sql            # Datos maestros iniciales y usuarios de prueba
+│   │   ├── 01_schema.sql             # Esquema DDL en 3FN, índices B+, vistas y triggers WORM
+│   │   └── 02_seeders.sql            # Datos maestros canónicos y cuentas operativas iniciales
 │   └── php/
-│       └── Dockerfile                # Imagen PHP 8.3 Apache con extensiones PDO y mariadb-client
-├── docker-compose.yml                # Orquestación de servicios en red interna
-├── respaldos/                        # Almacenamiento local de copias (.sql.gz + .sha256) [GitIgnored]
+│       └── Dockerfile                # Imagen PHP 8.3 Apache con PDO y cliente MariaDB
+├── docker-compose.yml                # Orquestación de contenedores y red interna bridge
+├── respaldos/                        # Directorio local de copias de seguridad (.sql.gz) [GitIgnored]
 ├── scripts/
-│   ├── daemon_respaldo.sh            # Demonio Cron automatizado (Bash/Linux/WSL)
-│   ├── daemon_respaldo.ps1           # Script de respaldo automatizado para Windows PowerShell
-│   ├── restaurar.sh                  # Restauración con certificación criptográfica SHA-256
-│   └── poblar_medicamentos.php       # Proxy CLI para ejecuciones directas
+│   ├── daemon_respaldo.sh            # Demonio automatizado de respaldo para entornos Unix / WSL
+│   ├── daemon_respaldo.ps1           # Demonio automatizado de respaldo para Windows PowerShell
+│   ├── restaurar.sh                  # Restauración certificada con validación criptográfica SHA-256
+│   ├── reset_quickstart.php          # Motor PHP para restablecimiento canónico de base de datos
+│   └── poblar_medicamentos.php       # Generador de carga masiva para pruebas de rendimiento
 ├── src/
 │   ├── config/
-│   │   └── database.php              # Conexión nativa PDO con reintentos y excepciones
+│   │   └── database.php              # Conexión nativa PDO con control de excepciones y sin emulación
 │   ├── helpers/
-│   │   ├── auth.php                  # Guardián de autenticación, sesiones y control RBAC
-│   │   └── auditoria.php             # Módulo forense para registro inmutable WORM en BD
+│   │   ├── auth.php                  # Autenticación, sesiones y control de acceso por roles (RBAC)
+│   │   └── auditoria.php             # Funciones de trazabilidad inmutable y resolución de deltas
 │   ├── public/
 │   │   ├── css/
-│   │   │   └── app.css               # Estilos de interfaz sobrios y de alta densidad asistencial
+│   │   │   └── app.css               # Hoja de estilos de interfaz asistencial responsiva
 │   │   └── js/
-│   │       └── validaciones.js       # Validaciones nativas en cliente (Vanilla JS)
+│   │       └── validaciones.js       # Validación preventiva y sanitización en cliente (Vanilla JS)
 │   ├── scripts/
-│   │   ├── reset_quickstart.php      # Reinicio de entorno para demostraciones del Quick Start
-│   │   └── poblar_medicamentos.php   # Generador masivo por lotes (Batch Multi-Row)
-│   ├── index.php                     # Dashboard Unificado (Ambulatorios, Catálogos, Operadores y Bitácora)
-│   ├── login.php                     # Inicio de sesión sobrio con selector de seed bajo demanda
-│   ├── logout.php                    # Cierre seguro de sesión con auditoría forense
-│   ├── setup.php                     # Asistente de Primer Arranque (Quick Start / Génesis del Admin)
-│   └── procesar.php                  # Controlador Transaccional Único Centralizado
-├── .gitignore
-└── README.md
+│   │   ├── reset_quickstart.php      # Proxy interno para restablecimiento desde contenedor
+│   │   └── poblar_medicamentos.php   # Proxy interno para generación de carga desde contenedor
+│   ├── index.php                     # Panel principal unificado (Ambulatorios, Catálogos, Operadores y Auditoría)
+│   ├── login.php                     # Control de acceso con formulario sobrio de autenticación
+│   ├── logout.php                    # Cierre de sesión seguro con registro en bitácora
+│   ├── setup.php                     # Asistente de primer arranque y configuración inicial del sistema
+│   └── procesar.php                  # Controlador transaccional centralizado para operaciones CRUD
+├── .gitattributes                    # Normalización de saltos de línea (LF en scripts Unix)
+├── .gitignore                        # Exclusión de temporales, credenciales y volcados pesados
+├── reset_quickstart.bat              # Acceso rápido en Windows para reinicio de demostración
+├── reset_quickstart.ps1              # Script PowerShell para reinicio de demostración
+└── README.md                         # Documentación técnica integral del proyecto
 ```
 
 ---
 
 ## 4. Despliegue con Docker
 
-### Requisitos
-* Docker Engine 24+ y Docker Compose v2+
+### Requisitos Previos
+* Docker Engine 24+ y Docker Compose v2+ instalados y operativos.
 
-### Pasos de inicialización
-1. **Iniciar contenedores:**
+### Procedimiento de Despliegue
+1. **Construir e iniciar los servicios:**
    ```bash
    docker compose up -d --build
    ```
 
-2. **Acceso al sistema:**
+2. **Parámetros de acceso:**
    * **Aplicación Web:** `http://localhost:8080`
-   * **Base de Datos (Puerto 3306):**
+   * **Servicio de Base de Datos (Puerto 3306):**
+     * Host: `localhost` (o `db` internamente en Docker)
      * Base de datos: `control_medicamentos_red`
      * Usuario: `app_salud_user`
      * Contraseña: `app_password_seguro_2026`
@@ -102,123 +197,95 @@ sistema-distribucion/
 
 ---
 
-## 4.1. Primer Arranque y Autenticación (Quick Start vs Modo Demo)
+## 5. Inicialización del Sistema y Perfiles de Acceso
 
-El sistema provee **dos métodos de inicio** diseñados tanto para instalaciones de producción limpias como para evaluaciones académicas:
+### Asistente de Configuración Inicial
+Diseñado para el primer arranque del sistema cuando la base de datos se encuentra limpia:
+1. Abra `http://localhost:8080/` en el navegador.
+2. Al detectar que no existen operadores registrados, el software redirige de forma automática al asistente `setup.php`.
+3. Ingrese los datos del Administrador Central Municipal:
+   * **Nombre:** Entre 4 y 80 caracteres.
+   * **Correo institucional:** Formato de correo válido.
+   * **Contraseña:** Mínimo 8 caracteres, con mayúscula, minúscula, número y símbolo especial. Incluye indicador dinámico de complejidad en tiempo real.
+4. **Casilla de datos de red asistencial:**
+   * Si permanece marcada, aprovisiona de forma inmediata 3 ambulatorios en Mérida y un operador farmacéutico auxiliar para evaluar el sistema.
+5. Al enviar el formulario, el sistema crea la cuenta administrativa raíz y **auto-bloquea permanentemente el asistente**, redirigiendo al panel de control.
 
-### Opción A: Asistente de Primer Arranque (`setup.php` / Quick Start)
-Diseñado para la inicialización institucional desde cero (cuando la base de datos no contiene operadores registrados):
-
-1. Abre `http://localhost:8080/` en tu navegador.
-2. Como el sistema detecta **0 usuarios registrados**, redirige automáticamente al asistente de inicialización: `setup.php`.
-3. Introduce los datos del Administrador Central Municipal:
-   * **Nombre completo:** Ej. `Mikael Pizzi` (validación en tiempo real de 4 a 80 caracteres).
-   * **Correo institucional:** Ej. `admin@salud.prueba.ve` (validación RFC estricta).
-   * **Contraseña:** Mínimo 8 caracteres (máx. 72 contra Bcrypt DoS), con mayúscula, minúscula, número y símbolo especial. Incluye barra de fortaleza y checklist interactivo en vivo.
-4. **Casilla de Datos de Demostración (Opcional):**
-   * Por defecto viene activada: `[X] Cargar datos de prueba de la red asistencial`.
-   * Si la mantienes activa, aprovisiona de inmediato 3 ambulatorios en Mérida con su equipamiento y un operador auxiliar farmacéutico (`farmacia.llano@salud.prueba.ve` / `farmacia123`) para evaluar el control de acceso por roles (RBAC).
-   * Si la desmarcas, obtienes un despliegue 100% en blanco de producción.
-5. Haz clic en **"Crear cuenta principal"**.
-6. El sistema ejecuta una transacción que:
-   * Inserta al Administrador Central con `rol_id = 1` (`rol_admin`) y jurisdicción central (`centro_salud_id = NULL`).
-   * Aprovisiona los ambulatorios y farmaceuta si se solicitó la demostración.
-   * Registra el evento `INICIALIZAR_SISTEMA` en la bitácora forense WORM.
-   * Inicia la sesión autenticada y redirige al panel de control `index.php`.
-7. **Mecanismo de Auto-Bloqueo de Seguridad:** Tan pronto como existe al menos 1 usuario en la base de datos, `setup.php` queda **permanentemente deshabilitado**. Cualquier intento posterior de acceso es rechazado con un HTTP 302 hacia la pantalla de autenticación sobria (`login.php`).
-
----
-
-### Opción B: Credenciales de Demostración Preconfiguradas
-Si durante el Quick Start mantuviste activa la casilla de datos de prueba (o cargaste `02_seeders.sql`), dispones de estos dos perfiles para evaluar el sistema:
+### Credenciales de Demostración
+Si el sistema fue inicializado con los datos de prueba (o mediante `02_seeders.sql`), dispone de los siguientes perfiles:
 
 | Perfil / Rol | Correo Institucional | Contraseña | Alcance y Jurisdicción (RBAC) |
 | :--- | :--- | :--- | :--- |
-| **Administrador Central** | Tu correo registrado en `setup.php` (o `admin@salud.prueba.ve`) | Tu clave asignada (o `admin123`) | **Global:** Gestión de toda la red de ambulatorios, catálogos 3FN, operadores de seguridad, bitácora WORM y respaldos en caliente. |
-| **Farmaceuta Operador** | `farmacia.llano@salud.prueba.ve` | `farmacia123` | **Aislado:** Restringido estrictamente a su ambulatorio asignado (*Ambulatorio Urbano III El Llano*). Bloqueo total de acceso a catálogos, operadores y respaldos. |
+| **Administrador Central** | `admin@salud.prueba.ve` | `admin123` | **Acceso Global:** Gestión de ambulatorios, catálogos 3FN, operadores de seguridad, auditoría inmutable y descarga de respaldos. |
+| **Farmaceuta Operador** | `farmacia.llano@salud.prueba.ve` | `farmacia123` | **Acceso Restringido:** Delimitado estrictamente a su ambulatorio de adscripción. Bloqueo total de catálogos, operadores, auditoría y respaldos. |
 
 ---
 
-## 5. Herramientas de Carga Masiva y Demostración
+## 6. Guía de Ejecución de Scripts Operativos
 
-El sistema incluye utilidades CLI para pruebas de rendimiento y restablecimiento de entornos de demostración:
+Todos los scripts de mantenimiento y administración se encuentran centralizados en el directorio `scripts/`:
 
-### 1. Generación Masiva por Lotes (Prueba de Rendimiento e I/O en InnoDB 16 KB):
-Inserta medicamentos en bloques transaccionales de 500 registros con `INSERT ... VALUES (...), (...)` para medir velocidad de inserción y densidad por página:
-```bash
-docker exec salud_php_apache php /var/www/html/scripts/poblar_medicamentos.php 1000
-```
+### 6.1. Demonio Automatizado de Respaldo Transaccional
+Ejecuta un volcado en caliente sin bloquear operaciones en los ambulatorios (`--single-transaction`), comprime el archivo en formato gzip nivel 9, genera una firma criptográfica SHA-256 para validación forense y purga automáticamente copias con más de 7 días de antigüedad.
 
-### 2. Limpieza de Registros de Prueba:
-Elimina los datos generados durante pruebas de carga y restablece el contador de autoincremento:
-```bash
-docker exec salud_php_apache php /var/www/html/scripts/poblar_medicamentos.php --limpiar
-```
-
-### 3. Restablecimiento para Demostración en Vivo (Quick Start):
-Vacia la base de datos a 0 usuarios y restaura los catálogos maestros canónicos para ejecutar el Asistente de Primer Arranque (`setup.php`):
-```powershell
-.\reset_quickstart.bat
-```
-
----
-
-## 6. Arquitectura de Respaldos y Recuperación ante Desastres (Regla 3-2-1)
-
-El sistema implementa una **estrategia de defensa en profundidad en 3 niveles concurrentes**, cumpliendo los lineamientos corporativos y la **Regla 3-2-1** (3 copias de los datos, 2 soportes distintos, 1 copia externa o fuera del sitio):
-
-```
-┌────────────────────────────────────────────────────────────────────────────┐
-│ NIVEL 1: INFRAESTRUCTURA / DOCKER (Alta Disponibilidad Inmediata)          │
-│ • Snapshot MVCC con mariadb-dump --single-transaction --quick              │
-│ • Credenciales aisladas sin exposición en proceso del SO (ps aux)          │
-└───────────────────────────────────────┬────────────────────────────────────┘
-                                        │ Flujo binario seguro
-                                        ▼
-┌────────────────────────────────────────────────────────────────────────────┐
-│ NIVEL 2: SISTEMA OPERATIVO / DEMONIO CRON (Recuperación ante Desastres)    │
-│ • Escritura atómica (.tmp -> .gz) + Firma Criptográfica SHA-256            │
-│ • Poda y Retención de 7 días (Pruning) para prevenir saturación de disco   │
-└───────────────────────────────────────┬────────────────────────────────────┘
-                                        │ Catálogo y verificación
-                                        ▼
-┌────────────────────────────────────────────────────────────────────────────┐
-│ NIVEL 3: APLICACIÓN WEB PHP (Gobernanza Sanitaria y Auditoría Forense)     │
-│ • Descarga bajo demanda en streaming con huella fija O(1) de RAM (< 2 MB)  │
-│ • Trazabilidad WORM inmutable en logs_auditoria (EXPORTAR_RESPALDO_BD)     │
-└────────────────────────────────────────────────────────────────────────────┘
-```
-
-### Nivel 1: Capa de Motor RDBMS y Docker (Snapshot MVCC)
-* Ejecución de `mariadb-dump` con snapshot transaccional repetible (`--single-transaction`), garantizando consistencia relacional sin bloquear las tablas (`LOCK TABLES`) y permitiendo que los ambulatorios sigan despachando medicamentos en tiempo real.
-* Inclusión de todos los objetos de base de datos (`--routines`, `--triggers`, `--events`, `--hex-blob`).
-* Credenciales seguras mediante `--defaults-extra-file` o paso por variable de entorno en subproceso (`MYSQL_PWD`), evitando la exposición de contraseñas en texto plano en la tabla de procesos (`ps aux`).
-
-### Nivel 2: Demonio del Sistema Operativo (Scripting y Criptografía)
-* **Escritura Atómica:** El volcado se genera primero en un archivo temporal (`.tmp`) y solo se comprime a `.sql.gz` al finalizar con éxito el volcado, previniendo respaldos corruptos o a medio escribir.
-* **Integridad Criptográfica (SHA-256):** Cada respaldo genera un archivo `.sha256` complementario para certificar la no-manipulación de los datos conforme a estándares forenses.
-* **Política de Retención (7 días):** Poda automática de copias de seguridad de más de 7 días mediante `find -mtime +7 -delete`.
-* **Ejecución manual o en crontab:**
+* **En entornos Linux / macOS / WSL:**
   ```bash
-  # En Linux / WSL:
   bash scripts/daemon_respaldo.sh
-
-  # En Windows PowerShell:
+  ```
+* **En entornos Windows PowerShell:**
+  ```powershell
   powershell -ExecutionPolicy Bypass -File scripts/daemon_respaldo.ps1
   ```
-* **Restauración con Verificación de Integridad:**
-  El script de restauración comprueba automáticamente el hash SHA-256 antes de inyectar el SQL en el motor, rechazando archivos corruptos o alterados:
+
+### 6.2. Restauración Certificada de Base de Datos
+Restaura un volcado verificando primero que el hash SHA-256 coincida con el archivo de firma. Si el archivo fue alterado o corrompido, la restauración se aborta físicamente por seguridad:
+```bash
+bash scripts/restaurar.sh respaldos/respaldo_sicm_YYYYMMDD_HHMMSS.sql.gz
+```
+
+### 6.3. Restablecimiento para Demostración en Vivo
+Vacia la base de datos a cero usuarios, limpia tablas transaccionales, restaura los catálogos maestros canónicos y reactiva los triggers WORM. Prepara el entorno para demostrar el asistente de primer arranque:
+
+* **En Windows (Acceso directo por archivo por lotes):**
+  ```cmd
+  reset_quickstart.bat
+  ```
+* **En Windows PowerShell:**
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File reset_quickstart.ps1
+  ```
+* **Desde el contenedor Docker en Linux / WSL:**
   ```bash
-  bash scripts/restaurar.sh respaldos/respaldo_sicm_YYYYMMDD_HHMMSS.sql.gz
+  docker exec salud_php_apache php /var/www/html/scripts/reset_quickstart.php
   ```
 
-### Nivel 3: Capa Web de Gobernanza y Control Municipal
-* **Streaming en memoria constante $\mathcal{O}(1)$:** En lugar de cargar megabytes o gigabytes en la memoria de PHP (`memory_limit`), el volcado se canaliza directamente hacia la salida HTTP con `proc_open()` y `fpassthru()`, consumiendo un búfer de menos de 2 MB de memoria RAM.
-* **Trazabilidad Forense Obligatoria:** Antes de emitir el primer byte binario, el sistema registra obligatoriamente en `logs_auditoria` el evento `EXPORTAR_RESPALDO_BD` con la IP remota, agente de usuario y marca de tiempo.
-* **Descarga directa:** Accesible desde el botón del encabezado o la pestaña de Auditoría en la interfaz web (`index.php?tab=auditoria`).
+### 6.4. Generación de Carga Masiva (Pruebas de Rendimiento en InnoDB)
+Inserta medicamentos en bloques transaccionales atómicos de 500 registros para evaluar la velocidad de inserción y la densidad de almacenamiento en las páginas de 16 KB de MySQL:
+
+* **Poblar 1.000 registros de medicamentos:**
+  ```bash
+  docker exec salud_php_apache php /var/www/html/scripts/poblar_medicamentos.php 1000
+  ```
+* **Limpiar los medicamentos de prueba y restablecer el autoincremento:**
+  ```bash
+  docker exec salud_php_apache php /var/www/html/scripts/poblar_medicamentos.php --limpiar
+  ```
 
 ---
 
-## 7. Licencia y Uso Académico
+## 7. Arquitectura de Respaldos y Resguardo Continuo
 
-Sistema de control y trazabilidad de insumos sanitarios para la red de salud pública municipal. Código abierto bajo licencia MIT.
+El sistema implementa una **estrategia de defensa en profundidad en 3 niveles**, cumpliendo con la **Regla 3-2-1** (3 copias de los datos, 2 soportes diferentes, 1 copia externa):
+
+1. **Nivel de Motor de Base de Datos (Snapshot MVCC):**  
+   Uso de `mariadb-dump` con snapshot transaccional repetible (`--single-transaction --quick --hex-blob`), garantizando consistencia relacional sin bloquear las tablas físicas y permitiendo que la dispensación continúe sin interrupciones.
+2. **Nivel de Sistema Operativo (Scripting Automatizado):**  
+   Escritura atómica en archivo temporal, compresión y firma criptográfica SHA-256 complementaria. Política de retención de 7 días para evitar saturación de almacenamiento en el servidor municipal.
+3. **Nivel de Aplicación Web (Streaming en Memoria Constante $\mathcal{O}(1)$):**  
+   Al pulsar el botón **Crear Respaldo** en el panel de control, PHP no carga el archivo en memoria RAM. Transmite el volcado comprimido directamente hacia la conexión HTTP mediante subproceso `proc_open()` y tubería de salida `fpassthru()`, operando con un búfer de menos de 2 MB de memoria independientemente del volumen de datos, y registrando la exportación en la bitácora inmutable.
+
+---
+
+## 8. Licencia
+
+Sistema desarrollado para el control y trazabilidad de insumos sanitarios en la red de salud pública municipal. Código abierto bajo licencia MIT.

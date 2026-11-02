@@ -5,6 +5,7 @@
 
 # Logs y temporales
 *.log
+*.zip
 scratch/
 .tmp/
 
