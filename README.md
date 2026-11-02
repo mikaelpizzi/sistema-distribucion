@@ -21,7 +21,7 @@ El sistema fue diseñado respondiendo a tres problemáticas críticas detectadas
 
 ## 2. Implementación del Esquema de Datos y Correspondencia con la Propuesta
 
-El esquema DDL implementado en [`docker/mysql/01_schema.sql`](file:///c:/Users/mikae/OneDrive/Documentos/GitHub/sistema-distribucion/docker/mysql/01_schema.sql) sigue con exactitud la propuesta arquitectónica original, cumpliendo con la Tercera Forma Normal (3FN), integridad referencial y las políticas forenses definidas para el proyecto.
+El esquema DDL implementado en [`docker/mysql/01_schema.sql`](docker/mysql/01_schema.sql) sigue con exactitud la propuesta arquitectónica original, cumpliendo con la Tercera Forma Normal (3FN), integridad referencial y las políticas forenses definidas para el proyecto.
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────┐
