@@ -1,0 +1,52 @@
+services:
+  db:
+    image: mariadb:11.4
+    container_name: salud_maria_db
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: root_secret_admin_2026
+      MARIADB_DATABASE: control_medicamentos_red
+      MARIADB_USER: app_salud_user
+      MARIADB_PASSWORD: app_password_seguro_2026
+      TZ: America/Caracas
+    command:
+      - --performance-schema=OFF
+      - --innodb-buffer-pool-size=64M
+      - --innodb-log-buffer-size=8M
+      - --max-connections=30
+      - --skip-log-bin
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./docker/mysql:/docker-entrypoint-initdb.d:ro
+    networks:
+      - red_salud_interna
+
+  web:
+    build:
+      context: ./docker/php
+    container_name: salud_php_apache
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./src:/var/www/html
+    depends_on:
+      - db
+    environment:
+      DB_HOST: db
+      DB_NAME: control_medicamentos_red
+      DB_USER: app_salud_user
+      DB_PASS: app_password_seguro_2026
+    networks:
+      - red_salud_interna
+
+volumes:
+  db_data:
+
+networks:
+  red_salud_interna:
+    driver: bridge

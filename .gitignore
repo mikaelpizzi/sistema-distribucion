@@ -1,0 +1,21 @@
+# Gitignore para Sistema Integrado de Control de Medicamentos
+.env
+.env.*
+!.env.example
+
+# Logs y temporales
+*.log
+scratch/
+.tmp/
+
+# Respaldos de base de datos locales
+respaldos/*.sql.gz
+respaldos/*.sha256
+src/backups/*.sql
+src/backups/*.sql.gz
+
+# Archivos de SO
+.DS_Store
+Thumbs.db
+desktop.ini
+
