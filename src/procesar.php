@@ -376,7 +376,7 @@ try {
                 exit;
             }
             if (mb_strlen($email, 'UTF-8') < 5 || mb_strlen($email, 'UTF-8') > 120 || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                header('Location: index.php?tab=usuarios&error=' . urlencode('Debe ingresar un correo institucional válido (ej. operador@salud.gob.ve).'));
+                header('Location: index.php?tab=usuarios&error=' . urlencode('Debe ingresar un correo institucional válido (ej. operador@salud.prueba.ve).'));
                 exit;
             }
 

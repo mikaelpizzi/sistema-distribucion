@@ -115,11 +115,11 @@ Diseñado para la inicialización institucional desde cero (cuando la base de da
 2. Como el sistema detecta **0 usuarios registrados**, redirige automáticamente al asistente de inicialización: `setup.php`.
 3. Introduce los datos del Administrador Central Municipal:
    * **Nombre completo:** Ej. `Mikael Pizzi` (validación en tiempo real de 4 a 80 caracteres).
-   * **Correo institucional:** Ej. `admin@salud.gob.ve` (validación RFC estricta).
+   * **Correo institucional:** Ej. `admin@salud.prueba.ve` (validación RFC estricta).
    * **Contraseña:** Mínimo 8 caracteres (máx. 72 contra Bcrypt DoS), con mayúscula, minúscula, número y símbolo especial. Incluye barra de fortaleza y checklist interactivo en vivo.
 4. **Casilla de Datos de Demostración (Opcional):**
    * Por defecto viene activada: `[X] Cargar datos de prueba de la red asistencial`.
-   * Si la mantienes activa, aprovisiona de inmediato 3 ambulatorios en Mérida con su equipamiento y un operador auxiliar farmacéutico (`farmacia.llano@salud.gob.ve` / `farmacia123`) para evaluar el control de acceso por roles (RBAC).
+   * Si la mantienes activa, aprovisiona de inmediato 3 ambulatorios en Mérida con su equipamiento y un operador auxiliar farmacéutico (`farmacia.llano@salud.prueba.ve` / `farmacia123`) para evaluar el control de acceso por roles (RBAC).
    * Si la desmarcas, obtienes un despliegue 100% en blanco de producción.
 5. Haz clic en **"Crear cuenta principal"**.
 6. El sistema ejecuta una transacción que:
@@ -136,8 +136,8 @@ Si durante el Quick Start mantuviste activa la casilla de datos de prueba (o car
 
 | Perfil / Rol | Correo Institucional | Contraseña | Alcance y Jurisdicción (RBAC) |
 | :--- | :--- | :--- | :--- |
-| **Administrador Central** | Tu correo registrado en `setup.php` (o `admin@salud.gob.ve`) | Tu clave asignada (o `admin123`) | **Global:** Gestión de toda la red de ambulatorios, catálogos 3FN, operadores de seguridad, bitácora WORM y respaldos en caliente. |
-| **Farmaceuta Operador** | `farmacia.llano@salud.gob.ve` | `farmacia123` | **Aislado:** Restringido estrictamente a su ambulatorio asignado (*Ambulatorio Urbano III El Llano*). Bloqueo total de acceso a catálogos, operadores y respaldos. |
+| **Administrador Central** | Tu correo registrado en `setup.php` (o `admin@salud.prueba.ve`) | Tu clave asignada (o `admin123`) | **Global:** Gestión de toda la red de ambulatorios, catálogos 3FN, operadores de seguridad, bitácora WORM y respaldos en caliente. |
+| **Farmaceuta Operador** | `farmacia.llano@salud.prueba.ve` | `farmacia123` | **Aislado:** Restringido estrictamente a su ambulatorio asignado (*Ambulatorio Urbano III El Llano*). Bloqueo total de acceso a catálogos, operadores y respaldos. |
 
 ---
 

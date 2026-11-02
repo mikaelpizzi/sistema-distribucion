@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s\.\-]{4,80}$/u', $nombre)) {
         $error = 'El nombre solo puede contener letras, espacios, acentos y puntos.';
     } elseif ($emailLen < 5 || $emailLen > 120 || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error = 'Debe ingresar un correo institucional válido (ej. operador@salud.gob.ve).';
+        $error = 'Debe ingresar un correo institucional válido (ej. operador@salud.prueba.ve).';
     } elseif ($passLen < 8) {
         $error = 'La contraseña debe contener al menos 8 caracteres.';
     } elseif ($passLen > 72) {
@@ -104,7 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ");
                 $stmtFarm->execute([
                     ':nombre' => 'Lcda. Elena Farmaceuta',
-                    ':email'  => 'farmacia.llano@salud.gob.ve',
+                    ':email'  => 'farmacia.llano@salud.prueba.ve',
                     ':pass'   => $hashFarm
                 ]);
             }
@@ -385,7 +385,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="mb-3">
                 <label for="email" class="form-label">Correo institucional</label>
                 <input type="email" class="form-control" id="email" name="email" 
-                    placeholder="operador@salud.gob.ve" required maxlength="120"
+                    placeholder="operador@salud.prueba.ve" required maxlength="120"
                     value="<?= htmlspecialchars($_POST['email'] ?? '') ?>">
                 <div class="feedback-msg" id="email-feedback">
                     Debe ingresar un formato de correo válido (ej. usuario@dominio.com).
@@ -448,7 +448,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <label class="form-check-label text-start" for="cargar_demo">
                         <span class="d-block fw-semibold" style="color: #f8fafc; font-size: 0.825rem;">Cargar datos de prueba de la red asistencial</span>
                         <span class="d-block mt-1" style="color: #cbd5e1; font-size: 0.74rem; line-height: 1.4;">
-                            Puebla 3 ambulatorios iniciales en Mérida y la cuenta de farmaceuta (<span class="font-monospace" style="color: #38bdf8; font-weight: 600;">farmacia.llano@salud.gob.ve</span> / <span class="font-monospace" style="color: #38bdf8; font-weight: 600;">farmacia123</span>) para verificar el control de acceso (RBAC).
+                            Puebla 3 ambulatorios iniciales en Mérida y la cuenta de farmaceuta (<span class="font-monospace" style="color: #38bdf8; font-weight: 600;">farmacia.llano@salud.prueba.ve</span> / <span class="font-monospace" style="color: #38bdf8; font-weight: 600;">farmacia123</span>) para verificar el control de acceso (RBAC).
                         </span>
                     </label>
                 </div>

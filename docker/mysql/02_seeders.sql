@@ -89,8 +89,8 @@ ON DUPLICATE KEY UPDATE operativo = VALUES(operativo), detalle_capacidad = VALUE
 -- Hash generado con función nativa de MySQL/MariaDB: SHA2('pass', 256)
 -- ============================================================================
 INSERT INTO usuarios (id, nombre, email, password_hash, rol_id, centro_salud_id, activo) VALUES 
-(1, 'Administrador Municipal', 'admin@salud.gob.ve', SHA2('admin123', 256), 1, NULL, 1),
-(2, 'Lcda. Elena Farmaceuta', 'farmacia.llano@salud.gob.ve', SHA2('farmacia123', 256), 2, 1, 1)
+(1, 'Administrador Municipal', 'admin@salud.prueba.ve', SHA2('admin123', 256), 1, NULL, 1),
+(2, 'Lcda. Elena Farmaceuta', 'farmacia.llano@salud.prueba.ve', SHA2('farmacia123', 256), 2, 1, 1)
 ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), email = VALUES(email);
 
 -- ============================================================================

@@ -241,7 +241,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="mb-3">
                 <label for="email" class="form-label">Correo institucional</label>
                 <input type="email" class="form-control" id="email" name="email" 
-                    placeholder="operador@salud.gob.ve" required autocomplete="email"
+                    placeholder="operador@salud.prueba.ve" required autocomplete="email"
                     value="<?= htmlspecialchars($_POST['email'] ?? '') ?>">
             </div>
 

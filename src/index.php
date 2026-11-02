@@ -436,9 +436,6 @@ if ($tabActiva === 'centros') {
                                 <span class="badge bg-success-subtle text-success border border-success-subtle font-monospace" style="font-size:0.68rem;">Rol Farmaceuta</span>
                             </div>
                             <div class="p-3">
-                                <div class="alert alert-info py-2 px-3 small mb-3">
-                                    <strong>Aislamiento por Ambulatorio:</strong> Conforme al principio de contraloría de su propuesta, sus consultas de inventario y dispensación están acotadas estrictamente a este centro asistencial.
-                                </div>
                                 <div class="mb-2">
                                     <span class="text-muted small">Ambulatorio Asignado:</span>
                                     <div class="fw-bold text-dark fs-6"><?= htmlspecialchars($usuario['centro_nombre']) ?></div>
@@ -781,7 +778,7 @@ if ($tabActiva === 'centros') {
                                 <div class="mb-2">
                                     <label for="u_email" class="form-label small fw-semibold mb-1">Correo Institucional Oficial</label>
                                     <input type="email" class="form-control form-control-sm" id="u_email" name="email"
-                                        placeholder="ej: mrivas@salud.gob.ve" required maxlength="120"
+                                        placeholder="ej: mrivas@salud.prueba.ve" required maxlength="120"
                                         value="<?= $usuarioEdicion ? htmlspecialchars($usuarioEdicion['email']) : '' ?>">
                                 </div>
 

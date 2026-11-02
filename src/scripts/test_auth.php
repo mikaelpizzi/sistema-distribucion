@@ -22,7 +22,7 @@ if ($totalU === 0) {
 }
 
 // 2. Probar autenticación del Administrador Central (rol_id = 1, centro_salud_id = NULL)
-$adminAuth = autenticarUsuario($pdo, 'admin@salud.gob.ve', 'admin123');
+$adminAuth = autenticarUsuario($pdo, 'admin@salud.prueba.ve', 'admin123');
 if (!$adminAuth || (int)$adminAuth['rol_id'] !== 1 || $adminAuth['centro_salud_id'] !== null) {
     echo "ERROR: Falló la autenticación del Administrador Central.\n";
     exit(1);
@@ -30,7 +30,7 @@ if (!$adminAuth || (int)$adminAuth['rol_id'] !== 1 || $adminAuth['centro_salud_i
 echo "2. [OK] Autenticación Exitosa: '{$adminAuth['nombre']}' como Admin Central (Jurisdicción Global).\n";
 
 // 3. Probar autenticación del Farmaceuta (rol_id = 2, centro_salud_id = 1)
-$farmaAuth = autenticarUsuario($pdo, 'farmacia.llano@salud.gob.ve', 'farmacia123');
+$farmaAuth = autenticarUsuario($pdo, 'farmacia.llano@salud.prueba.ve', 'farmacia123');
 if (!$farmaAuth || (int)$farmaAuth['rol_id'] !== 2 || (int)$farmaAuth['centro_salud_id'] !== 1) {
     echo "ERROR: Falló la autenticación del Farmaceuta de El Llano.\n";
     exit(1);
@@ -38,7 +38,7 @@ if (!$farmaAuth || (int)$farmaAuth['rol_id'] !== 2 || (int)$farmaAuth['centro_sa
 echo "3. [OK] Autenticación Exitosa: '{$farmaAuth['nombre']}' como Farmaceuta adscrito al Ambulatorio #{$farmaAuth['centro_salud_id']}.\n";
 
 // 4. Probar rechazo con contraseña incorrecta
-$failAuth = autenticarUsuario($pdo, 'admin@salud.gob.ve', 'clave_falsa_1234');
+$failAuth = autenticarUsuario($pdo, 'admin@salud.prueba.ve', 'clave_falsa_1234');
 if ($failAuth !== null) {
     echo "ERROR: Una contraseña inválida no debe autenticar.\n";
     exit(1);
@@ -46,7 +46,7 @@ if ($failAuth !== null) {
 echo "4. [OK] Seguridad de Contraseña: Clave incorrecta rechazada satisfactoriamente.\n";
 
 // 5. Probar creación de usuario con Bcrypt moderno (password_hash)
-$testEmail = 'operador.prueba@salud.gob.ve';
+$testEmail = 'operador.prueba@salud.prueba.ve';
 $pdo->prepare("DELETE FROM usuarios WHERE email = :e")->execute([':e' => $testEmail]);
 
 $hashBcrypt = password_hash('secreto_seguro_2026', PASSWORD_DEFAULT);
