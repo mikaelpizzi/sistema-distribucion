@@ -95,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ");
                 }
 
-                // 2. Operador Farmaceuta de Demostración para evaluación docente de RBAC
+                // 2. Operador Farmaceuta de Demostración para validación de perfiles RBAC
                 $hashFarm = password_hash('farmacia123', PASSWORD_DEFAULT);
                 $stmtFarm = $pdo->prepare("
                     INSERT INTO usuarios (nombre, email, password_hash, rol_id, centro_salud_id, activo)

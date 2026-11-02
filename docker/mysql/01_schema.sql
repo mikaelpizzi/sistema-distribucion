@@ -27,7 +27,7 @@ CREATE TABLE formas_farmaceuticas (
     nombre VARCHAR(60) NOT NULL UNIQUE COMMENT 'Tableta, Jarabe, Ampolla'
 ) ENGINE=InnoDB;
 
--- 1.1 Catálogo Maestro Parametrizable: Tipos de Centros de Salud (Clases 26 y 42)
+-- 1.1 Catálogo Maestro Parametrizable: Tipos de Centros de Salud (3FN)
 CREATE TABLE tipos_centro_salud (
     id INT AUTO_INCREMENT PRIMARY KEY,
     codigo VARCHAR(30) NOT NULL UNIQUE COMMENT 'Ej: AMB_URB_1, AMB_URB_2, CLIN_MUN',
@@ -76,7 +76,7 @@ CREATE TABLE centro_recursos (
 ) ENGINE=InnoDB;
 
 -- ============================================================================
--- 2. SEGURIDAD Y OPERADORES (Fiel a tu diccionario de datos)
+-- 2. SEGURIDAD, AUTENTICACIÓN Y ROLES (RBAC)
 -- ============================================================================
 
 CREATE TABLE usuarios (
@@ -176,7 +176,7 @@ CREATE TABLE despacho_detalles (
 ) ENGINE=InnoDB;
 
 -- ============================================================================
--- 5. TABLA DE LOGS / AUDITORÍA FORENSE (Exigencia directa del profesor - Misión 2)
+-- 5. TABLA DE LOGS Y AUDITORÍA FORENSE INMUTABLE (WORM)
 -- ============================================================================
 
 CREATE TABLE logs_auditoria (

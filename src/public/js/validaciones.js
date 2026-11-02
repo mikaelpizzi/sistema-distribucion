@@ -1,7 +1,7 @@
 // src/public/js/validaciones.js
-// Validación nativa en cliente (JavaScript Puro / Vanilla JS)
-// Objetivo de cátedra: Validar en el navegador para no enviar datos vacíos o inconsistentes a PHP
-// Reglas: Cero frameworks, sanitización en tiempo real (mayúsculas/slugs) y protección de tipos.
+// Validación y sanitización en cliente (Vanilla JS / ES6+)
+// Validación preventiva en navegador para mitigar latencia y rechazar inconsistencias antes del procesamiento en backend.
+// Reglas: Cero dependencias externas, sanitización en tiempo real y tipado estricto.
 
 document.addEventListener('DOMContentLoaded', () => {
 

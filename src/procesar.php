@@ -231,7 +231,7 @@ try {
             exit;
 
         // ======================================================================
-        // 3. CATÁLOGOS MAESTROS 3FN (Regla de los 6 Meses)
+        // 3. CATÁLOGOS MAESTROS PARAMETRIZABLES (3FN)
         // ======================================================================
         case 'crear_tipo_centro':
             if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -521,7 +521,7 @@ try {
             exit;
 
         // ======================================================================
-        // 5. DISASTER RECOVERY & RESPALDOS (NIVEL 3: STREAMING EN O(1) Y AUDITORÍA)
+        // 5. DISASTER RECOVERY Y RESPALDOS (STREAMING EN O(1) Y AUDITORÍA WORM)
         // ======================================================================
         case 'descargar_respaldo':
             // 1. Trazabilidad Forense Obligatoria (WORM Audit Trail)

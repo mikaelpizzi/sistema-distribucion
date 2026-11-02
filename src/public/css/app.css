@@ -164,7 +164,7 @@ body {
     overflow-y: auto;
 }
 
-/* Adaptabilidad Móvil (Responsive Design - Clase 0) */
+/* Adaptabilidad Móvil (Responsive Layout) */
 @media (max-width: 768px) {
     .header-sicm {
         padding: 0.5rem 0.75rem;

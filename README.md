@@ -60,7 +60,7 @@ sistema-distribucion/
 │   │   └── auditoria.php             # Módulo forense para registro inmutable WORM en BD
 │   ├── public/
 │   │   ├── css/
-│   │   │   └── app.css               # Estilos de alta densidad empresarial (0 Slop)
+│   │   │   └── app.css               # Estilos de interfaz sobrios y de alta densidad asistencial
 │   │   └── js/
 │   │       └── validaciones.js       # Validaciones nativas en cliente (Vanilla JS)
 │   ├── scripts/
@@ -230,4 +230,4 @@ El sistema implementa una **estrategia de defensa en profundidad en 3 niveles co
 
 ## 7. Licencia y Uso Académico
 
-Proyecto desarrollado con fines académicos para la cátedra de **Bases de Datos**. Código abierto bajo licencia MIT.
+Sistema de control y trazabilidad de insumos sanitarios para la red de salud pública municipal. Código abierto bajo licencia MIT.
