@@ -24,18 +24,29 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
-/* Header Institucional */
+/* Header Institucional Responsivo */
 .header-sicm {
     background-color: var(--sicm-navy);
     border-bottom: 2px solid var(--sicm-blue);
-    padding: 0.65rem 1.25rem;
+    padding: 0.5rem 1rem;
 }
 
 .brand-title {
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 700;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.3px;
     color: #ffffff;
+}
+
+.header-sicm .navbar-toggler {
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    padding: 0.25rem 0.5rem;
+    font-size: 0.85rem;
+}
+
+.header-sicm .navbar-toggler:focus {
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.4);
+    outline: none;
 }
 
 .brand-badge {
@@ -56,6 +67,7 @@ body {
     padding: 0.35rem 0.75rem;
     border-radius: 6px;
     transition: all 0.15s ease-in-out;
+    display: block;
 }
 
 .nav-sicm .nav-link-sicm:hover {
@@ -164,17 +176,38 @@ body {
     overflow-y: auto;
 }
 
-/* Adaptabilidad Móvil (Responsive Layout) */
-@media (max-width: 768px) {
-    .header-sicm {
-        padding: 0.5rem 0.75rem;
-    }
-    .brand-title {
-        font-size: 0.95rem;
+/* Adaptabilidad Móvil y Breakpoints Responsivos */
+@media (max-width: 991.98px) {
+    .header-sicm .navbar-collapse {
+        background-color: var(--sicm-navy);
+        padding-top: 0.75rem;
+        padding-bottom: 0.5rem;
     }
     .nav-sicm .nav-link-sicm {
-        font-size: 0.75rem;
-        padding: 0.25rem 0.5rem;
+        padding: 0.5rem 0.75rem;
+        margin-bottom: 0.2rem;
+    }
+    .header-user-block {
+        border-top: 1px solid rgba(255, 255, 255, 0.15) !important;
+        padding-top: 0.75rem !important;
+        margin-top: 0.5rem !important;
+    }
+}
+
+@media (min-width: 992px) {
+    .header-user-block {
+        border-top: none !important;
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .header-sicm {
+        padding: 0.45rem 0.75rem;
+    }
+    .brand-title {
+        font-size: 0.90rem;
     }
     .table-responsive {
         -webkit-overflow-scrolling: touch;

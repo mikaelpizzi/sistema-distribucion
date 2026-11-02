@@ -255,54 +255,64 @@ if ($tabActiva === 'centros') {
 </head>
 <body>
 
-    <!-- Encabezado Institucional -->
-    <header class="header-sicm text-white d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <div class="d-flex align-items-center gap-3">
-            <span class="brand-title">Sistema Integrado de Control de Medicamentos (SICM)</span>
-            <span class="text-white-50 d-none d-lg-inline">|</span>
-            <ul class="nav nav-sicm gap-1 border-0">
-                <li class="nav-item">
-                    <a href="index.php?tab=centros" class="nav-link-sicm <?= $tabActiva === 'centros' ? 'active' : '' ?>">
-                        <?= $esAdmin ? 'Ambulatorios' : 'Mi Ambulatorio' ?>
-                    </a>
-                </li>
-                <?php if ($esAdmin): ?>
-                    <li class="nav-item">
-                        <a href="index.php?tab=maestras" class="nav-link-sicm <?= $tabActiva === 'maestras' ? 'active' : '' ?>">
-                            Configuración
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="index.php?tab=usuarios" class="nav-link-sicm <?= $tabActiva === 'usuarios' ? 'active' : '' ?>">
-                            Operadores
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="index.php?tab=auditoria" class="nav-link-sicm <?= $tabActiva === 'auditoria' ? 'active' : '' ?>">
-                            Auditoría
-                        </a>
-                    </li>
-                <?php endif; ?>
-            </ul>
-        </div>
-        <div class="d-flex align-items-center gap-2">
-            <?php if ($esAdmin): ?>
-                <a href="procesar.php?accion=descargar_respaldo" class="btn btn-outline-light btn-sm py-1 px-2.5 text-uppercase" style="font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em;" title="Descargar snapshot caliente comprimido (.sql.gz)">
-                    CREAR RESPALDO
-                </a>
-            <?php endif; ?>
-            <div class="small d-flex align-items-center text-white me-2" style="font-size: 0.8rem;">
-                <?php if ($esAdmin): ?>
-                    <span class="text-white fw-medium"><?= htmlspecialchars($usuario['nombre']) ?></span>
-                    <span class="text-white-50 ms-1.5" style="font-size: 0.74rem;">(<?= htmlspecialchars($usuario['email']) ?>)</span>
-                <?php else: ?>
-                    <span class="text-white fw-medium"><?= htmlspecialchars($usuario['nombre']) ?></span>
-                    <span class="text-white-50 ms-1.5" style="font-size: 0.74rem;">(<?= htmlspecialchars($usuario['email']) ?> &bull; <?= htmlspecialchars($usuario['centro_nombre'] ?? 'Farmacia') ?>)</span>
-                <?php endif; ?>
-            </div>
-            <a href="logout.php" class="btn btn-outline-danger btn-sm py-1 px-2.5 ms-1" style="font-size: 0.75rem;" title="Cerrar sesión de forma segura">
-                Salir
+    <!-- Encabezado Institucional Responsivo -->
+    <header class="navbar navbar-expand-lg navbar-dark header-sicm">
+        <div class="container-fluid px-2 px-md-3">
+            <a class="navbar-brand brand-title d-flex align-items-center text-white text-decoration-none me-3" href="index.php">
+                <span class="d-none d-sm-inline">Sistema Integrado de Control de Medicamentos (SICM)</span>
+                <span class="d-inline d-sm-none fw-bold">SICM &bull; Salud Municipal</span>
             </a>
+
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSicm" aria-controls="navbarSicm" aria-expanded="false" aria-label="Navegación">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarSicm">
+                <ul class="navbar-nav nav-sicm me-auto my-2 my-lg-0 gap-1">
+                    <li class="nav-item">
+                        <a href="index.php?tab=centros" class="nav-link-sicm <?= $tabActiva === 'centros' ? 'active' : '' ?>">
+                            <?= $esAdmin ? 'Ambulatorios' : 'Mi Ambulatorio' ?>
+                        </a>
+                    </li>
+                    <?php if ($esAdmin): ?>
+                        <li class="nav-item">
+                            <a href="index.php?tab=maestras" class="nav-link-sicm <?= $tabActiva === 'maestras' ? 'active' : '' ?>">
+                                Configuración
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="index.php?tab=usuarios" class="nav-link-sicm <?= $tabActiva === 'usuarios' ? 'active' : '' ?>">
+                                Operadores
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="index.php?tab=auditoria" class="nav-link-sicm <?= $tabActiva === 'auditoria' ? 'active' : '' ?>">
+                                Auditoría
+                            </a>
+                        </li>
+                    <?php endif; ?>
+                </ul>
+
+                <div class="header-user-block d-flex flex-column flex-lg-row align-items-stretch align-items-lg-center gap-2 pt-2 pt-lg-0 mt-2 mt-lg-0 border-top border-secondary-subtle">
+                    <?php if ($esAdmin): ?>
+                        <a href="procesar.php?accion=descargar_respaldo" class="btn btn-outline-light btn-sm py-1 px-2.5 text-uppercase text-center" style="font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em;" title="Descargar snapshot caliente comprimido (.sql.gz)">
+                            CREAR RESPALDO
+                        </a>
+                    <?php endif; ?>
+                    <div class="small d-flex align-items-center text-white py-1 py-lg-0 text-truncate" style="font-size: 0.8rem; max-width: 100%;">
+                        <?php if ($esAdmin): ?>
+                            <span class="text-white fw-medium"><?= htmlspecialchars($usuario['nombre']) ?></span>
+                            <span class="text-white-50 ms-1.5" style="font-size: 0.74rem;">(<?= htmlspecialchars($usuario['email']) ?>)</span>
+                        <?php else: ?>
+                            <span class="text-white fw-medium"><?= htmlspecialchars($usuario['nombre']) ?></span>
+                            <span class="text-white-50 ms-1.5" style="font-size: 0.74rem;">(<?= htmlspecialchars($usuario['email']) ?> &bull; <?= htmlspecialchars($usuario['centro_nombre'] ?? 'Farmacia') ?>)</span>
+                        <?php endif; ?>
+                    </div>
+                    <a href="logout.php" class="btn btn-outline-danger btn-sm py-1 px-2.5 text-center" style="font-size: 0.75rem;" title="Cerrar sesión de forma segura">
+                        Salir
+                    </a>
+                </div>
+            </div>
         </div>
     </header>
 
