@@ -7,3 +7,4 @@ try {
 } catch {
     docker exec salud_php_apache php /var/www/html/scripts/reset_quickstart.php
 }
+
