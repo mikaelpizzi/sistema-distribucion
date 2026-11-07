@@ -129,11 +129,7 @@ function requerirAutenticacion(PDO $pdo): array
     $uaPrevio = $_SESSION['sesion_user_agent'] ?? null;
     if ($uaPrevio !== null && $uaPrevio !== $uaActual) {
         cerrarSesion();
-        $msg = sprintf(
-            'Sesión revocada por seguridad: Cambió el identificador del navegador (User-Agent modificado). Anterior: [%.40s...] | Actual: [%.40s...]. Si activó o desactivó la emulación móvil en DevTools (F12), inicie sesión nuevamente.',
-            $uaPrevio,
-            $uaActual
-        );
+        $msg = 'Sesión finalizada: Se detectó un cambio de navegador o dispositivo. Por seguridad, inicie sesión nuevamente.';
         header('Location: login.php?error=' . urlencode($msg));
         exit;
     }
@@ -151,7 +147,7 @@ function requerirAutenticacion(PDO $pdo): array
 
     if ($activo !== false && (int)$activo !== 1) {
         cerrarSesion();
-        header('Location: login.php?error=' . urlencode("Acceso revocado: La cuenta del operador #{$usuario['id']} ({$usuario['email']}) fue desactivada en la base de datos (columna activo = 0)."));
+        header('Location: login.php?error=' . urlencode('Su cuenta ha sido desactivada. Comuníquese con el administrador.'));
         exit;
     }
 

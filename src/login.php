@@ -32,6 +32,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($email === '' || $password === '') {
         $error = 'Por favor ingrese su correo institucional y su contraseña.';
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = 'Ingrese un formato de correo electrónico válido.';
     } else {
         $resultado = autenticarUsuario($pdo, $email, $password);
 
@@ -47,28 +49,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         } elseif (isset($resultado['error']) && $resultado['error'] === 'cuenta_inactiva') {
             registrarAuditoria($pdo, null, 'INTENTO_LOGIN_RECHAZADO', 'usuarios', null, [
-                'motivo'          => 'Cuenta desactivada (activo = 0)',
+                'motivo'          => 'Cuenta desactivada',
                 'email_ingresado' => $email
             ]);
-            $error = "Acceso denegado: La cuenta del operador '{$email}' está desactivada en la base de datos (activo = 0).";
+            $error = 'Esta cuenta ha sido desactivada. Contacte al administrador.';
         } elseif (isset($resultado['error']) && $resultado['error'] === 'usuario_no_encontrado') {
             registrarAuditoria($pdo, null, 'INTENTO_LOGIN_FALLIDO', 'usuarios', null, [
                 'motivo'          => 'Usuario no encontrado',
                 'email_ingresado' => $email
             ]);
-            $error = "Acceso denegado: El correo '{$email}' no existe en el catálogo de operadores (tabla usuarios).";
+            $error = 'Credenciales inválidas. Verifique su correo y contraseña.';
         } elseif (isset($resultado['error']) && $resultado['error'] === 'password_incorrecto') {
             registrarAuditoria($pdo, null, 'INTENTO_LOGIN_FALLIDO', 'usuarios', null, [
                 'motivo'          => 'Contraseña incorrecta',
                 'email_ingresado' => $email
             ]);
-            $error = "Acceso denegado: La contraseña ingresada no coincide con el hash del usuario '{$email}'.";
+            $error = 'Credenciales inválidas. Verifique su correo y contraseña.';
         } else {
             registrarAuditoria($pdo, null, 'INTENTO_LOGIN_FALLIDO', 'usuarios', null, [
                 'evento'          => 'Intento de acceso rechazado',
                 'email_ingresado' => $email
             ]);
-            $error = 'Credenciales no válidas. Verifique su correo institucional y su contraseña.';
+            $error = 'Credenciales inválidas. Verifique su correo y contraseña.';
         }
     }
 }

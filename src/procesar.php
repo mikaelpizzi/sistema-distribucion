@@ -616,27 +616,27 @@ try {
     $mensajeSql = $e->getMessage();
     $driverCode = (int)($e->errorInfo[1] ?? 0);
 
-    // Mapeo detallado de violaciones de restricciones en el motor MariaDB
+    // Mapeo amigable de violaciones de integridad y reglas de base de datos
     if ($driverCode === 1062 || str_contains($mensajeSql, '1062 Duplicate entry')) {
         if (str_contains($mensajeSql, 'uk_retiro_mensual')) {
-            $msg = 'Bloqueo Antifraude [MariaDB 1062]: El paciente ya registra un despacho en este periodo mensual. La restricción UNIQUE (uk_retiro_mensual) en la tabla despachos impidió el doble retiro.';
+            $msg = 'El paciente ya registró un retiro de este tratamiento en el periodo mensual actual.';
         } elseif (str_contains($mensajeSql, 'email')) {
-            $msg = 'Restricción UNIQUE [MariaDB 1062]: El correo electrónico ya se encuentra registrado por otro operador en la tabla usuarios.';
+            $msg = 'El correo electrónico ya se encuentra registrado por otro usuario.';
         } elseif (str_contains($mensajeSql, 'codigo_sanitario') || str_contains($mensajeSql, 'codigo')) {
-            $msg = 'Restricción UNIQUE [MariaDB 1062]: El código ingresado ya existe en la base de datos.';
+            $msg = 'El código ingresado ya se encuentra registrado en el sistema.';
         } else {
-            $msg = "Restricción UNIQUE [MariaDB 1062 - Entrada Duplicada]: {$mensajeSql}";
+            $msg = 'Ya existe un registro con los datos ingresados.';
         }
     } elseif ($driverCode === 1451 || str_contains($mensajeSql, '1451')) {
-        $msg = 'Integridad Referencial [MariaDB 1451 - Restricción FK]: No es posible eliminar o alterar este registro porque existen filas vinculadas en tablas dependientes (lotes, usuarios o despachos).';
+        $msg = 'No es posible eliminar o modificar este registro porque tiene datos vinculados en el sistema.';
     } elseif ($driverCode === 1452 || str_contains($mensajeSql, '1452')) {
-        $msg = 'Integridad Referencial [MariaDB 1452 - Restricción FK]: El registro hace referencia a una clave foránea (FK) que no existe en la tabla principal.';
+        $msg = 'El registro hace referencia a un elemento que no existe.';
     } elseif ($driverCode === 4025 || (str_contains($mensajeSql, 'CONSTRAINT') && str_contains($mensajeSql, 'failed'))) {
-        $msg = "Restricción CHECK [MariaDB 4025]: Los datos no cumplen la regla de validación física a nivel de columna: {$mensajeSql}";
+        $msg = 'Los datos ingresados no cumplen con las reglas requeridas.';
     } elseif ($codigoSql === '45000') {
-        $msg = "Restricción Activa [Trigger SQLSTATE 45000]: {$mensajeSql}";
+        $msg = 'Operación rechazada por reglas de auditoría e integridad del sistema.';
     } else {
-        $msg = "Error de Base de Datos [SQLSTATE {$codigoSql} - Código {$driverCode}]: {$mensajeSql}";
+        $msg = 'Ocurrió un error al procesar la solicitud en la base de datos.';
     }
 
     header("Location: index.php?tab={$targetTab}&error=" . urlencode($msg));
