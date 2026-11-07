@@ -611,9 +611,34 @@ try {
     } elseif (str_contains($accion, 'usuario')) {
         $targetTab = 'usuarios';
     }
-    $msg = ($e->getCode() === '23000')
-        ? 'Error de Integridad Referencial: El código ingresado ya existe en el sistema.'
-        : 'Error de Base de Datos: ' . $e->getMessage();
+
+    $codigoSql  = (string)$e->getCode();
+    $mensajeSql = $e->getMessage();
+    $driverCode = (int)($e->errorInfo[1] ?? 0);
+
+    // Mapeo detallado de violaciones de restricciones en el motor MariaDB
+    if ($driverCode === 1062 || str_contains($mensajeSql, '1062 Duplicate entry')) {
+        if (str_contains($mensajeSql, 'uk_retiro_mensual')) {
+            $msg = 'Bloqueo Antifraude [MariaDB 1062]: El paciente ya registra un despacho en este periodo mensual. La restricción UNIQUE (uk_retiro_mensual) en la tabla despachos impidió el doble retiro.';
+        } elseif (str_contains($mensajeSql, 'email')) {
+            $msg = 'Restricción UNIQUE [MariaDB 1062]: El correo electrónico ya se encuentra registrado por otro operador en la tabla usuarios.';
+        } elseif (str_contains($mensajeSql, 'codigo_sanitario') || str_contains($mensajeSql, 'codigo')) {
+            $msg = 'Restricción UNIQUE [MariaDB 1062]: El código ingresado ya existe en la base de datos.';
+        } else {
+            $msg = "Restricción UNIQUE [MariaDB 1062 - Entrada Duplicada]: {$mensajeSql}";
+        }
+    } elseif ($driverCode === 1451 || str_contains($mensajeSql, '1451')) {
+        $msg = 'Integridad Referencial [MariaDB 1451 - Restricción FK]: No es posible eliminar o alterar este registro porque existen filas vinculadas en tablas dependientes (lotes, usuarios o despachos).';
+    } elseif ($driverCode === 1452 || str_contains($mensajeSql, '1452')) {
+        $msg = 'Integridad Referencial [MariaDB 1452 - Restricción FK]: El registro hace referencia a una clave foránea (FK) que no existe en la tabla principal.';
+    } elseif ($driverCode === 4025 || (str_contains($mensajeSql, 'CONSTRAINT') && str_contains($mensajeSql, 'failed'))) {
+        $msg = "Restricción CHECK [MariaDB 4025]: Los datos no cumplen la regla de validación física a nivel de columna: {$mensajeSql}";
+    } elseif ($codigoSql === '45000') {
+        $msg = "Restricción Activa [Trigger SQLSTATE 45000]: {$mensajeSql}";
+    } else {
+        $msg = "Error de Base de Datos [SQLSTATE {$codigoSql} - Código {$driverCode}]: {$mensajeSql}";
+    }
+
     header("Location: index.php?tab={$targetTab}&error=" . urlencode($msg));
     exit;
 } catch (Exception $e) {

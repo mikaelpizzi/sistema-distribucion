@@ -77,7 +77,7 @@ function autenticarUsuario(PDO $pdo, string $email, string $password): ?array
     $usuario = $stmt->fetch();
 
     if (!$usuario) {
-        return null;
+        return ['error' => 'usuario_no_encontrado'];
     }
 
     if ((int)$usuario['activo'] !== 1) {
@@ -85,21 +85,22 @@ function autenticarUsuario(PDO $pdo, string $email, string $password): ?array
     }
 
     if (!verificarPassword($password, $usuario['password_hash'])) {
-        return null;
+        return ['error' => 'password_incorrecto'];
     }
 
     // Iniciar sesión y regenerar ID para prevenir fijación de sesión
     if (!headers_sent()) {
         session_regenerate_id(true);
     }
-    $_SESSION['usuario_id']       = (int)$usuario['id'];
-    $_SESSION['usuario_nombre']   = $usuario['nombre'];
-    $_SESSION['usuario_email']    = $usuario['email'];
-    $_SESSION['rol_id']           = (int)$usuario['rol_id'];
-    $_SESSION['rol_nombre']       = $usuario['rol_nombre'];
-    $_SESSION['centro_salud_id']  = $usuario['centro_salud_id'] !== null ? (int)$usuario['centro_salud_id'] : null;
-    $_SESSION['centro_nombre']    = $usuario['centro_nombre'] ?? 'Red Municipal Central';
-    $_SESSION['huella_cliente']   = hash('sha256', ($_SERVER['HTTP_USER_AGENT'] ?? 'CLI') . ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'));
+    $_SESSION['usuario_id']        = (int)$usuario['id'];
+    $_SESSION['usuario_nombre']    = $usuario['nombre'];
+    $_SESSION['usuario_email']     = $usuario['email'];
+    $_SESSION['rol_id']            = (int)$usuario['rol_id'];
+    $_SESSION['rol_nombre']        = $usuario['rol_nombre'];
+    $_SESSION['centro_salud_id']   = $usuario['centro_salud_id'] !== null ? (int)$usuario['centro_salud_id'] : null;
+    $_SESSION['centro_nombre']     = $usuario['centro_nombre'] ?? 'Red Municipal Central';
+    $_SESSION['sesion_user_agent'] = $_SERVER['HTTP_USER_AGENT'] ?? 'CLI';
+    $_SESSION['sesion_ip']         = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
 
     return $usuario;
 }
@@ -123,14 +124,24 @@ function requerirAutenticacion(PDO $pdo): array
         exit;
     }
 
-    // 3. Verificación de integridad de sesión contra secuestro (Session Hijacking / Cookie Theft)
-    if (!empty($_SESSION['huella_cliente'])) {
-        $huellaActual = hash('sha256', ($_SERVER['HTTP_USER_AGENT'] ?? 'CLI') . ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'));
-        if (!hash_equals($_SESSION['huella_cliente'], $huellaActual)) {
-            cerrarSesion();
-            header('Location: login.php?error=' . urlencode('Sesión revocada: Se detectó una inconsistencia en la huella de seguridad del navegador.'));
-            exit;
-        }
+    // 3. Verificación de integridad de sesión del cliente
+    $uaActual = $_SERVER['HTTP_USER_AGENT'] ?? 'CLI';
+    $uaPrevio = $_SESSION['sesion_user_agent'] ?? null;
+    if ($uaPrevio !== null && $uaPrevio !== $uaActual) {
+        cerrarSesion();
+        $msg = sprintf(
+            'Sesión revocada por seguridad: Cambió el identificador del navegador (User-Agent modificado). Anterior: [%.40s...] | Actual: [%.40s...]. Si activó o desactivó la emulación móvil en DevTools (F12), inicie sesión nuevamente.',
+            $uaPrevio,
+            $uaActual
+        );
+        header('Location: login.php?error=' . urlencode($msg));
+        exit;
+    }
+
+    // Mantener la IP sincronizada sin invalidar la sesión (previene falsos positivos en redes móviles o puentes Docker)
+    $ipActual = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+    if (!empty($_SESSION['sesion_ip']) && $_SESSION['sesion_ip'] !== $ipActual) {
+        $_SESSION['sesion_ip'] = $ipActual;
     }
 
     // 4. Verificar en BD que el usuario siga activo (evita que un usuario desactivado siga navegando)
@@ -140,7 +151,7 @@ function requerirAutenticacion(PDO $pdo): array
 
     if ($activo !== false && (int)$activo !== 1) {
         cerrarSesion();
-        header('Location: login.php?error=' . urlencode('Su cuenta ha sido desactivada por el Administrador.'));
+        header('Location: login.php?error=' . urlencode("Acceso revocado: La cuenta del operador #{$usuario['id']} ({$usuario['email']}) fue desactivada en la base de datos (columna activo = 0)."));
         exit;
     }
 

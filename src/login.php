@@ -46,7 +46,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             header('Location: index.php');
             exit;
         } elseif (isset($resultado['error']) && $resultado['error'] === 'cuenta_inactiva') {
-            $error = 'Su cuenta de operador se encuentra desactivada por Contraloría.';
+            registrarAuditoria($pdo, null, 'INTENTO_LOGIN_RECHAZADO', 'usuarios', null, [
+                'motivo'          => 'Cuenta desactivada (activo = 0)',
+                'email_ingresado' => $email
+            ]);
+            $error = "Acceso denegado: La cuenta del operador '{$email}' está desactivada en la base de datos (activo = 0).";
+        } elseif (isset($resultado['error']) && $resultado['error'] === 'usuario_no_encontrado') {
+            registrarAuditoria($pdo, null, 'INTENTO_LOGIN_FALLIDO', 'usuarios', null, [
+                'motivo'          => 'Usuario no encontrado',
+                'email_ingresado' => $email
+            ]);
+            $error = "Acceso denegado: El correo '{$email}' no existe en el catálogo de operadores (tabla usuarios).";
+        } elseif (isset($resultado['error']) && $resultado['error'] === 'password_incorrecto') {
+            registrarAuditoria($pdo, null, 'INTENTO_LOGIN_FALLIDO', 'usuarios', null, [
+                'motivo'          => 'Contraseña incorrecta',
+                'email_ingresado' => $email
+            ]);
+            $error = "Acceso denegado: La contraseña ingresada no coincide con el hash del usuario '{$email}'.";
         } else {
             registrarAuditoria($pdo, null, 'INTENTO_LOGIN_FALLIDO', 'usuarios', null, [
                 'evento'          => 'Intento de acceso rechazado',
