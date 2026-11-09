@@ -683,8 +683,8 @@ if ($tabActiva === 'centros') {
     if (!empty($pacienteIds)) {
         $inClause = implode(',', array_map('intval', $pacienteIds));
         $sqlContactos = "
-            SELECT pc.id, pc.paciente_id, pc.tipo_contacto_id, tc.nombre AS tipo_nombre,
-                   pc.valor, pc.nombre_contacto_emergencia AS titular, pc.es_principal
+            SELECT pc.*, tc.codigo AS tipo_contacto_codigo, tc.nombre AS tipo_nombre,
+                   pc.nombre_contacto_emergencia AS titular
             FROM paciente_contactos pc
             LEFT JOIN tipos_contacto tc ON pc.tipo_contacto_id = tc.id
             WHERE pc.paciente_id IN ({$inClause})
@@ -2974,13 +2974,10 @@ if ($tabDesconocida) {
 
         <?php endif; ?>
 
-    </div>
-
-
-
-    <!-- MODAL: DETALLE TÉCNICO DEL EVENTO -->
-
-<?php if ($tabActiva === 'configuracion' && $esAdmin): ?>
+        <!-- ==================================================================== -->
+        <!-- PESTAÑA: IDENTIDAD INSTITUCIONAL (WHITE-LABELING)                    -->
+        <!-- ==================================================================== -->
+        <?php if ($tabActiva === 'configuracion' && $esAdmin): ?>
             <div class="row g-3">
                 <div class="col-xl-9 col-lg-11 mx-auto">
                     <div class="card-sicm">
@@ -3630,146 +3627,148 @@ if ($tabDesconocida) {
         <?php endif; ?>
 
         </main>
+    </div>
+</div>
 
-            </main>
+<!-- ==================================================================== -->
+<!-- MODALES DEL SISTEMA                                                  -->
+<!-- ==================================================================== -->
+
+<!-- Modal: Detalle Técnico del Evento (Auditoría Forense) -->
+<div class="modal fade" id="modalJson" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-dark text-white py-2.5 px-3">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-shield-check text-info fs-5"></i>
+                    <h6 class="modal-title font-monospace m-0">
+                        Detalle del Evento #<span id="mj-id" class="text-info"></span>
+                    </h6>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span id="mj-badge-accion" class="badge bg-primary"></span>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                        aria-label="Cerrar"></button>
+                </div>
+            </div>
+            <div class="modal-body p-3">
+                <!-- Cuadrícula Técnica de Información -->
+                <div class="card bg-light border mb-3">
+                    <div class="card-body p-3">
+                        <div class="row g-2 small">
+                            <div class="col-sm-6">
+                                <span class="text-muted fw-semibold">Fecha y Hora:</span>
+                                <div id="mj-fecha" class="font-monospace fw-bold text-dark"></div>
+                            </div>
+                            <div class="col-sm-6">
+                                <span class="text-muted fw-semibold">Operador Responsable:</span>
+                                <div id="mj-actor-block" class="fw-bold text-dark"></div>
+                            </div>
+                            <div class="col-sm-6">
+                                <span class="text-muted fw-semibold">Origen de Red:</span>
+                                <div>
+                                    <code id="mj-ip" class="font-monospace fw-bold"></code>
+                                    <span class="text-muted ms-1" id="mj-ua-summary"></span>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <span class="text-muted fw-semibold">Elemento Afectado:</span>
+                                <div>
+                                    <span id="mj-canal" class="badge bg-secondary font-monospace"></span>
+                                    <span class="text-muted ms-1"><span id="mj-entidad-txt"
+                                            class="fw-semibold text-dark"></span><code id="mj-tabla"></code> <span
+                                            id="mj-registro" class="text-muted"></span></span>
+                                </div>
+                            </div>
+                            <div class="col-12 mt-2 pt-2 border-top">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="text-muted fw-semibold" style="font-size: 0.72rem;">Navegador /
+                                        Cliente Completo:</span>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2"
+                                        id="btn-copy-ua" style="font-size: 0.68rem;" title="Copiar User-Agent">
+                                        Copiar
+                                    </button>
+                                </div>
+                                <div id="mj-ua"
+                                    class="p-2 bg-white border rounded font-monospace small text-break user-select-all"
+                                    style="font-size: 0.74rem; max-height: 70px; overflow-y: auto; color: #1e293b; line-height: 1.4;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Descripción del Evento -->
+                <div id="mj-evento-desc" class="alert alert-info py-2 px-3 small mb-3 d-none"></div>
+
+                <!-- Tabla de Diferencias (Visual Diff) -->
+                <div id="mj-diff-wrap" class="d-none mb-3">
+                    <div class="fw-semibold small text-dark mb-1 d-flex align-items-center gap-1">
+                        <i class="bi bi-arrow-left-right text-primary"></i>
+                        <span>Cambios Registrados:</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm mb-0 small">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 25%;">Campo</th>
+                                    <th style="width: 37.5%;" class="text-danger bg-danger-subtle">Valor Anterior
+                                    </th>
+                                    <th style="width: 37.5%;" class="text-success bg-success-subtle">Valor Posterior
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody id="mj-diff-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Carga Transaccional Desglosada en Pares Clave-Valor -->
+                <div id="mj-datos-wrap" class="d-none mb-3">
+                    <div class="fw-semibold small text-dark mb-1 d-flex align-items-center gap-1">
+                        <i class="bi bi-card-checklist text-primary"></i>
+                        <span>Detalle de los Datos:</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm mb-0 small">
+                            <tbody id="mj-datos-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Acordeón para Inspeccionar Payload JSON Crudo -->
+                <details class="mt-2">
+                    <summary class="text-muted small cursor-pointer user-select-none" style="cursor: pointer;">
+                        <i class="bi bi-chevron-right me-1"></i> Ver Datos Técnicos Adicionales (JSON)
+                    </summary>
+                    <div class="position-relative mt-2">
+                        <button type="button"
+                            class="btn btn-outline-light btn-sm position-absolute top-0 end-0 m-2 py-0 px-2"
+                            id="btn-copy-json" style="font-size: 0.68rem; z-index: 5;">
+                            Copiar JSON
+                        </button>
+                        <pre id="mj-contenido"
+                            class="json-viewer p-2.5 bg-dark text-light rounded small font-monospace m-0"
+                            style="max-height: 220px; overflow-y: auto;"></pre>
+                    </div>
+                </details>
+            </div>
+            <div class="modal-footer py-2 px-3 bg-light d-flex justify-content-between align-items-center">
+                <span class="text-muted small" style="font-size: 0.75rem;">
+                    <i class="bi bi-shield-check text-success me-1"></i> Registro inmutable de auditoría
+                </span>
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+            </div>
         </div>
     </div>
-
-    <div class="modal fade" id="modalJson" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
-            <div class="modal-content border-0 shadow-lg">
-                <div class="modal-header bg-dark text-white py-2.5 px-3">
-                    <div class="d-flex align-items-center gap-2">
-                        <i class="bi bi-shield-check text-info fs-5"></i>
-                        <h6 class="modal-title font-monospace m-0">
-                            Detalle del Evento #<span id="mj-id" class="text-info"></span>
-                        </h6>
-                    
-                    <div class="d-flex align-items-center gap-2">
-                        <span id="mj-badge-accion" class="badge bg-primary"></span>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
-                            aria-label="Cerrar"></button>
-                    
-                
-                <div class="modal-body p-3">
-                    <!-- Cuadrícula Técnica de Información -->
-                    <div class="card bg-light border mb-3">
-                        <div class="card-body p-3">
-                            <div class="row g-2 small">
-                                <div class="col-sm-6">
-                                    <span class="text-muted fw-semibold">Fecha y Hora:</span>
-                                    <div id="mj-fecha" class="font-monospace fw-bold text-dark">
-                                
-                                <div class="col-sm-6">
-                                    <span class="text-muted fw-semibold">Operador Responsable:</span>
-                                    <div id="mj-actor-block" class="fw-bold text-dark">
-                                
-                                <div class="col-sm-6">
-                                    <span class="text-muted fw-semibold">Origen de Red:</span>
-                                    <div>
-                                        <code id="mj-ip" class="font-monospace fw-bold"></code>
-                                        <span class="text-muted ms-1" id="mj-ua-summary"></span>
-                                    
-                                
-                                <div class="col-sm-6">
-                                    <span class="text-muted fw-semibold">Elemento Afectado:</span>
-                                    <div>
-                                        <span id="mj-canal" class="badge bg-secondary font-monospace"></span>
-                                        <span class="text-muted ms-1"><span id="mj-entidad-txt"
-                                                class="fw-semibold text-dark"></span><code id="mj-tabla"></code> <span
-                                                id="mj-registro" class="text-muted"></span></span>
-                                    
-                                
-                                <div class="col-12 mt-2 pt-2 border-top">
-                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <span class="text-muted fw-semibold" style="font-size: 0.72rem;">Navegador /
-                                            Cliente Completo:</span>
-                                        <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2"
-                                            id="btn-copy-ua" style="font-size: 0.68rem;" title="Copiar User-Agent">
-                                            Copiar
-                                        </button>
-                                    
-                                    <div id="mj-ua"
-                                        class="p-2 bg-white border rounded font-monospace small text-break user-select-all"
-                                        style="font-size: 0.74rem; max-height: 70px; overflow-y: auto; color: #1e293b; line-height: 1.4;">
-                                    
-                                
-                            
-                        
-                    
-
-                    <!-- Descripción del Evento -->
-                    <div id="mj-evento-desc" class="alert alert-info py-2 px-3 small mb-3 d-none">
-
-                    <!-- Tabla de Diferencias (Visual Diff) -->
-                    <div id="mj-diff-wrap" class="d-none mb-3">
-                        <div class="fw-semibold small text-dark mb-1 d-flex align-items-center gap-1">
-                            <i class="bi bi-arrow-left-right text-primary"></i>
-                            <span>Cambios Registrados:</span>
-                        
-                        <div class="table-responsive">
-                            <table class="table table-bordered table-sm mb-0 small">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th style="width: 25%;">Campo</th>
-                                        <th style="width: 37.5%;" class="text-danger bg-danger-subtle">Valor Anterior
-                                        </th>
-                                        <th style="width: 37.5%;" class="text-success bg-success-subtle">Valor Posterior
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody id="mj-diff-tbody"></tbody>
-                            </table>
-                        
-                    
-
-                    <!-- Carga Transaccional Desglosada en Pares Clave-Valor -->
-                    <div id="mj-datos-wrap" class="d-none mb-3">
-                        <div class="fw-semibold small text-dark mb-1 d-flex align-items-center gap-1">
-                            <i class="bi bi-card-checklist text-primary"></i>
-                            <span>Detalle de los Datos:</span>
-                        
-                        <div class="table-responsive">
-                            <table class="table table-bordered table-sm mb-0 small">
-                                <tbody id="mj-datos-tbody"></tbody>
-                            </table>
-                        
-                    
-
-                    <!-- Acordeón para Inspeccionar Payload JSON Crudo -->
-                    <details class="mt-2">
-                        <summary class="text-muted small cursor-pointer user-select-none" style="cursor: pointer;">
-                            <i class="bi bi-chevron-right me-1"></i> Ver Datos Técnicos Adicionales (JSON)
-                        </summary>
-                        <div class="position-relative mt-2">
-                            <button type="button"
-                                class="btn btn-outline-light btn-sm position-absolute top-0 end-0 m-2 py-0 px-2"
-                                id="btn-copy-json" style="font-size: 0.68rem; z-index: 5;">
-                                Copiar JSON
-                            </button>
-                            <pre id="mj-contenido"
-                                class="json-viewer p-2.5 bg-dark text-light rounded small font-monospace m-0"
-                                style="max-height: 220px; overflow-y: auto;"></pre>
-                        
-                    </details>
-                
-                <div class="modal-footer py-2 px-3 bg-light d-flex justify-content-between align-items-center">
-                    <span class="text-muted small" style="font-size: 0.75rem;">
-                        <i class="bi bi-shield-check text-success me-1"></i> Registro inmutable de auditoría
-                    </span>
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
-                
-            
-        
-    
+</div>
 
     <script src="public/js/validaciones.js"></script>
     <script src="public/js/auditoria_stream.js?v=<?= filemtime(__DIR__ . '/public/js/auditoria_stream.js') ?>"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        document.addEventListener('DOMConten tLoaded', () => {
+        document.addEventListener('DOMContentLoaded', () => {
             // Modal de Detalle Técnico del Evento
-            const modalJ = do cument.getElementById('modalJson');
+            const modalJ = document.getElementById('modalJson');
             if (modalJ) {
                 const bsJ = new bootstrap.Modal(modalJ);
 
