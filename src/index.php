@@ -4528,7 +4528,7 @@ if ($tabDesconocida) {
                                 </span>
                                 <input type="text" name="q_paciente" class="form-control" 
                                        placeholder="Ingrese cédula de identidad o nombre del paciente..." 
-                                       value="<?= htmlspecialchars($busquedaPaciente) ?>" autofocus required>
+                                       value="<?= htmlspecialchars($busquedaPaciente) ?>" autocomplete="off" autofocus required>
                                 <?php if ($busquedaPaciente !== ''): ?>
                                     <a href="index.php?tab=despachos<?= $esAdmin ? '&centro_id=' . (int)$centroOperativoId : '' ?>" 
                                        class="btn btn-outline-secondary" title="Limpiar consulta">
