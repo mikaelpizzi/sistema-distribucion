@@ -17,8 +17,9 @@ $centroUsuarioId = $usuario['centro_salud_id'];
 $configInst = obtenerConfiguracionInstitucional($pdo);
 
 $tabActiva = $_GET['tab'] ?? 'centros';
-$mensajeExito = $_GET['msg'] ?? null;
-$mensajeError = $_GET['error'] ?? null;
+$mensajeExito = $_GET['msg'] ?? ($_SESSION['mensaje_exito'] ?? null);
+$mensajeError = $_GET['error'] ?? ($_SESSION['mensaje_error'] ?? null);
+unset($_SESSION['mensaje_exito'], $_SESSION['mensaje_error']);
 
 // Protección RBAC: El Farmaceuta solo tiene acceso a las pestañas asistenciales de su ambulatorio
 $tabsAdmin = ['maestras', 'usuarios', 'auditoria', 'configuracion'];
@@ -3877,6 +3878,7 @@ if ($tabDesconocida) {
                                         <label class="form-label small fw-semibold text-secondary mb-1">Fecha de Vencimiento *</label>
                                         <input type="date" name="fecha_vencimiento_recipe" id="recipe_fecha_vencimiento" class="form-control form-control-sm"
                                             required
+                                            min="<?= $recipeEdicion ? htmlspecialchars($recipeEdicion['fecha_emision_recipe']) : date('Y-m-d') ?>"
                                             value="<?= $recipeEdicion ? htmlspecialchars($recipeEdicion['fecha_vencimiento_recipe']) : date('Y-m-d', strtotime('+6 months')) ?>">
                                         <div class="form-text" style="font-size: 0.68rem;">Límite temporal de vigencia para despachos asistenciales.</div>
                                     </div>

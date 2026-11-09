@@ -202,8 +202,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // =========================================================================
-    // 5. VALIDACIÓN DEL FORMULARIO DE RÉCIPES MÉDICOS
+    // 5. VALIDACIÓN Y COHERENCIA DE FECHAS EN RÉCIPES MÉDICOS
     // =========================================================================
+    const emisionInput     = document.getElementById('recipe_fecha_emision');
+    const vencimientoInput = document.getElementById('recipe_fecha_vencimiento');
+    if (emisionInput && vencimientoInput) {
+        const syncFechasRecipe = () => {
+            if (emisionInput.value) {
+                vencimientoInput.min = emisionInput.value;
+                if (vencimientoInput.value && vencimientoInput.value < emisionInput.value) {
+                    vencimientoInput.value = emisionInput.value;
+                }
+            }
+        };
+        emisionInput.addEventListener('change', syncFechasRecipe);
+        emisionInput.addEventListener('input', syncFechasRecipe);
+        syncFechasRecipe();
+    }
+
     const formRecipe = document.getElementById('form-recipe');
     if (formRecipe) {
         formRecipe.addEventListener('submit', (e) => {

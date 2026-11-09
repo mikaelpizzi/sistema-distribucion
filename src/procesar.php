@@ -1097,6 +1097,32 @@ try {
                 ];
             }
 
+            // Manejo si se recibe arreglo estructurado $_POST['contactos'] (API o payload normalizado)
+            if (isset($_POST['contactos']) && is_array($_POST['contactos'])) {
+                foreach ($_POST['contactos'] as $idx => $c) {
+                    if (!is_array($c)) continue;
+                    $rawVal = trim((string)($c['valor'] ?? ''));
+                    if ($rawVal === '') {
+                        continue; // Omitir filas vacías sin error
+                    }
+                    $rawTipo = isset($c['tipo_id']) ? (int)$c['tipo_id'] : (isset($c['tipo']) ? (int)$c['tipo'] : $tipoDefecto);
+                    if (!in_array($rawTipo, $setTiposValidos, true)) {
+                        $rawTipo = $tipoDefecto;
+                    }
+                    $rawDet = trim((string)($c['detalle'] ?? ($c['nombre_contacto_emergencia'] ?? '')));
+                    $esPrincipal = !empty($c['es_principal']) ? 1 : 0;
+                    if ($esPrincipal === 1) {
+                        $huboPrincipal = true;
+                    }
+                    $contactosAInsertar[] = [
+                        'tipo_id'      => $rawTipo,
+                        'valor'        => mb_substr($rawVal, 0, 120, 'UTF-8'),
+                        'detalle'      => $rawDet !== '' ? mb_substr($rawDet, 0, 100, 'UTF-8') : null,
+                        'es_principal' => $esPrincipal
+                    ];
+                }
+            }
+
             // Compatibilidad hacia atrás si se envían los campos individuales tradicionales
             if (empty($contactosAInsertar) && (!empty($_POST['telefono_principal']) || !empty($_POST['contacto_emergencia_telefono']))) {
                 if (!empty($_POST['telefono_principal'])) {
@@ -1323,6 +1349,18 @@ try {
             }
 
             if ($id === null) {
+                // Arquitectura Híbrida: Desactivar previamente cualquier prescripción activa y vigente del mismo fármaco
+                // Esto garantiza continuidad asistencial limpia para ajustes de dosis o renovación de recetas
+                $stmtDesactivar = $pdo->prepare("UPDATE tratamientos_autorizados 
+                                                SET activo = 0 
+                                                WHERE paciente_id = :p_id 
+                                                  AND medicamento_id = :m_id 
+                                                  AND activo = 1");
+                $stmtDesactivar->execute([
+                    ':p_id' => $pacienteId,
+                    ':m_id' => $medicamentoId
+                ]);
+
                 // CREATE
                 $sql = "INSERT INTO tratamientos_autorizados 
                         (paciente_id, medicamento_id, patologia_id, dosis_mensual, fecha_emision_recipe, fecha_vencimiento_recipe, medico_prescriptor, activo)
@@ -1501,11 +1539,19 @@ try {
     } elseif ($driverCode === 1452 || str_contains($mensajeSql, '1452')) {
         $msg = 'El registro hace referencia a un elemento que no existe.';
     } elseif ($driverCode === 4025 || (str_contains($mensajeSql, 'CONSTRAINT') && str_contains($mensajeSql, 'failed'))) {
-        $msg = 'Los datos ingresados no cumplen con las reglas requeridas.';
-    } elseif ($codigoSql === '45000') {
-        $msg = 'Operación rechazada por reglas de auditoría e integridad del sistema.';
+        if (str_contains($mensajeSql, 'chk_recipe_rango_fechas')) {
+            $msg = 'Incoherencia en fechas: La fecha de vencimiento debe ser igual o posterior a la fecha de emisión del récipe.';
+        } else {
+            $msg = 'Los datos ingresados no cumplen con las reglas requeridas.';
+        }
+    } elseif ($codigoSql === '45000' || $driverCode === 1644) {
+        $msg = !empty($e->errorInfo[2]) ? $e->errorInfo[2] : 'Operación rechazada por reglas de auditoría e integridad del sistema.';
     } else {
         $msg = 'Ocurrió un error al procesar la solicitud en la base de datos.';
+    }
+
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        $_SESSION['mensaje_error'] = $msg;
     }
 
     header("Location: index.php?tab={$targetTab}&error=" . urlencode($msg));

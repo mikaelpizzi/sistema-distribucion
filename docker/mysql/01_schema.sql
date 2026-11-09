@@ -292,7 +292,8 @@ CREATE TABLE tratamientos_autorizados (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_tratamientos_paciente FOREIGN KEY (paciente_id) REFERENCES pacientes(id),
     CONSTRAINT fk_tratamientos_medicamento FOREIGN KEY (medicamento_id) REFERENCES medicamentos(id),
-    CONSTRAINT fk_tratamientos_patologia FOREIGN KEY (patologia_id) REFERENCES patologias(id)
+    CONSTRAINT fk_tratamientos_patologia FOREIGN KEY (patologia_id) REFERENCES patologias(id),
+    CONSTRAINT chk_recipe_rango_fechas CHECK (fecha_vencimiento_recipe >= fecha_emision_recipe)
 ) ENGINE=InnoDB;
 
 -- POLÍTICA APLICADA: Despachos estrictamente inmutables con candado contra doble retiro mensual
@@ -508,6 +509,50 @@ BEGIN
         IF v_tiene_frio = 0 THEN
             SIGNAL SQLSTATE '45000'
             SET MESSAGE_TEXT = 'Violación de Seguridad Sanitaria: El ambulatorio destino no cuenta con equipo operativo de Cadena de Frío para almacenar este medicamento termolábil.';
+        END IF;
+    END IF;
+END$$
+
+-- 8.5b Centinela de Unicidad y Coherencia Clínica de Récipes Activos
+DROP TRIGGER IF EXISTS trg_tratamientos_no_duplicados_activos_ins$$
+CREATE TRIGGER trg_tratamientos_no_duplicados_activos_ins
+BEFORE INSERT ON tratamientos_autorizados
+FOR EACH ROW
+BEGIN
+    DECLARE v_existentes INT DEFAULT 0;
+    IF NEW.activo = 1 THEN
+        SELECT COUNT(*) INTO v_existentes
+        FROM tratamientos_autorizados
+        WHERE paciente_id = NEW.paciente_id
+          AND medicamento_id = NEW.medicamento_id
+          AND activo = 1
+          AND fecha_vencimiento_recipe >= CURDATE();
+
+        IF v_existentes > 0 THEN
+            SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Conflicto Clínico: El paciente ya posee un récipe activo y vigente para este mismo medicamento. Desactive o expire el anterior antes de emitir uno nuevo.';
+        END IF;
+    END IF;
+END$$
+
+DROP TRIGGER IF EXISTS trg_tratamientos_no_duplicados_activos_upd$$
+CREATE TRIGGER trg_tratamientos_no_duplicados_activos_upd
+BEFORE UPDATE ON tratamientos_autorizados
+FOR EACH ROW
+BEGIN
+    DECLARE v_existentes INT DEFAULT 0;
+    IF NEW.activo = 1 THEN
+        SELECT COUNT(*) INTO v_existentes
+        FROM tratamientos_autorizados
+        WHERE paciente_id = NEW.paciente_id
+          AND medicamento_id = NEW.medicamento_id
+          AND activo = 1
+          AND fecha_vencimiento_recipe >= CURDATE()
+          AND id != NEW.id;
+
+        IF v_existentes > 0 THEN
+            SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Conflicto Clínico: El paciente ya posee un récipe activo y vigente para este mismo medicamento. Desactive o expire el anterior antes de emitir uno nuevo.';
         END IF;
     END IF;
 END$$
