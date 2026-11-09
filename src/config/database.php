@@ -3,6 +3,33 @@
 // Conexión nativa a MariaDB/MySQL mediante PDO sin librerías externas
 declare(strict_types=1);
 
+// Sincronizar zona horaria de la aplicación con la hora legal de Venezuela (UTC-4)
+date_default_timezone_set('America/Caracas');
+
+/**
+ * Establece las variables de contexto de sesión SQL (@app_user_id, @app_client_ip, @app_user_agent)
+ * en la conexión PDO activa para que los triggers de auditoría registren al operador web real.
+ */
+function establecerContextoAuditoriaSQL(
+    PDO $pdo,
+    ?int $usuarioId = null,
+    ?string $ip = null,
+    ?string $userAgent = null
+): void {
+    try {
+        $ip = $ip ?? ($_SESSION['sesion_ip'] ?? ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'));
+        $userAgent = $userAgent ?? ($_SESSION['sesion_user_agent'] ?? ($_SERVER['HTTP_USER_AGENT'] ?? 'CLI'));
+
+        $usrSql = $usuarioId !== null ? (int)$usuarioId : 'NULL';
+        $ipSql  = $ip !== null ? $pdo->quote(substr($ip, 0, 45)) : 'NULL';
+        $uaSql  = $userAgent !== null ? $pdo->quote(substr($userAgent, 0, 255)) : 'NULL';
+
+        $pdo->exec("SET @app_user_id = {$usrSql}, @app_client_ip = {$ipSql}, @app_user_agent = {$uaSql};");
+    } catch (Throwable $e) {
+        error_log('[AUDITORIA SQL CONTEXT ERROR]: ' . $e->getMessage());
+    }
+}
+
 function getDB(): PDO
 {
     static $pdo = null;
@@ -39,6 +66,23 @@ function getDB(): PDO
                     die("Error de Infraestructura: No fue posible conectar con la base de datos MySQL/MariaDB. " . $e->getMessage());
                 }
             }
+        }
+
+        // Forzar zona horaria de MariaDB a UTC-4 (America/Caracas)
+        try {
+            $pdo->exec("SET time_zone = '-04:00';");
+        } catch (Throwable $tzErr) {
+            // Continuar si la directiva ya viene configurada por el servidor
+        }
+
+        // Si la sesión PHP ya está iniciada con un usuario activo, sincronizar variables SQL en la conexión
+        if (session_status() === PHP_SESSION_ACTIVE && !empty($_SESSION['usuario_id'])) {
+            establecerContextoAuditoriaSQL(
+                $pdo,
+                (int)$_SESSION['usuario_id'],
+                $_SESSION['sesion_ip'] ?? ($_SERVER['REMOTE_ADDR'] ?? null),
+                $_SESSION['sesion_user_agent'] ?? ($_SERVER['HTTP_USER_AGENT'] ?? null)
+            );
         }
     }
 

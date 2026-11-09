@@ -6,8 +6,10 @@ declare(strict_types=1);
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/helpers/auth.php';
 require_once __DIR__ . '/helpers/auditoria.php';
+require_once __DIR__ . '/helpers/configuracion.php';
 
 $pdo = getDB();
+$configInst = obtenerConfiguracionInstitucional($pdo);
 
 
 // 1. Si no hay usuarios en la base de datos y no se pidió seed, ir a setup
@@ -80,19 +82,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema Integrado de Control de Medicamentos</title>
+    <title><?= htmlspecialchars($configInst['siglas_sistema']) ?> - <?= htmlspecialchars($configInst['nombre_sistema']) ?></title>
+    <link rel="icon" type="<?= !empty($configInst['logotipo_ruta']) && file_exists(__DIR__ . '/' . $configInst['logotipo_ruta']) ? (str_ends_with(strtolower($configInst['logotipo_ruta']), '.svg') ? 'image/svg+xml' : 'image/png') : 'image/svg+xml' ?>" href="<?= !empty($configInst['logotipo_ruta']) && file_exists(__DIR__ . '/' . $configInst['logotipo_ruta']) ? htmlspecialchars($configInst['logotipo_ruta']) : 'public/img/favicon.svg' ?>">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style>
         :root {
-            --bg-page: #0f172a;
-            --border-subtle: #1e293b;
-            --border-input: #334155;
-            --input-bg: #1e293b;
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --text-label: #cbd5e1;
-            --primary: #2563eb;
-            --primary-hover: #1d4ed8;
+            --bg-page: #f8fafc;
+            --card-bg: #ffffff;
+            --border-card: #e2e8f0;
+            --border-input: #cbd5e1;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --text-label: #334155;
+            --primary: #0d6efd;
+            --primary-hover: #0b5ed7;
         }
 
         body {
@@ -108,35 +112,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             -webkit-font-smoothing: antialiased;
         }
 
-        .auth-container {
-            max-width: 380px;
+        .auth-card {
+            max-width: 410px;
             width: 100%;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-card);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            padding: 2.25rem 2rem;
         }
 
         .auth-title {
-            font-size: 1.15rem;
-            font-weight: 600;
+            font-size: 1.2rem;
+            font-weight: 700;
             letter-spacing: -0.01em;
             color: var(--text-main);
-            margin-bottom: 0.25rem;
-            line-height: 1.35;
+            line-height: 1.3;
         }
 
         .auth-subtitle {
-            font-size: 0.825rem;
+            font-size: 0.8125rem;
             color: var(--text-muted);
             margin-bottom: 1.75rem;
         }
 
         .form-label {
             font-size: 0.8125rem;
-            font-weight: 500;
+            font-weight: 600;
             color: var(--text-label);
             margin-bottom: 0.35rem;
         }
 
         .form-control {
-            background-color: var(--input-bg);
+            background-color: #ffffff;
             border: 1px solid var(--border-input);
             color: var(--text-main);
             font-size: 0.875rem;
@@ -146,18 +154,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         .form-control:focus {
-            background-color: var(--input-bg);
-            border-color: var(--primary);
+            background-color: #ffffff;
+            border-color: #3b82f6;
             color: var(--text-main);
-            box-shadow: 0 0 0 1px var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
         }
 
         .form-control::placeholder {
-            color: #64748b;
+            color: #94a3b8;
         }
 
         .btn-toggle-eye {
-            background-color: var(--input-bg);
+            background-color: #ffffff;
             border: 1px solid var(--border-input);
             border-left: none;
             color: var(--text-muted);
@@ -165,12 +173,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             border-top-right-radius: 6px;
             border-bottom-right-radius: 6px;
             cursor: pointer;
-            transition: color 0.15s ease;
+            transition: color 0.15s ease, background-color 0.15s ease;
         }
 
         .btn-toggle-eye:hover {
             color: var(--text-main);
-            background-color: var(--input-bg);
+            background-color: #f8fafc;
         }
 
         .btn-submit {
@@ -178,83 +186,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             border: 1px solid var(--primary);
             color: #ffffff;
             font-size: 0.875rem;
-            font-weight: 500;
-            padding: 0.55rem 1rem;
+            font-weight: 600;
+            padding: 0.6rem 1rem;
             border-radius: 6px;
             width: 100%;
-            transition: background-color 0.15s ease, border-color 0.15s ease;
+            transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
         }
 
         .btn-submit:hover {
             background-color: var(--primary-hover);
-            border-color: var(--primary-hover);
+            border-color: #0a58ca;
             color: #ffffff;
-        }
-
-        .auth-divider {
-            border-top: 1px solid var(--border-subtle);
-            margin-top: 1.5rem;
-            padding-top: 1.25rem;
-        }
-
-        .form-check-input {
-            background-color: var(--input-bg);
-            border-color: var(--border-input);
-            cursor: pointer;
-        }
-
-        .form-check-input:checked {
-            background-color: var(--primary);
-            border-color: var(--primary);
-        }
-
-        .form-check-label {
-            font-size: 0.8125rem;
-            color: var(--text-muted);
-            cursor: pointer;
-            user-select: none;
-        }
-
-        .alert-auth {
-            font-size: 0.8125rem;
-            padding: 0.6rem 0.85rem;
-            border-radius: 6px;
-            margin-bottom: 1.25rem;
-            border: 1px solid transparent;
-        }
-        .alert-auth-danger {
-            background-color: rgba(239, 68, 68, 0.12);
-            border-color: rgba(239, 68, 68, 0.3);
-            color: #fca5a5;
-        }
-        .alert-auth-success {
-            background-color: rgba(34, 197, 94, 0.12);
-            border-color: rgba(34, 197, 94, 0.3);
-            color: #86efac;
+            box-shadow: 0 2px 6px rgba(13, 110, 253, 0.25);
         }
     </style>
 </head>
 <body>
 
-    <div class="auth-container">
-        <!-- 1. Jerarquía de Títulos Limpia (Sin acrónimos ni badges) -->
-        <h1 class="auth-title">Sistema Integrado de Control de Medicamentos</h1>
-        <div class="auth-subtitle">Red Municipal de Ambulatorios</div>
+    <div class="auth-card">
+        <!-- Identidad Institucional Parametrizable (White-labeling) -->
+        <div class="text-center mb-3">
+            <?php if (!empty($configInst['logotipo_ruta'])): ?>
+                <img src="<?= htmlspecialchars($configInst['logotipo_ruta']) ?>" alt="Logotipo Institucional" style="max-height: 52px; max-width: 100%; object-fit: contain;" class="mb-2">
+            <?php else: ?>
+                <div class="d-inline-flex align-items-center justify-content-center rounded-3 bg-primary bg-opacity-10 text-primary border border-primary border-opacity-20 p-2 mb-2" style="width: 50px; height: 50px;">
+                    <i class="bi bi-shield-plus fs-2"></i>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <div class="d-flex align-items-center justify-content-between mb-1">
+            <h1 class="auth-title mb-0"><?= htmlspecialchars($configInst['nombre_sistema']) ?></h1>
+            <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace ms-2"><?= htmlspecialchars($configInst['siglas_sistema']) ?></span>
+        </div>
+        <div class="auth-subtitle"><?= htmlspecialchars($configInst['ente_rector']) ?> &bull; <?= htmlspecialchars($configInst['municipio']) ?></div>
 
         <!-- Notificaciones -->
         <?php if ($msg): ?>
-            <div class="alert-auth alert-auth-success">
-                <?= htmlspecialchars($msg) ?>
+            <div class="alert alert-success border-success-subtle py-2 px-3 mb-3 d-flex align-items-center gap-2" style="font-size: 0.8125rem;">
+                <i class="bi bi-check-circle-fill text-success flex-shrink-0"></i>
+                <span><?= htmlspecialchars($msg) ?></span>
             </div>
         <?php endif; ?>
 
         <?php if ($error): ?>
-            <div class="alert-auth alert-auth-danger">
-                <?= htmlspecialchars($error) ?>
+            <div class="alert alert-danger border-danger-subtle py-2 px-3 mb-3 d-flex align-items-center gap-2" style="font-size: 0.8125rem;">
+                <i class="bi bi-exclamation-triangle-fill text-danger flex-shrink-0"></i>
+                <span><?= htmlspecialchars($error) ?></span>
             </div>
         <?php endif; ?>
 
-        <!-- 2. Formulario Sobrio -->
+        <!-- Formulario de Acceso Institucional -->
         <form id="form-login" action="login.php" method="POST" novalidate>
             <div class="mb-3">
                 <label for="email" class="form-label">Correo institucional</label>
@@ -281,8 +263,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <button type="submit" class="btn btn-submit">
                 Iniciar sesión
             </button>
-
-
         </form>
     </div>
 

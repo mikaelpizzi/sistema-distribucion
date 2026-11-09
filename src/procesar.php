@@ -6,6 +6,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/helpers/auth.php';
 require_once __DIR__ . '/helpers/auditoria.php';
+require_once __DIR__ . '/helpers/configuracion.php';
 
 $pdo = getDB();
 $accion = $_REQUEST['accion'] ?? '';
@@ -29,7 +30,14 @@ $accionesSoloAdmin = [
     'toggle_recurso',
     'guardar_usuario',
     'cambiar_estado_usuario',
-    'descargar_respaldo'
+    'descargar_respaldo',
+    'guardar_identidad_institucional',
+    'crear_medicamento',
+    'editar_medicamento',
+    'cambiar_estado_medicamento',
+    'crear_patologia',
+    'cambiar_estado_patologia',
+    'crear_forma_farmaceutica'
 ];
 
 if (in_array($accion, $accionesSoloAdmin, true) && !$esAdmin) {
@@ -596,7 +604,635 @@ try {
             }
             exit;
 
-        default:
+
+        case 'guardar_identidad_institucional':
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                header('Location: index.php?tab=configuracion');
+                exit;
+            }
+
+            $nombreSistema = trim($_POST['nombre_sistema'] ?? '');
+            $siglasSistema = strtoupper(trim($_POST['siglas_sistema'] ?? ''));
+            $enteRector    = trim($_POST['ente_rector'] ?? '');
+            $municipio     = trim($_POST['municipio'] ?? '');
+            $diasFefo      = (int)($_POST['dias_alerta_fefo'] ?? 60);
+            $eliminarLogo  = !empty($_POST['eliminar_logo']);
+            $logotipoRuta  = trim($_POST['logotipo_ruta'] ?? '');
+
+            if (mb_strlen($nombreSistema, 'UTF-8') < 3 || mb_strlen($siglasSistema, 'UTF-8') < 2 || mb_strlen($enteRector, 'UTF-8') < 3) {
+                header('Location: index.php?tab=configuracion&error=' . urlencode('Los campos Nombre del Sistema, Siglas y Ente Rector son obligatorios.'));
+                exit;
+            }
+
+            if ($diasFefo < 1 || $diasFefo > 365) {
+                header('Location: index.php?tab=configuracion&error=' . urlencode('El umbral de alerta FEFO debe situarse entre 1 y 365 días.'));
+                exit;
+            }
+
+            $actual = obtenerConfiguracionInstitucional($pdo);
+            $rutaFinalLogo = $actual['logotipo_ruta'];
+
+            if ($eliminarLogo) {
+                $rutaFinalLogo = null;
+            }
+
+            // Procesar carga de archivo de imagen si fue suministrado
+            if (isset($_FILES['logotipo_archivo']) && $_FILES['logotipo_archivo']['error'] === UPLOAD_ERR_OK) {
+                $file = $_FILES['logotipo_archivo'];
+                $maxBytes = 2 * 1024 * 1024; // 2 MB
+                if ($file['size'] > $maxBytes) {
+                    header('Location: index.php?tab=configuracion&error=' . urlencode('El archivo de imagen no debe superar los 2 MB.'));
+                    exit;
+                }
+
+                $finfo = new finfo(FILEINFO_MIME_TYPE);
+                $mime = $finfo->file($file['tmp_name']);
+                $permitidos = [
+                    'image/png'     => 'png',
+                    'image/jpeg'    => 'jpg',
+                    'image/svg+xml' => 'svg',
+                    'image/webp'    => 'webp'
+                ];
+
+                if (!isset($permitidos[$mime])) {
+                    header('Location: index.php?tab=configuracion&error=' . urlencode('Formato de imagen no permitido. Admite PNG, JPG, SVG y WEBP.'));
+                    exit;
+                }
+
+                $uploadDir = __DIR__ . '/public/img';
+                if (!is_dir($uploadDir)) {
+                    @mkdir($uploadDir, 0755, true);
+                }
+
+                $ext = $permitidos[$mime];
+                $destName = 'logo_institucional_' . time() . '.' . $ext;
+                $destPath = $uploadDir . '/' . $destName;
+
+                if (move_uploaded_file($file['tmp_name'], $destPath)) {
+                    $rutaFinalLogo = 'public/img/' . $destName;
+                }
+            } elseif (!empty($logotipoRuta)) {
+                $rutaFinalLogo = $logotipoRuta;
+            }
+
+            $pdo->beginTransaction();
+
+            $stmt = $pdo->prepare("
+                UPDATE configuracion_institucional
+                SET nombre_sistema = :nombre,
+                    siglas_sistema = :siglas,
+                    ente_rector = :ente,
+                    municipio = :municipio,
+                    logotipo_ruta = :logo,
+                    dias_alerta_fefo = :dias
+                WHERE id = 1
+            ");
+            $stmt->execute([
+                ':nombre'    => $nombreSistema,
+                ':siglas'    => $siglasSistema,
+                ':ente'      => $enteRector,
+                ':municipio' => $municipio,
+                ':logo'      => $rutaFinalLogo,
+                ':dias'      => $diasFefo
+            ]);
+
+            // Auditoría forense del cambio con delta detallado
+            registrarAuditoria($pdo, $usuarioSesionId, 'ACTUALIZAR_IDENTIDAD_INSTITUCIONAL', 'configuracion_institucional', 1, [
+                'evento' => 'Actualización de Identidad Institucional y Parametrización FEFO',
+                'delta' => [
+                    'nombre_sistema'   => ['antes' => $actual['nombre_sistema'], 'despues' => $nombreSistema],
+                    'siglas_sistema'   => ['antes' => $actual['siglas_sistema'], 'despues' => $siglasSistema],
+                    'ente_rector'      => ['antes' => $actual['ente_rector'], 'despues' => $enteRector],
+                    'municipio'        => ['antes' => $actual['municipio'], 'despues' => $municipio],
+                    'dias_alerta_fefo' => ['antes' => $actual['dias_alerta_fefo'], 'despues' => $diasFefo],
+                    'logotipo_ruta'    => ['antes' => $actual['logotipo_ruta'], 'despues' => $rutaFinalLogo]
+                ]
+            ]);
+
+            $pdo->commit();
+            header('Location: index.php?tab=configuracion&msg=' . urlencode('Identidad institucional y parámetros actualizados exitosamente.'));
+            exit;
+
+        case 'crear_medicamento':
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                header('Location: index.php?tab=medicamentos');
+                exit;
+            }
+
+            $nombre = trim($_POST['nombre_generico'] ?? '');
+            $concentracion = trim($_POST['concentracion'] ?? '');
+            $formaFarmaceuticaId = (int) ($_POST['forma_farmaceutica_id'] ?? 0);
+            $requiereFrio = !empty($_POST['requiere_cadena_frio']) ? 1 : 0;
+            $stockMinimo = max(1, (int) ($_POST['stock_minimo_sugerido'] ?? 20));
+
+            if (mb_strlen($nombre, 'UTF-8') < 2 || mb_strlen($concentracion, 'UTF-8') < 1 || $formaFarmaceuticaId <= 0) {
+                header('Location: index.php?tab=medicamentos&subtab=vademecum&error=' . urlencode('Verifique los campos requeridos: Nombre Genérico, Concentración y Forma Farmacéutica.'));
+                exit;
+            }
+
+            $stmtCheckF = $pdo->prepare("SELECT id, nombre FROM formas_farmaceuticas WHERE id = :id");
+            $stmtCheckF->execute([':id' => $formaFarmaceuticaId]);
+            $formaInfo = $stmtCheckF->fetch();
+            if (!$formaInfo) {
+                header('Location: index.php?tab=medicamentos&subtab=vademecum&error=' . urlencode('La forma farmacéutica seleccionada no es válida.'));
+                exit;
+            }
+
+            $pdo->beginTransaction();
+
+            $stmtIns = $pdo->prepare("
+                INSERT INTO medicamentos (nombre_generico, concentracion, forma_farmaceutica_id, requiere_cadena_frio, stock_minimo_sugerido, activo)
+                VALUES (:nombre, :conc, :forma_id, :frio, :stock, 1)
+            ");
+            $stmtIns->execute([
+                ':nombre' => $nombre,
+                ':conc' => $concentracion,
+                ':forma_id' => $formaFarmaceuticaId,
+                ':frio' => $requiereFrio,
+                ':stock' => $stockMinimo
+            ]);
+            $nuevoId = (int) $pdo->lastInsertId();
+
+            registrarAuditoria($pdo, $usuarioSesionId, 'CREAR_MEDICAMENTO', 'medicamentos', $nuevoId, [
+                'evento' => 'Alta de fármaco en Vademécum Institucional',
+                'nombre_generico' => $nombre,
+                'concentracion' => $concentracion,
+                'forma_farmaceutica' => $formaInfo['nombre'],
+                'requiere_cadena_frio' => $requiereFrio,
+                'stock_minimo_sugerido' => $stockMinimo
+            ]);
+
+            $pdo->commit();
+            header('Location: index.php?tab=medicamentos&subtab=vademecum&msg=' . urlencode("Medicamento '{$nombre} ({$concentracion})' registrado exitosamente en el vademécum municipal."));
+            exit;
+
+        case 'editar_medicamento':
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                header('Location: index.php?tab=medicamentos');
+                exit;
+            }
+
+            $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+            $nombre = trim($_POST['nombre_generico'] ?? '');
+            $concentracion = trim($_POST['concentracion'] ?? '');
+            $formaFarmaceuticaId = (int) ($_POST['forma_farmaceutica_id'] ?? 0);
+            $requiereFrio = !empty($_POST['requiere_cadena_frio']) ? 1 : 0;
+            $stockMinimo = max(1, (int) ($_POST['stock_minimo_sugerido'] ?? 20));
+
+            if (!$id || mb_strlen($nombre, 'UTF-8') < 2 || mb_strlen($concentracion, 'UTF-8') < 1 || $formaFarmaceuticaId <= 0) {
+                header('Location: index.php?tab=medicamentos&subtab=vademecum&error=' . urlencode('Verifique los campos requeridos: ID, Nombre Genérico, Concentración y Forma Farmacéutica.'));
+                exit;
+            }
+
+            $stmtOld = $pdo->prepare("SELECT * FROM medicamentos WHERE id = :id");
+            $stmtOld->execute([':id' => $id]);
+            $antiguo = $stmtOld->fetch();
+            if (!$antiguo) {
+                header('Location: index.php?tab=medicamentos&subtab=vademecum&error=' . urlencode('El medicamento especificado no existe.'));
+                exit;
+            }
+
+            $stmtCheckF = $pdo->prepare("SELECT id, nombre FROM formas_farmaceuticas WHERE id = :id");
+            $stmtCheckF->execute([':id' => $formaFarmaceuticaId]);
+            $formaInfo = $stmtCheckF->fetch();
+            if (!$formaInfo) {
+                header('Location: index.php?tab=medicamentos&subtab=vademecum&error=' . urlencode('La forma farmacéutica seleccionada no es válida.'));
+                exit;
+            }
+
+            $delta = [];
+            if ($antiguo['nombre_generico'] !== $nombre) {
+                $delta['nombre_generico'] = ['antes' => $antiguo['nombre_generico'], 'despues' => $nombre];
+            }
+            if ($antiguo['concentracion'] !== $concentracion) {
+                $delta['concentracion'] = ['antes' => $antiguo['concentracion'], 'despues' => $concentracion];
+            }
+            if ((int) $antiguo['forma_farmaceutica_id'] !== $formaFarmaceuticaId) {
+                $delta['forma_farmaceutica_id'] = ['antes' => (int) $antiguo['forma_farmaceutica_id'], 'despues' => $formaFarmaceuticaId];
+            }
+            if ((int) $antiguo['requiere_cadena_frio'] !== $requiereFrio) {
+                $delta['requiere_cadena_frio'] = ['antes' => (int) $antiguo['requiere_cadena_frio'], 'despues' => $requiereFrio];
+            }
+            if ((int) $antiguo['stock_minimo_sugerido'] !== $stockMinimo) {
+                $delta['stock_minimo_sugerido'] = ['antes' => (int) $antiguo['stock_minimo_sugerido'], 'despues' => $stockMinimo];
+            }
+
+            $pdo->beginTransaction();
+
+            // La actualización dispara automáticamente el trigger trg_medicamentos_audit_delta
+            $stmtUpd = $pdo->prepare("
+                UPDATE medicamentos
+                SET nombre_generico = :nombre,
+                    concentracion = :conc,
+                    forma_farmaceutica_id = :forma_id,
+                    requiere_cadena_frio = :frio,
+                    stock_minimo_sugerido = :stock
+                WHERE id = :id
+            ");
+            $stmtUpd->execute([
+                ':nombre' => $nombre,
+                ':conc' => $concentracion,
+                ':forma_id' => $formaFarmaceuticaId,
+                ':frio' => $requiereFrio,
+                ':stock' => $stockMinimo,
+                ':id' => $id
+            ]);
+
+            registrarAuditoria($pdo, $usuarioSesionId, 'EDITAR_MEDICAMENTO', 'medicamentos', $id, [
+                'evento' => 'Actualización de especificaciones de fármaco en Vademécum',
+                'nombre_generico' => $nombre,
+                'delta' => !empty($delta) ? $delta : 'Sin modificaciones detectadas'
+            ]);
+
+            $pdo->commit();
+            header('Location: index.php?tab=medicamentos&subtab=vademecum&msg=' . urlencode("Medicamento '{$nombre}' actualizado correctamente."));
+            exit;
+
+        case 'cambiar_estado_medicamento':
+            $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+            if (!$id) {
+                $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+            }
+
+            if (!$id) {
+                header('Location: index.php?tab=medicamentos&subtab=vademecum&error=' . urlencode('Identificador de fármaco inválido.'));
+                exit;
+            }
+
+            $pdo->beginTransaction();
+
+            $stmt = $pdo->prepare("SELECT id, nombre_generico, concentracion, activo FROM medicamentos WHERE id = :id");
+            $stmt->execute([':id' => $id]);
+            $med = $stmt->fetch();
+
+            if (!$med) {
+                $pdo->rollBack();
+                header('Location: index.php?tab=medicamentos&subtab=vademecum&error=' . urlencode('Fármaco no encontrado.'));
+                exit;
+            }
+
+            $nuevoEstado = ((int) $med['activo'] === 1) ? 0 : 1;
+            $stmtUpd = $pdo->prepare("UPDATE medicamentos SET activo = :activo WHERE id = :id");
+            $stmtUpd->execute([':activo' => $nuevoEstado, ':id' => $id]);
+
+            $accionLog = ($nuevoEstado === 1) ? 'REACTIVAR_MEDICAMENTO' : 'DESACTIVAR_MEDICAMENTO';
+            registrarAuditoria($pdo, $usuarioSesionId, $accionLog, 'medicamentos', $id, [
+                'evento' => ($nuevoEstado === 1) ? 'Reactivación de fármaco en vademécum' : 'Descontinuación de fármaco (Soft Delete)',
+                'nombre_generico' => $med['nombre_generico'],
+                'concentracion' => $med['concentracion'],
+                'estado_anterior' => (int) $med['activo'],
+                'nuevo_estado' => $nuevoEstado
+            ]);
+
+            $pdo->commit();
+            $msg = ($nuevoEstado === 1)
+                ? "Fármaco '{$med['nombre_generico']}' reactivado exitosamente en el vademécum."
+                : "Fármaco '{$med['nombre_generico']}' descontinuado del vademécum operativo.";
+            header('Location: index.php?tab=medicamentos&subtab=vademecum&msg=' . urlencode($msg));
+            exit;
+
+        case 'crear_patologia':
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                header('Location: index.php?tab=medicamentos&subtab=patologias');
+                exit;
+            }
+
+            $codigo = strtoupper(trim($_POST['codigo_cie10'] ?? ''));
+            $codigo = preg_replace('/[^A-Z0-9\.\-]/', '', $codigo);
+            if ($codigo === '') {
+                $codigo = null;
+            }
+
+            $nombre = trim($_POST['nombre'] ?? '');
+            $cronica = !empty($_POST['cronica']) ? 1 : 0;
+            $descripcion = trim($_POST['descripcion'] ?? '');
+
+            if (mb_strlen($nombre, 'UTF-8') < 3) {
+                header('Location: index.php?tab=medicamentos&subtab=patologias&error=' . urlencode('El diagnóstico/nombre de la patología es obligatorio (mínimo 3 caracteres).'));
+                exit;
+            }
+
+            $pdo->beginTransaction();
+
+            $stmtIns = $pdo->prepare("
+                INSERT INTO patologias (codigo_cie10, nombre, cronica, descripcion, activo)
+                VALUES (:codigo, :nombre, :cronica, :descripcion, 1)
+            ");
+            $stmtIns->execute([
+                ':codigo' => $codigo,
+                ':nombre' => $nombre,
+                ':cronica' => $cronica,
+                ':descripcion' => $descripcion !== '' ? $descripcion : null
+            ]);
+            $nuevoId = (int) $pdo->lastInsertId();
+
+            registrarAuditoria($pdo, $usuarioSesionId, 'CREAR_PATOLOGIA', 'patologias', $nuevoId, [
+                'evento' => 'Registro de patología diagnóstica en catálogo CIE-10',
+                'codigo_cie10' => $codigo,
+                'nombre' => $nombre,
+                'cronica' => $cronica,
+                'descripcion' => $descripcion !== '' ? $descripcion : null
+            ]);
+
+            $pdo->commit();
+            header('Location: index.php?tab=medicamentos&subtab=patologias&msg=' . urlencode("Patología CIE-10 '{$nombre}' registrada satisfactoriamente."));
+            exit;
+
+        case 'cambiar_estado_patologia':
+            $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+            if (!$id) {
+                $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+            }
+
+            if (!$id) {
+                header('Location: index.php?tab=medicamentos&subtab=patologias&error=' . urlencode('Identificador de patología inválido.'));
+                exit;
+            }
+
+            $pdo->beginTransaction();
+
+            $stmt = $pdo->prepare("SELECT id, codigo_cie10, nombre, activo FROM patologias WHERE id = :id");
+            $stmt->execute([':id' => $id]);
+            $pat = $stmt->fetch();
+
+            if (!$pat) {
+                $pdo->rollBack();
+                header('Location: index.php?tab=medicamentos&subtab=patologias&error=' . urlencode('Patología no encontrada.'));
+                exit;
+            }
+
+            $nuevoEstado = ((int) $pat['activo'] === 1) ? 0 : 1;
+            $stmtUpd = $pdo->prepare("UPDATE patologias SET activo = :activo WHERE id = :id");
+            $stmtUpd->execute([':activo' => $nuevoEstado, ':id' => $id]);
+
+            $accionLog = ($nuevoEstado === 1) ? 'REACTIVAR_PATOLOGIA' : 'DESACTIVAR_PATOLOGIA';
+            registrarAuditoria($pdo, $usuarioSesionId, $accionLog, 'patologias', $id, [
+                'evento' => ($nuevoEstado === 1) ? 'Reactivación de patología en catálogo clínico' : 'Desactivación lógica de patología',
+                'codigo_cie10' => $pat['codigo_cie10'],
+                'nombre' => $pat['nombre'],
+                'nuevo_estado' => $nuevoEstado
+            ]);
+
+            $pdo->commit();
+            $msg = ($nuevoEstado === 1)
+                ? "Patología '{$pat['nombre']}' reactivada exitosamente."
+                : "Patología '{$pat['nombre']}' desactivada del catálogo clínico.";
+            header('Location: index.php?tab=medicamentos&subtab=patologias&msg=' . urlencode($msg));
+            exit;
+
+        case 'crear_forma_farmaceutica':
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                header('Location: index.php?tab=medicamentos&subtab=formas');
+                exit;
+            }
+
+            $nombre = trim($_POST['nombre'] ?? '');
+            if (mb_strlen($nombre, 'UTF-8') < 2) {
+                header('Location: index.php?tab=medicamentos&subtab=formas&error=' . urlencode('La denominación de la forma farmacéutica es obligatoria (mínimo 2 caracteres).'));
+                exit;
+            }
+
+            $pdo->beginTransaction();
+
+            $stmtIns = $pdo->prepare("INSERT INTO formas_farmaceuticas (nombre) VALUES (:nombre)");
+            $stmtIns->execute([':nombre' => $nombre]);
+            $nuevoId = (int) $pdo->lastInsertId();
+
+            registrarAuditoria($pdo, $usuarioSesionId, 'CREAR_FORMA_FARMACEUTICA', 'formas_farmaceuticas', $nuevoId, [
+                'evento' => 'Alta de presentación farmacéutica en catálogo',
+                'nombre' => $nombre
+            ]);
+
+            $pdo->commit();
+            header('Location: index.php?tab=medicamentos&subtab=formas&msg=' . urlencode("Forma farmacéutica '{$nombre}' incorporada exitosamente."));
+            exit;
+
+        case 'guardar_paciente':
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                header('Location: index.php?tab=pacientes');
+                exit;
+            }
+
+            $id = !empty($_POST['id']) ? (int) $_POST['id'] : null;
+            $tipoDocumentoId = (int) ($_POST['tipo_documento_id'] ?? 0);
+            $cedula = preg_replace('/[^0-9]/', '', (string) ($_POST['cedula'] ?? ''));
+            $nombreCompleto = trim((string) ($_POST['nombre_completo'] ?? ''));
+            $fechaNacimiento = trim((string) ($_POST['fecha_nacimiento'] ?? ''));
+            $direccionResidencia = trim((string) ($_POST['direccion_residencia'] ?? ''));
+
+            if ($tipoDocumentoId <= 0) {
+                header('Location: index.php?tab=pacientes&error=' . urlencode('Debe seleccionar un tipo de documento de identidad válido.'));
+                exit;
+            }
+
+            if (!preg_match('/^[0-9]{5,12}$/', $cedula)) {
+                header('Location: index.php?tab=pacientes&error=' . urlencode('El número de cédula debe contener únicamente entre 5 y 12 dígitos numéricos sin puntos ni letras.'));
+                exit;
+            }
+
+            if (mb_strlen($nombreCompleto, 'UTF-8') < 3) {
+                header('Location: index.php?tab=pacientes&error=' . urlencode('El nombre y apellido del paciente debe contener al menos 3 caracteres.'));
+                exit;
+            }
+
+            $fechaNacValida = null;
+            if ($fechaNacimiento !== '') {
+                $d = DateTime::createFromFormat('Y-m-d', $fechaNacimiento);
+                if (!$d || $d->format('Y-m-d') !== $fechaNacimiento) {
+                    header('Location: index.php?tab=pacientes&error=' . urlencode('La fecha de nacimiento no tiene un formato válido (AAAA-MM-DD).'));
+                    exit;
+                }
+                if ($fechaNacimiento > date('Y-m-d')) {
+                    header('Location: index.php?tab=pacientes&error=' . urlencode('La fecha de nacimiento no puede ser una fecha futura.'));
+                    exit;
+                }
+                $fechaNacValida = $fechaNacimiento;
+            }
+
+            // Validar que el tipo de documento exista en catálogo
+            $stmtCheckDoc = $pdo->prepare("SELECT id FROM tipos_documento WHERE id = :id");
+            $stmtCheckDoc->execute([':id' => $tipoDocumentoId]);
+            if (!$stmtCheckDoc->fetch()) {
+                header('Location: index.php?tab=pacientes&error=' . urlencode('El tipo de documento seleccionado no existe en el catálogo.'));
+                exit;
+            }
+
+            // Catálogo de tipos de contacto válidos
+            $tiposValidos = $pdo->query("SELECT id FROM tipos_contacto")->fetchAll(PDO::FETCH_COLUMN);
+            $setTiposValidos = array_map('intval', $tiposValidos);
+            $tipoDefecto = !empty($setTiposValidos) ? $setTiposValidos[0] : 2;
+
+            // Procesar arreglo dinámico de contactos (1FN)
+            $contactosTipo = (array) ($_POST['contactos_tipo'] ?? []);
+            $contactosValor = (array) ($_POST['contactos_valor'] ?? []);
+            $contactosDetalle = (array) ($_POST['contactos_detalle'] ?? []);
+            $principalIdx = isset($_POST['contacto_principal_radio']) ? (int)$_POST['contacto_principal_radio'] : 0;
+
+            $contactosAInsertar = [];
+            $huboPrincipal = false;
+            $totalFilas = max(count($contactosTipo), count($contactosValor), count($contactosDetalle));
+
+            for ($i = 0; $i < $totalFilas; $i++) {
+                $rawVal = isset($contactosValor[$i]) ? trim((string)$contactosValor[$i]) : '';
+                if ($rawVal === '') {
+                    continue; // Omitir filas vacías
+                }
+
+                $rawTipo = isset($contactosTipo[$i]) ? (int)$contactosTipo[$i] : $tipoDefecto;
+                if (!in_array($rawTipo, $setTiposValidos, true)) {
+                    $rawTipo = $tipoDefecto;
+                }
+
+                $rawDet = isset($contactosDetalle[$i]) ? trim((string)$contactosDetalle[$i]) : '';
+                $esPrincipal = ($i === $principalIdx) ? 1 : 0;
+                if ($esPrincipal === 1) {
+                    $huboPrincipal = true;
+                }
+
+                $contactosAInsertar[] = [
+                    'tipo_id'      => $rawTipo,
+                    'valor'        => mb_substr($rawVal, 0, 120, 'UTF-8'),
+                    'detalle'      => $rawDet !== '' ? mb_substr($rawDet, 0, 100, 'UTF-8') : null,
+                    'es_principal' => $esPrincipal
+                ];
+            }
+
+            // Compatibilidad hacia atrás si se envían los campos individuales tradicionales
+            if (empty($contactosAInsertar) && (!empty($_POST['telefono_principal']) || !empty($_POST['contacto_emergencia_telefono']))) {
+                if (!empty($_POST['telefono_principal'])) {
+                    $contactosAInsertar[] = [
+                        'tipo_id'      => (int)($_POST['tipo_contacto_principal_id'] ?? 2),
+                        'valor'        => mb_substr(trim($_POST['telefono_principal']), 0, 120, 'UTF-8'),
+                        'detalle'      => 'Paciente Directo',
+                        'es_principal' => 1
+                    ];
+                    $huboPrincipal = true;
+                }
+                if (!empty($_POST['contacto_emergencia_telefono'])) {
+                    $contactosAInsertar[] = [
+                        'tipo_id'      => (int)($_POST['tipo_contacto_emergencia_id'] ?? 5),
+                        'valor'        => mb_substr(trim($_POST['contacto_emergencia_telefono']), 0, 120, 'UTF-8'),
+                        'detalle'      => trim($_POST['contacto_emergencia_nombre'] ?? '') ?: 'Contacto de Emergencia',
+                        'es_principal' => empty($contactosAInsertar) ? 1 : 0
+                    ];
+                }
+            }
+
+            // Asegurar que al menos una vía quede marcada como principal
+            if (!$huboPrincipal && !empty($contactosAInsertar)) {
+                $contactosAInsertar[0]['es_principal'] = 1;
+            }
+
+            $pdo->beginTransaction();
+
+            if ($id === null) {
+                // CREATE
+                $sql = "INSERT INTO pacientes (tipo_documento_id, cedula, nombre_completo, fecha_nacimiento, direccion_residencia)
+                        VALUES (:tipo_doc, :cedula, :nombre, :fecha_nac, :direccion)";
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([
+                    ':tipo_doc'   => $tipoDocumentoId,
+                    ':cedula'     => $cedula,
+                    ':nombre'     => $nombreCompleto,
+                    ':fecha_nac'  => $fechaNacValida,
+                    ':direccion'  => $direccionResidencia !== '' ? $direccionResidencia : null
+                ]);
+                $pacienteId = (int) $pdo->lastInsertId();
+
+                // Sincronizar Contactos 1FN
+                if (!empty($contactosAInsertar)) {
+                    $stmtCont = $pdo->prepare("INSERT INTO paciente_contactos (paciente_id, tipo_contacto_id, valor, es_principal, nombre_contacto_emergencia)
+                                               VALUES (:pid, :tid, :valor, :es_p, :detalle)");
+                    foreach ($contactosAInsertar as $c) {
+                        $stmtCont->execute([
+                            ':pid'     => $pacienteId,
+                            ':tid'     => $c['tipo_id'],
+                            ':valor'   => $c['valor'],
+                            ':es_p'    => $c['es_principal'],
+                            ':detalle' => $c['detalle']
+                        ]);
+                    }
+                }
+
+                registrarAuditoria($pdo, $usuarioSesionId, 'CREAR_PACIENTE', 'pacientes', $pacienteId, [
+                    'evento'             => 'Registro de paciente en padrón municipal',
+                    'cedula'             => $cedula,
+                    'nombre_completo'    => $nombreCompleto,
+                    'tipo_documento_id'  => $tipoDocumentoId,
+                    'total_contactos'    => count($contactosAInsertar),
+                    'contactos'          => array_map(function($c) { 
+                        return "{$c['valor']} [" . ($c['es_principal'] ? 'Principal' : 'Secundario') . ($c['detalle'] ? " - {$c['detalle']}" : '') . "]"; 
+                    }, $contactosAInsertar)
+                ]);
+
+                $pdo->commit();
+                header('Location: index.php?tab=pacientes&msg=' . urlencode("Paciente '{$nombreCompleto}' registrado exitosamente en el padrón municipal."));
+                exit;
+
+            } else {
+                // UPDATE
+                $stmtPrev = $pdo->prepare("SELECT * FROM pacientes WHERE id = :id");
+                $stmtPrev->execute([':id' => $id]);
+                $prev = $stmtPrev->fetch(PDO::FETCH_ASSOC);
+
+                if (!$prev) {
+                    $pdo->rollBack();
+                    header('Location: index.php?tab=pacientes&error=' . urlencode('El paciente especificado no existe en el sistema.'));
+                    exit;
+                }
+
+                $sql = "UPDATE pacientes
+                        SET tipo_documento_id = :tipo_doc,
+                            cedula = :cedula,
+                            nombre_completo = :nombre,
+                            fecha_nacimiento = :fecha_nac,
+                            direccion_residencia = :direccion
+                        WHERE id = :id";
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([
+                    ':tipo_doc'   => $tipoDocumentoId,
+                    ':cedula'     => $cedula,
+                    ':nombre'     => $nombreCompleto,
+                    ':fecha_nac'  => $fechaNacValida,
+                    ':direccion'  => $direccionResidencia !== '' ? $direccionResidencia : null,
+                    ':id'         => $id
+                ]);
+
+                // Eliminar contactos previos del paciente e insertar la nueva colección (1FN Real con permiso DELETE)
+                $stmtDel = $pdo->prepare("DELETE FROM paciente_contactos WHERE paciente_id = :pid");
+                $stmtDel->execute([':pid' => $id]);
+
+                if (!empty($contactosAInsertar)) {
+                    $stmtCont = $pdo->prepare("INSERT INTO paciente_contactos (paciente_id, tipo_contacto_id, valor, es_principal, nombre_contacto_emergencia)
+                                               VALUES (:pid, :tid, :valor, :es_p, :detalle)");
+                    foreach ($contactosAInsertar as $c) {
+                        $stmtCont->execute([
+                            ':pid'     => $id,
+                            ':tid'     => $c['tipo_id'],
+                            ':valor'   => $c['valor'],
+                            ':es_p'    => $c['es_principal'],
+                            ':detalle' => $c['detalle']
+                        ]);
+                    }
+                }
+
+                registrarAuditoria($pdo, $usuarioSesionId, 'EDITAR_PACIENTE', 'pacientes', $id, [
+                    'evento'             => 'Actualización de expediente clínico del paciente',
+                    'cedula'             => $cedula,
+                    'nombre_completo'    => $nombreCompleto,
+                    'tipo_documento_id'  => $tipoDocumentoId,
+                    'total_contactos'    => count($contactosAInsertar),
+                    'contactos'          => array_map(function($c) { 
+                        return "{$c['valor']} [" . ($c['es_principal'] ? 'Principal' : 'Secundario') . ($c['detalle'] ? " - {$c['detalle']}" : '') . "]"; 
+                    }, $contactosAInsertar)
+                ]);
+
+                $pdo->commit();
+                header('Location: index.php?tab=pacientes&msg=' . urlencode("Expediente del paciente '{$nombreCompleto}' actualizado exitosamente."));
+                exit;
+            }
+
+                default:
             header('Location: index.php');
             exit;
     }
@@ -610,6 +1246,16 @@ try {
         $targetTab = 'maestras';
     } elseif (str_contains($accion, 'usuario')) {
         $targetTab = 'usuarios';
+    } elseif (str_contains($accion, 'paciente')) {
+        $targetTab = 'pacientes';
+    } elseif (str_contains($accion, 'configuracion') || str_contains($accion, 'identidad')) {
+        $targetTab = 'configuracion';
+    } elseif (str_contains($accion, 'medicamento')) {
+        $targetTab = 'medicamentos&subtab=vademecum';
+    } elseif (str_contains($accion, 'patologia')) {
+        $targetTab = 'medicamentos&subtab=patologias';
+    } elseif (str_contains($accion, 'forma')) {
+        $targetTab = 'medicamentos&subtab=formas';
     }
 
     $codigoSql  = (string)$e->getCode();

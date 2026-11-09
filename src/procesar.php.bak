@@ -1,0 +1,227 @@
+        // ======================================================================
+        // GESTIÓN DEL PADRÓN DE PACIENTES Y CONTACTOS NORMALIZADOS (1FN REAL)
+        // ======================================================================
+        case 'guardar_paciente':
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                header('Location: index.php?tab=pacientes');
+                exit;
+            }
+
+            $id = !empty($_POST['id']) ? (int) $_POST['id'] : null;
+            $tipoDocumentoId = (int) ($_POST['tipo_documento_id'] ?? 0);
+            $cedula = preg_replace('/[^0-9]/', '', (string) ($_POST['cedula'] ?? ''));
+            $nombreCompleto = trim((string) ($_POST['nombre_completo'] ?? ''));
+            $fechaNacimiento = trim((string) ($_POST['fecha_nacimiento'] ?? ''));
+            $direccionResidencia = trim((string) ($_POST['direccion_residencia'] ?? ''));
+
+            if ($tipoDocumentoId <= 0) {
+                header('Location: index.php?tab=pacientes&error=' . urlencode('Debe seleccionar un tipo de documento de identidad válido.'));
+                exit;
+            }
+
+            if (!preg_match('/^[0-9]{5,12}$/', $cedula)) {
+                header('Location: index.php?tab=pacientes&error=' . urlencode('El número de cédula debe contener únicamente entre 5 y 12 dígitos numéricos sin puntos ni letras.'));
+                exit;
+            }
+
+            if (mb_strlen($nombreCompleto, 'UTF-8') < 3) {
+                header('Location: index.php?tab=pacientes&error=' . urlencode('El nombre y apellido del paciente debe contener al menos 3 caracteres.'));
+                exit;
+            }
+
+            $fechaNacValida = null;
+            if ($fechaNacimiento !== '') {
+                $d = DateTime::createFromFormat('Y-m-d', $fechaNacimiento);
+                if (!$d || $d->format('Y-m-d') !== $fechaNacimiento) {
+                    header('Location: index.php?tab=pacientes&error=' . urlencode('La fecha de nacimiento no tiene un formato válido (AAAA-MM-DD).'));
+                    exit;
+                }
+                if ($fechaNacimiento > date('Y-m-d')) {
+                    header('Location: index.php?tab=pacientes&error=' . urlencode('La fecha de nacimiento no puede ser una fecha futura.'));
+                    exit;
+                }
+                $fechaNacValida = $fechaNacimiento;
+            }
+
+            // Validar que el tipo de documento exista en catálogo
+            $stmtCheckDoc = $pdo->prepare("SELECT id FROM tipos_documento WHERE id = :id");
+            $stmtCheckDoc->execute([':id' => $tipoDocumentoId]);
+            if (!$stmtCheckDoc->fetch()) {
+                header('Location: index.php?tab=pacientes&error=' . urlencode('El tipo de documento seleccionado no existe en el catálogo.'));
+                exit;
+            }
+
+            // Catálogo de tipos de contacto válidos
+            $tiposValidos = $pdo->query("SELECT id FROM tipos_contacto")->fetchAll(PDO::FETCH_COLUMN);
+            $setTiposValidos = array_map('intval', $tiposValidos);
+            $tipoDefecto = !empty($setTiposValidos) ? $setTiposValidos[0] : 2;
+
+            // Procesar arreglo dinámico de contactos (1FN)
+            $contactosTipo = (array) ($_POST['contactos_tipo'] ?? []);
+            $contactosValor = (array) ($_POST['contactos_valor'] ?? []);
+            $contactosDetalle = (array) ($_POST['contactos_detalle'] ?? []);
+            $principalIdx = isset($_POST['contacto_principal_radio']) ? (int)$_POST['contacto_principal_radio'] : 0;
+
+            $contactosAInsertar = [];
+            $huboPrincipal = false;
+            $totalFilas = max(count($contactosTipo), count($contactosValor), count($contactosDetalle));
+
+            for ($i = 0; $i < $totalFilas; $i++) {
+                $rawVal = isset($contactosValor[$i]) ? trim((string)$contactosValor[$i]) : '';
+                if ($rawVal === '') {
+                    continue; // Omitir filas vacías
+                }
+
+                $rawTipo = isset($contactosTipo[$i]) ? (int)$contactosTipo[$i] : $tipoDefecto;
+                if (!in_array($rawTipo, $setTiposValidos, true)) {
+                    $rawTipo = $tipoDefecto;
+                }
+
+                $rawDet = isset($contactosDetalle[$i]) ? trim((string)$contactosDetalle[$i]) : '';
+                $esPrincipal = ($i === $principalIdx) ? 1 : 0;
+                if ($esPrincipal === 1) {
+                    $huboPrincipal = true;
+                }
+
+                $contactosAInsertar[] = [
+                    'tipo_id'      => $rawTipo,
+                    'valor'        => mb_substr($rawVal, 0, 120, 'UTF-8'),
+                    'detalle'      => $rawDet !== '' ? mb_substr($rawDet, 0, 100, 'UTF-8') : null,
+                    'es_principal' => $esPrincipal
+                ];
+            }
+
+            // Compatibilidad hacia atrás si se envían los campos individuales tradicionales
+            if (empty($contactosAInsertar) && (!empty($_POST['telefono_principal']) || !empty($_POST['contacto_emergencia_telefono']))) {
+                if (!empty($_POST['telefono_principal'])) {
+                    $contactosAInsertar[] = [
+                        'tipo_id'      => (int)($_POST['tipo_contacto_principal_id'] ?? 2),
+                        'valor'        => mb_substr(trim($_POST['telefono_principal']), 0, 120, 'UTF-8'),
+                        'detalle'      => 'Paciente Directo',
+                        'es_principal' => 1
+                    ];
+                    $huboPrincipal = true;
+                }
+                if (!empty($_POST['contacto_emergencia_telefono'])) {
+                    $contactosAInsertar[] = [
+                        'tipo_id'      => (int)($_POST['tipo_contacto_emergencia_id'] ?? 5),
+                        'valor'        => mb_substr(trim($_POST['contacto_emergencia_telefono']), 0, 120, 'UTF-8'),
+                        'detalle'      => trim($_POST['contacto_emergencia_nombre'] ?? '') ?: 'Contacto de Emergencia',
+                        'es_principal' => empty($contactosAInsertar) ? 1 : 0
+                    ];
+                }
+            }
+
+            // Asegurar que al menos una vía quede marcada como principal
+            if (!$huboPrincipal && !empty($contactosAInsertar)) {
+                $contactosAInsertar[0]['es_principal'] = 1;
+            }
+
+            $pdo->beginTransaction();
+
+            if ($id === null) {
+                // CREATE
+                $sql = "INSERT INTO pacientes (tipo_documento_id, cedula, nombre_completo, fecha_nacimiento, direccion_residencia)
+                        VALUES (:tipo_doc, :cedula, :nombre, :fecha_nac, :direccion)";
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([
+                    ':tipo_doc'   => $tipoDocumentoId,
+                    ':cedula'     => $cedula,
+                    ':nombre'     => $nombreCompleto,
+                    ':fecha_nac'  => $fechaNacValida,
+                    ':direccion'  => $direccionResidencia !== '' ? $direccionResidencia : null
+                ]);
+                $pacienteId = (int) $pdo->lastInsertId();
+
+                // Sincronizar Contactos 1FN
+                if (!empty($contactosAInsertar)) {
+                    $stmtCont = $pdo->prepare("INSERT INTO paciente_contactos (paciente_id, tipo_contacto_id, valor, es_principal, nombre_contacto_emergencia)
+                                               VALUES (:pid, :tid, :valor, :es_p, :detalle)");
+                    foreach ($contactosAInsertar as $c) {
+                        $stmtCont->execute([
+                            ':pid'     => $pacienteId,
+                            ':tid'     => $c['tipo_id'],
+                            ':valor'   => $c['valor'],
+                            ':es_p'    => $c['es_principal'],
+                            ':detalle' => $c['detalle']
+                        ]);
+                    }
+                }
+
+                registrarAuditoria($pdo, $usuarioSesionId, 'CREAR_PACIENTE', 'pacientes', $pacienteId, [
+                    'evento'             => 'Registro de paciente en padrón municipal',
+                    'cedula'             => $cedula,
+                    'nombre_completo'    => $nombreCompleto,
+                    'tipo_documento_id'  => $tipoDocumentoId,
+                    'total_contactos'    => count($contactosAInsertar),
+                    'contactos'          => array_map(function($c) { 
+                        return "{$c['valor']} [" . ($c['es_principal'] ? 'Principal' : 'Secundario') . ($c['detalle'] ? " - {$c['detalle']}" : '') . "]"; 
+                    }, $contactosAInsertar)
+                ]);
+
+                $pdo->commit();
+                header('Location: index.php?tab=pacientes&msg=' . urlencode("Paciente '{$nombreCompleto}' registrado exitosamente en el padrón municipal."));
+                exit;
+
+            } else {
+                // UPDATE
+                $stmtPrev = $pdo->prepare("SELECT * FROM pacientes WHERE id = :id");
+                $stmtPrev->execute([':id' => $id]);
+                $prev = $stmtPrev->fetch(PDO::FETCH_ASSOC);
+
+                if (!$prev) {
+                    $pdo->rollBack();
+                    header('Location: index.php?tab=pacientes&error=' . urlencode('El paciente especificado no existe en el sistema.'));
+                    exit;
+                }
+
+                $sql = "UPDATE pacientes
+                        SET tipo_documento_id = :tipo_doc,
+                            cedula = :cedula,
+                            nombre_completo = :nombre,
+                            fecha_nacimiento = :fecha_nac,
+                            direccion_residencia = :direccion
+                        WHERE id = :id";
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute([
+                    ':tipo_doc'   => $tipoDocumentoId,
+                    ':cedula'     => $cedula,
+                    ':nombre'     => $nombreCompleto,
+                    ':fecha_nac'  => $fechaNacValida,
+                    ':direccion'  => $direccionResidencia !== '' ? $direccionResidencia : null,
+                    ':id'         => $id
+                ]);
+
+                // Eliminar contactos previos del paciente e insertar la nueva colección (1FN Real con permiso DELETE)
+                $stmtDel = $pdo->prepare("DELETE FROM paciente_contactos WHERE paciente_id = :pid");
+                $stmtDel->execute([':pid' => $id]);
+
+                if (!empty($contactosAInsertar)) {
+                    $stmtCont = $pdo->prepare("INSERT INTO paciente_contactos (paciente_id, tipo_contacto_id, valor, es_principal, nombre_contacto_emergencia)
+                                               VALUES (:pid, :tid, :valor, :es_p, :detalle)");
+                    foreach ($contactosAInsertar as $c) {
+                        $stmtCont->execute([
+                            ':pid'     => $id,
+                            ':tid'     => $c['tipo_id'],
+                            ':valor'   => $c['valor'],
+                            ':es_p'    => $c['es_principal'],
+                            ':detalle' => $c['detalle']
+                        ]);
+                    }
+                }
+
+                registrarAuditoria($pdo, $usuarioSesionId, 'EDITAR_PACIENTE', 'pacientes', $id, [
+                    'evento'             => 'Actualización de expediente clínico del paciente',
+                    'cedula'             => $cedula,
+                    'nombre_completo'    => $nombreCompleto,
+                    'tipo_documento_id'  => $tipoDocumentoId,
+                    'total_contactos'    => count($contactosAInsertar),
+                    'contactos'          => array_map(function($c) { 
+                        return "{$c['valor']} [" . ($c['es_principal'] ? 'Principal' : 'Secundario') . ($c['detalle'] ? " - {$c['detalle']}" : '') . "]"; 
+                    }, $contactosAInsertar)
+                ]);
+
+                $pdo->commit();
+                header('Location: index.php?tab=pacientes&msg=' . urlencode("Expediente del paciente '{$nombreCompleto}' actualizado exitosamente."));
+                exit;
+            }

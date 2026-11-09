@@ -3,9 +3,16 @@
 // Módulo de Autenticación, Control de Acceso Basado en Roles (RBAC) y Seguridad de Sesión
 declare(strict_types=1);
 
+// Sincronizar zona horaria de la aplicación con la hora legal de Venezuela (UTC-4)
+date_default_timezone_set('America/Caracas');
+
+require_once __DIR__ . '/../config/database.php';
+
+// Ampliar la vida de la sesión PHP a 24 horas (86400 segundos) para evitar expiraciones prematuras
+ini_set('session.gc_maxlifetime', '86400');
 if (session_status() === PHP_SESSION_NONE) {
     session_set_cookie_params([
-        'lifetime' => 0,
+        'lifetime' => 86400,
         'path'     => '/',
         'httponly' => true,
         'samesite' => 'Lax'
@@ -88,8 +95,18 @@ function autenticarUsuario(PDO $pdo, string $email, string $password): ?array
         return ['error' => 'password_incorrecto'];
     }
 
+    iniciarSesionUsuario($pdo, $usuario);
+
+    return $usuario;
+}
+
+/**
+ * Inicializa la sesión PHP con los datos del usuario autenticado y sincroniza el contexto SQL de auditoría.
+ */
+function iniciarSesionUsuario(PDO $pdo, array $usuario): void
+{
     // Iniciar sesión y regenerar ID para prevenir fijación de sesión
-    if (!headers_sent()) {
+    if (!headers_sent() && session_status() === PHP_SESSION_ACTIVE) {
         session_regenerate_id(true);
     }
     $_SESSION['usuario_id']        = (int)$usuario['id'];
@@ -97,12 +114,17 @@ function autenticarUsuario(PDO $pdo, string $email, string $password): ?array
     $_SESSION['usuario_email']     = $usuario['email'];
     $_SESSION['rol_id']            = (int)$usuario['rol_id'];
     $_SESSION['rol_nombre']        = $usuario['rol_nombre'];
-    $_SESSION['centro_salud_id']   = $usuario['centro_salud_id'] !== null ? (int)$usuario['centro_salud_id'] : null;
+    $_SESSION['centro_salud_id']   = isset($usuario['centro_salud_id']) && $usuario['centro_salud_id'] !== null ? (int)$usuario['centro_salud_id'] : null;
     $_SESSION['centro_nombre']     = $usuario['centro_nombre'] ?? 'Red Municipal Central';
     $_SESSION['sesion_user_agent'] = $_SERVER['HTTP_USER_AGENT'] ?? 'CLI';
     $_SESSION['sesion_ip']         = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
 
-    return $usuario;
+    establecerContextoAuditoriaSQL(
+        $pdo,
+        (int)$usuario['id'],
+        $_SESSION['sesion_ip'],
+        $_SESSION['sesion_user_agent']
+    );
 }
 
 /**
@@ -117,12 +139,16 @@ function requerirAutenticacion(PDO $pdo): array
         exit;
     }
 
-    // 2. Si no hay sesión iniciada, enviar a login
+    // 2. Si no hay sesión iniciada, enviar a login con aviso informativo
     $usuario = obtenerUsuarioSesion();
     if (!$usuario) {
-        header('Location: login.php');
+        header('Location: login.php?msg=' . urlencode('Su sesión ha expirado o requiere autenticación para ingresar.'));
         exit;
     }
+
+    // Actualizar timestamp de actividad en la sesión para forzar a PHP a actualizar
+    // el mtime del archivo de sesión en disco en cada petición, impidiendo que el GC la purgue.
+    $_SESSION['ultimo_acceso'] = time();
 
     // 3. Verificación de integridad de sesión del cliente
     $uaActual = $_SERVER['HTTP_USER_AGENT'] ?? 'CLI';
@@ -150,6 +176,14 @@ function requerirAutenticacion(PDO $pdo): array
         header('Location: login.php?error=' . urlencode('Su cuenta ha sido desactivada. Comuníquese con el administrador.'));
         exit;
     }
+
+    // Sincronizar contexto de auditoría con la conexión SQL para disparadores automáticos
+    establecerContextoAuditoriaSQL(
+        $pdo,
+        (int)$usuario['id'],
+        $_SESSION['sesion_ip'] ?? ($_SERVER['REMOTE_ADDR'] ?? null),
+        $_SESSION['sesion_user_agent'] ?? ($_SERVER['HTTP_USER_AGENT'] ?? null)
+    );
 
     return $usuario;
 }

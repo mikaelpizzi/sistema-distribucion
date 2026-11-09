@@ -1,0 +1,2 @@
+# Configuración institucional SICM - Manejo de errores defensivo
+ErrorDocument 404 /404.php
