@@ -9,28 +9,15 @@
 scratch/
 .tmp/
 
-# Respaldos de base de datos locales
+# Respaldos de base de datos locales y temporales
 respaldos/*.sql.gz
 respaldos/*.sha256
 src/backups/*.sql
 src/backups/*.sql.gz
 *.bak
-
-# Scripts y temporales de rescate
-rescatados_hoy/
-salida_rescate.txt
-modulo_pacientes_rescatado.txt
-extraer.py
-rescatar_todo.py
-verificar_candidatos.py
-ensamblar_maestro.py
-reparar_sintaxis.py
-corregir_index.py
-ensamblar_final.py
-cloudflared.deb
+*.tmp
 
 # Archivos de SO
 .DS_Store
 Thumbs.db
 desktop.ini
-

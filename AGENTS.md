@@ -8,3 +8,4 @@ Consulte [GEMINI.md](file:///c:/Users/mikae/OneDrive/Documentos/GitHub/sistema-d
 3. **Uso de Subagente `self`:** Obligatorio para tareas de código; permite que el usuario converse con el agente padre en paralelo sin que se detenga el flujo.
 4. **Verificación de Sintaxis:** Validar siempre con `wsl docker exec salud_php_apache php -l /var/www/html/...` antes de finalizar.
 5. **Arquitectura 3FN:** Crecer verticalmente en registros, nunca en columnas; cero listas en JSON; cero jerga técnica o emojis en la UI.
+

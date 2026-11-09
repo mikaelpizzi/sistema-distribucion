@@ -65,3 +65,4 @@ Este documento contiene las reglas de operación técnica, de control de version
   1. **Linter PHP:** `wsl docker exec salud_php_apache php -l /var/www/html/archivo.php` (debe retornar `No syntax errors detected`).
   2. **Contenedores Activos:** `salud_php_apache` (puerto 8080) y `salud_maria_db` (puerto 3306).
   3. **Control de Errores PDO:** Todo fallo de integridad (`1062`, `1451`, `1452`) debe mapearse amigablemente y registrarse en la bitácora de auditoría forense (`logs_auditoria`).
+
