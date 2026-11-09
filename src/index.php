@@ -245,7 +245,9 @@ if ($tabActiva === 'centros') {
 
     // Edición si aplica
     $medicamentoEdicion = null;
-    $editarMId = filter_input(INPUT_GET, 'editar_m', FILTER_VALIDATE_INT);
+    $editarMId = filter_input(INPUT_GET, 'editar_m', FILTER_VALIDATE_INT)
+        ?: filter_input(INPUT_GET, 'editar_med', FILTER_VALIDATE_INT)
+        ?: filter_input(INPUT_GET, 'editar', FILTER_VALIDATE_INT);
     if ($editarMId) {
         $stmtMEd = $pdo->prepare("SELECT * FROM medicamentos WHERE id = :id");
         $stmtMEd->execute([':id' => $editarMId]);
@@ -699,8 +701,8 @@ if ($tabActiva === 'centros') {
     // 7. Carga de paciente para edición si aplica
     $pacienteEdicion = null;
     $contactosEdicion = [];
-    if (!empty($_GET['editar_id'])) {
-        $edId = (int) $_GET['editar_id'];
+    if (!empty($_GET['editar_id']) || !empty($_GET['editar'])) {
+        $edId = (int) (!empty($_GET['editar_id']) ? $_GET['editar_id'] : $_GET['editar']);
         $stmtEd = $pdo->prepare("SELECT * FROM pacientes WHERE id = :id");
         $stmtEd->execute([':id' => $edId]);
         $pacienteEdicion = $stmtEd->fetch(PDO::FETCH_ASSOC) ?: null;
@@ -904,8 +906,8 @@ if ($tabDesconocida) {
                     </nav>
                 </div>
                 <div class="d-flex align-items-center gap-3">
-                    <span class="badge bg-success-subtle text-success border border-success-subtle d-none d-sm-inline-flex align-items-center gap-1.5 py-1 px-2" style="font-size: 0.72rem;">
-                        <span class="spinner-grow spinner-grow-sm text-success" style="width: 7px; height: 7px;"></span> En línea
+                    <span class="badge bg-success-subtle text-success border border-success-subtle d-none d-sm-inline-flex align-items-center gap-2 py-1 px-2.5" style="font-size: 0.72rem;">
+                        <span class="spinner-grow spinner-grow-sm text-success me-1.5" style="width: 7px; height: 7px;"></span> En línea
                     </span>
                 </div>
             </header>
@@ -931,141 +933,27 @@ if ($tabDesconocida) {
                 <?php endif; ?>
 
         <?php if ($tabActiva === 'centros'): ?>
-            <div class="row g-3">
-                <!-- Formulario (Admin) o Ficha Jurisdiccional (Farmaceuta) -->
-                <div class="col-xl-4 col-lg-5">
-                    <?php if ($esAdmin): ?>
-                        <div class="card-sicm">
-                            <div class="card-header-sicm d-flex justify-content-between align-items-center">
-                                <span><?= $centroEdicion ? 'Editar Ambulatorio #' . (int) $centroEdicion['id'] : 'Nuevo Ambulatorio' ?></span>
-                                <?php if ($centroEdicion): ?>
-                                    <a href="index.php?tab=centros" class="small text-decoration-none text-muted">Cancelar
-                                        edición</a>
-                                <?php endif; ?>
+            <?php if (!$esAdmin): ?>
+                <!-- Ficha de Jurisdicción para Farmaceuta -->
+                <div class="card-sicm mb-3">
+                    <div class="card-header-sicm d-flex justify-content-between align-items-center">
+                        <span class="fw-bold"><i class="bi bi-geo-alt-fill text-primary me-1"></i> Jurisdicción Asignada</span>
+                        <span class="badge bg-success-subtle text-success border border-success-subtle font-monospace"
+                            style="font-size:0.68rem;">Rol Farmaceuta</span>
+                    </div>
+                    <div class="p-3">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <span class="text-muted small">Ambulatorio Asignado:</span>
+                                <div class="fw-bold text-dark fs-6"><?= htmlspecialchars($usuario['centro_nombre']) ?></div>
                             </div>
-                            <div class="p-3">
-                                <form id="form-centro" action="procesar.php" method="POST" novalidate>
-                                    <input type="hidden" name="accion" value="guardar_centro">
-                                    <input type="hidden" name="id"
-                                        value="<?= $centroEdicion ? (int) $centroEdicion['id'] : '' ?>">
-
-                                    <div class="mb-2">
-                                        <label for="codigo_sicm" class="form-label small fw-semibold mb-1">Código Sanitario
-                                            SICM</label>
-                                        <input type="text" class="form-control form-control-sm font-monospace text-uppercase"
-                                            id="codigo_sicm" name="codigo_sicm" placeholder="Ej: AMB-MER-004" required
-                                            maxlength="30"
-                                            value="<?= $centroEdicion ? htmlspecialchars($centroEdicion['codigo_sicm']) : '' ?>">
-                                    </div>
-
-                                    <div class="mb-2">
-                                        <label for="nombre" class="form-label small fw-semibold mb-1">Nombre del
-                                            Ambulatorio</label>
-                                        <input type="text" class="form-control form-control-sm" id="nombre" name="nombre"
-                                            placeholder="Ej: Ambulatorio Urbano Los Curos" required maxlength="120"
-                                            value="<?= $centroEdicion ? htmlspecialchars($centroEdicion['nombre']) : '' ?>">
-                                    </div>
-
-                                    <div class="mb-2">
-                                        <label for="tipo_centro_id" class="form-label small fw-semibold mb-1">Clasificación
-                                            Asistencial</label>
-                                        <select class="form-select form-select-sm" id="tipo_centro_id" name="tipo_centro_id"
-                                            required>
-                                            <option value="">-- Seleccionar --</option>
-                                            <?php foreach ($tiposCentro as $t): ?>
-                                                <?php $sel = ($centroEdicion && (int) $centroEdicion['tipo_centro_id'] === (int) $t['id']) ? 'selected' : ''; ?>
-                                                <option value="<?= (int) $t['id'] ?>" <?= $sel ?>>
-                                                    <?= htmlspecialchars($t['nombre']) ?> (<?= htmlspecialchars($t['codigo']) ?>)
-                                                </option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-
-                                    <div class="row g-2 mb-2">
-                                        <div class="col-md-6">
-                                            <label for="medico_director" class="form-label small fw-semibold mb-1">Director
-                                                Médico</label>
-                                            <input type="text" class="form-control form-control-sm" id="medico_director"
-                                                name="medico_director" placeholder="Ej: Dra. Carmen Gil" maxlength="120"
-                                                value="<?= $centroEdicion ? htmlspecialchars($centroEdicion['medico_director'] ?? '') : '' ?>">
-                                        </div>
-                                        <div class="col-md-6">
-                                            <label for="horario_atencion"
-                                                class="form-label small fw-semibold mb-1">Horario</label>
-                                            <input type="text" class="form-control form-control-sm" id="horario_atencion"
-                                                name="horario_atencion" placeholder="Ej: 24 Horas" maxlength="100"
-                                                value="<?= $centroEdicion ? htmlspecialchars($centroEdicion['horario_atencion'] ?? '') : '' ?>">
-                                        </div>
-                                    </div>
-
-                                    <div class="mb-2">
-                                        <label for="direccion" class="form-label small fw-semibold mb-1">Dirección</label>
-                                        <textarea class="form-control form-control-sm" id="direccion" name="direccion" rows="2"
-                                            placeholder="Sector, calle o avenida" required
-                                            maxlength="255"><?= $centroEdicion ? htmlspecialchars($centroEdicion['direccion']) : '' ?></textarea>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label for="telefono_principal"
-                                            class="form-label small fw-semibold mb-1">Teléfono</label>
-                                        <input type="text" class="form-control form-control-sm" id="telefono_principal"
-                                            name="telefono_principal" placeholder="Ej: 0274-2521100" maxlength="30"
-                                            value="<?= $centroEdicion ? htmlspecialchars($centroEdicion['telefono_principal'] ?? '') : '' ?>">
-                                    </div>
-
-                                    <!-- Equipamiento médico (N:M) -->
-                                    <div class="mb-3 p-2 bg-light border rounded">
-                                        <div class="d-flex justify-content-between align-items-center mb-1">
-                                            <span class="small fw-semibold text-dark">Equipamiento y Capacidades</span>
-                                            <a href="index.php?tab=maestras" class="small text-decoration-none"
-                                                style="font-size: 0.70rem;">Configurar</a>
-                                        </div>
-                                        <div class="row g-1 mt-1">
-                                            <?php foreach ($catalogoRecursosActivos as $rec): ?>
-                                                <?php $chk = in_array((int) $rec['id'], $recursosEdicionIds, true) ? 'checked' : ''; ?>
-                                                <div class="col-12">
-                                                    <div class="form-check form-check-sm mb-1">
-                                                        <input class="form-check-input" type="checkbox" name="recursos[]"
-                                                            value="<?= (int) $rec['id'] ?>" id="rec_<?= (int) $rec['id'] ?>" <?= $chk ?>>
-                                                        <label class="form-check-label small" for="rec_<?= (int) $rec['id'] ?>">
-                                                            <strong><?= htmlspecialchars($rec['nombre']) ?></strong>
-                                                            <span class="d-block text-muted"
-                                                                style="font-size: 0.70rem;"><?= htmlspecialchars($rec['descripcion'] ?? '') ?></span>
-                                                        </label>
-                                                    </div>
-                                                </div>
-                                            <?php endforeach; ?>
-                                        </div>
-                                    </div>
-
-                                    <div class="d-flex gap-2">
-                                        <button type="submit" class="btn btn-primary btn-sm w-100 fw-semibold">
-                                            <?= $centroEdicion ? 'Actualizar Ambulatorio' : 'Guardar Ambulatorio' ?>
-                                        </button>
-                                    </div>
-                                </form>
+                            <div class="col-md-4">
+                                <span class="text-muted small">Funcionario Responsable:</span>
+                                <div class="fw-semibold text-dark"><?= htmlspecialchars($usuario['nombre']) ?></div>
+                                <div class="text-muted small font-monospace"><?= htmlspecialchars($usuario['email']) ?></div>
                             </div>
-                        </div>
-                    <?php else: ?>
-                        <!-- Ficha de Jurisdicción para Farmaceuta -->
-                        <div class="card-sicm">
-                            <div class="card-header-sicm d-flex justify-content-between align-items-center">
-                                <span>Jurisdicción Asignada</span>
-                                <span class="badge bg-success-subtle text-success border border-success-subtle font-monospace"
-                                    style="font-size:0.68rem;">Rol Farmaceuta</span>
-                            </div>
-                            <div class="p-3">
-                                <div class="mb-2">
-                                    <span class="text-muted small">Ambulatorio Asignado:</span>
-                                    <div class="fw-bold text-dark fs-6"><?= htmlspecialchars($usuario['centro_nombre']) ?></div>
-                                </div>
-                                <div class="mb-2">
-                                    <span class="text-muted small">Funcionario Responsable:</span>
-                                    <div class="fw-semibold text-dark"><?= htmlspecialchars($usuario['nombre']) ?></div>
-                                    <div class="text-muted small font-monospace"><?= htmlspecialchars($usuario['email']) ?>
-                                    </div>
-                                </div>
-                                <div class="p-2 bg-light border rounded small text-secondary mt-3" style="font-size: 0.72rem;">
+                            <div class="col-md-4">
+                                <div class="p-2 bg-light border rounded small text-secondary" style="font-size: 0.72rem;">
                                     <strong>Permisos Habilitados:</strong>
                                     <ul class="mb-0 ps-3 mt-1">
                                         <li>Consulta de lotes e inventario de su sede.</li>
@@ -1075,16 +963,141 @@ if ($tabDesconocida) {
                                 </div>
                             </div>
                         </div>
-                    <?php endif; ?>
+                    </div>
                 </div>
+            <?php endif; ?>
 
-                <!-- Tabla de Ambulatorios -->
-                <div class="col-xl-8 col-lg-7">
+            <?php if ($esAdmin): ?>
+                <!-- Modal de Registro / Edición de Ambulatorio -->
+                <div class="modal fade" id="modalCentro" tabindex="-1" aria-labelledby="modalCentroLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-lg modal-dialog-centered">
+                        <div class="modal-content border-0 shadow">
+                            <form id="form-centro" action="procesar.php" method="POST" novalidate>
+                                <div class="modal-header bg-light py-2 px-3 border-bottom">
+                                    <h6 class="modal-title fw-bold" id="modalCentroLabel">
+                                        <i class="bi <?= $centroEdicion ? 'bi-pencil-square text-warning' : 'bi-hospital text-primary' ?> me-1"></i>
+                                        <?= $centroEdicion ? 'Editar Ambulatorio #' . (int) $centroEdicion['id'] : 'Registrar Nuevo Ambulatorio' ?>
+                                    </h6>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                                </div>
+                                <div class="modal-body p-3">
+                                    <input type="hidden" name="accion" value="guardar_centro">
+                                    <input type="hidden" name="id"
+                                        value="<?= $centroEdicion ? (int) $centroEdicion['id'] : '' ?>">
+
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-md-4">
+                                            <label for="codigo_sicm" class="form-label small fw-semibold mb-1">Código Sanitario SICM <span class="text-danger">*</span></label>
+                                            <input type="text" class="form-control form-control-sm font-monospace text-uppercase"
+                                                id="codigo_sicm" name="codigo_sicm" placeholder="Ej: AMB-MER-004" required
+                                                maxlength="30"
+                                                value="<?= $centroEdicion ? htmlspecialchars($centroEdicion['codigo_sicm']) : '' ?>">
+                                        </div>
+                                        <div class="col-md-8">
+                                            <label for="nombre" class="form-label small fw-semibold mb-1">Nombre del Ambulatorio <span class="text-danger">*</span></label>
+                                            <input type="text" class="form-control form-control-sm" id="nombre" name="nombre"
+                                                placeholder="Ej: Ambulatorio Urbano Los Curos" required maxlength="120"
+                                                value="<?= $centroEdicion ? htmlspecialchars($centroEdicion['nombre']) : '' ?>">
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-md-6">
+                                            <label for="tipo_centro_id" class="form-label small fw-semibold mb-1">Clasificación Asistencial <span class="text-danger">*</span></label>
+                                            <select class="form-select form-select-sm" id="tipo_centro_id" name="tipo_centro_id" required>
+                                                <option value="">-- Seleccionar --</option>
+                                                <?php foreach ($tiposCentro as $t): ?>
+                                                    <?php $sel = ($centroEdicion && (int) $centroEdicion['tipo_centro_id'] === (int) $t['id']) ? 'selected' : ''; ?>
+                                                    <option value="<?= (int) $t['id'] ?>" <?= $sel ?>>
+                                                        <?= htmlspecialchars($t['nombre']) ?> (<?= htmlspecialchars($t['codigo']) ?>)
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="telefono_principal" class="form-label small fw-semibold mb-1">Teléfono Institucional</label>
+                                            <input type="text" class="form-control form-control-sm" id="telefono_principal"
+                                                name="telefono_principal" placeholder="Ej: 0274-2521100" maxlength="30"
+                                                value="<?= $centroEdicion ? htmlspecialchars($centroEdicion['telefono_principal'] ?? '') : '' ?>">
+                                        </div>
+                                    </div>
+
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-md-6">
+                                            <label for="medico_director" class="form-label small fw-semibold mb-1">Director Médico / Responsable</label>
+                                            <input type="text" class="form-control form-control-sm" id="medico_director"
+                                                name="medico_director" placeholder="Ej: Dra. Carmen Gil" maxlength="120"
+                                                value="<?= $centroEdicion ? htmlspecialchars($centroEdicion['medico_director'] ?? '') : '' ?>">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="horario_atencion" class="form-label small fw-semibold mb-1">Horario de Atención</label>
+                                            <input type="text" class="form-control form-control-sm" id="horario_atencion"
+                                                name="horario_atencion" placeholder="Ej: 24 Horas" maxlength="100"
+                                                value="<?= $centroEdicion ? htmlspecialchars($centroEdicion['horario_atencion'] ?? '') : '' ?>">
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="direccion" class="form-label small fw-semibold mb-1">Dirección <span class="text-danger">*</span></label>
+                                        <textarea class="form-control form-control-sm" id="direccion" name="direccion" rows="2"
+                                            placeholder="Sector, calle o avenida" required
+                                            maxlength="255"><?= $centroEdicion ? htmlspecialchars($centroEdicion['direccion']) : '' ?></textarea>
+                                    </div>
+
+                                    <!-- Equipamiento médico (N:M) -->
+                                    <div class="p-2.5 bg-light border rounded">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <span class="small fw-semibold text-dark">Equipamiento y Capacidades Clínicas</span>
+                                            <a href="index.php?tab=maestras" class="small text-decoration-none" style="font-size: 0.70rem;">Configurar Catálogo</a>
+                                        </div>
+                                        <div class="row g-2 mt-1">
+                                            <?php foreach ($catalogoRecursosActivos as $rec): ?>
+                                                <?php $chk = in_array((int) $rec['id'], $recursosEdicionIds, true) ? 'checked' : ''; ?>
+                                                <div class="col-md-6">
+                                                    <div class="form-check form-check-sm mb-1">
+                                                        <input class="form-check-input" type="checkbox" name="recursos[]"
+                                                            value="<?= (int) $rec['id'] ?>" id="rec_<?= (int) $rec['id'] ?>" <?= $chk ?>>
+                                                        <label class="form-check-label small" for="rec_<?= (int) $rec['id'] ?>">
+                                                            <strong><?= htmlspecialchars($rec['nombre']) ?></strong>
+                                                            <span class="d-block text-muted" style="font-size: 0.70rem;"><?= htmlspecialchars($rec['descripcion'] ?? '') ?></span>
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-between">
+                                    <?php if ($centroEdicion): ?>
+                                        <a href="index.php?tab=centros" class="btn btn-outline-secondary btn-sm">Cancelar edición</a>
+                                    <?php else: ?>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+                                    <?php endif; ?>
+                                    <button type="submit" class="btn btn-primary btn-sm px-3 fw-semibold">
+                                        <i class="bi <?= $centroEdicion ? 'bi-check2-circle' : 'bi-plus-lg' ?> me-1"></i>
+                                        <?= $centroEdicion ? 'Actualizar Ambulatorio' : 'Guardar Ambulatorio' ?>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            <?php endif; ?>
+
+            <div class="row g-3">
+                <!-- Tabla de Ambulatorios (Ocupa 100% del ancho) -->
+                <div class="col-12">
                     <div class="card-sicm">
                         <div class="card-header-sicm d-flex flex-wrap justify-content-between align-items-center gap-2">
                             <div class="d-flex align-items-center gap-2">
-                                <span>Ambulatorios de la Red</span>
+                                <span class="fw-bold"><i class="bi bi-hospital me-1"></i> Ambulatorios de la Red</span>
                                 <span class="badge bg-primary rounded-pill"><?= count($centros) ?></span>
+                                <?php if ($esAdmin): ?>
+                                    <button type="button" class="btn btn-primary btn-sm px-3 d-inline-flex align-items-center gap-1.5 shadow-sm ms-2"
+                                        data-bs-toggle="modal" data-bs-target="#modalCentro">
+                                        <i class="bi bi-plus-lg me-1"></i>Nuevo Ambulatorio
+                                    </button>
+                                <?php endif; ?>
                             </div>
                             <div class="d-flex align-items-center gap-2">
                                 <div class="btn-group btn-group-sm btn-filter-group" role="group">
@@ -1278,63 +1291,63 @@ if ($tabDesconocida) {
 
             <!-- SUBPESTAÑA 1: VADEMÉCUM DE MEDICAMENTOS -->
             <?php if ($subtabMedicamentos === 'vademecum'): ?>
-                <div class="row g-3">
-                    <!-- Formulario de Registro / Edición de Medicamento -->
-                    <div class="col-xl-4 col-lg-5">
-                        <div class="card-sicm">
-                            <div class="card-header-sicm d-flex justify-content-between align-items-center">
-                                <h6 class="m-0 fw-bold">
-                                    <i class="bi <?= $medicamentoEdicion ? 'bi-pencil-square text-warning' : 'bi-plus-circle text-primary' ?> me-1"></i>
-                                    <?= $medicamentoEdicion ? 'Editar Especificaciones' : 'Registrar Fármaco' ?>
-                                </h6>
-                                <?php if ($medicamentoEdicion): ?>
-                                    <span class="badge bg-warning text-dark font-monospace">Modo Edición</span>
-                                <?php endif; ?>
-                            </div>
-                            <div class="card-body p-3">
-                                <form method="POST" action="procesar.php" novalidate id="form-medicamento">
+                <!-- Modal de Registro / Edición de Fármaco -->
+                <div class="modal fade" id="modalMedicamento" tabindex="-1" aria-labelledby="modalMedicamentoLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-lg modal-dialog-centered">
+                        <div class="modal-content border-0 shadow">
+                            <form method="POST" action="procesar.php" novalidate id="form-medicamento">
+                                <div class="modal-header bg-light py-2 px-3 border-bottom">
+                                    <h6 class="modal-title fw-bold" id="modalMedicamentoLabel">
+                                        <i class="bi <?= $medicamentoEdicion ? 'bi-pencil-square text-warning' : 'bi-capsule text-primary' ?> me-1"></i>
+                                        <?= $medicamentoEdicion ? 'Editar Especificaciones de Fármaco #' . (int) $medicamentoEdicion['id'] : 'Registrar Nuevo Fármaco' ?>
+                                    </h6>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                                </div>
+                                <div class="modal-body p-3">
                                     <input type="hidden" name="accion" value="<?= $medicamentoEdicion ? 'editar_medicamento' : 'crear_medicamento' ?>">
                                     <?php if ($medicamentoEdicion): ?>
                                         <input type="hidden" name="id" value="<?= (int) $medicamentoEdicion['id'] ?>">
                                     <?php endif; ?>
 
-                                    <div class="mb-3">
-                                        <label class="form-label-sicm">Nombre Genérico (Principio Activo) <span class="text-danger">*</span></label>
-                                        <input type="text" name="nombre_generico" class="form-control form-control-sm"
-                                            placeholder="Ej: Losartán Potásico" required minlength="2" maxlength="120"
-                                            value="<?= htmlspecialchars($medicamentoEdicion['nombre_generico'] ?? '') ?>">
-                                        <div class="form-text" style="font-size: 0.70rem;">Denominación Común Internacional (DCI).</div>
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-md-7">
+                                            <label class="form-label-sicm mb-1">Nombre Genérico (Principio Activo) <span class="text-danger">*</span></label>
+                                            <input type="text" name="nombre_generico" class="form-control form-control-sm"
+                                                placeholder="Ej: Losartán Potásico" required minlength="2" maxlength="120"
+                                                value="<?= htmlspecialchars($medicamentoEdicion['nombre_generico'] ?? '') ?>">
+                                            <div class="form-text" style="font-size: 0.70rem;">Denominación Común Internacional (DCI).</div>
+                                        </div>
+                                        <div class="col-md-5">
+                                            <label class="form-label-sicm mb-1">Concentración / Dosificación <span class="text-danger">*</span></label>
+                                            <input type="text" name="concentracion" class="form-control form-control-sm"
+                                                placeholder="Ej: 50mg, 100UI/ml, 850mg" required minlength="1" maxlength="50"
+                                                value="<?= htmlspecialchars($medicamentoEdicion['concentracion'] ?? '') ?>">
+                                            <div class="form-text" style="font-size: 0.70rem;">Fuerza activa o dosis unitaria.</div>
+                                        </div>
                                     </div>
 
-                                    <div class="mb-3">
-                                        <label class="form-label-sicm">Concentración / Dosificación <span class="text-danger">*</span></label>
-                                        <input type="text" name="concentracion" class="form-control form-control-sm"
-                                            placeholder="Ej: 50mg, 100UI/ml, 850mg, 100mcg/dosis" required minlength="1" maxlength="50"
-                                            value="<?= htmlspecialchars($medicamentoEdicion['concentracion'] ?? '') ?>">
-                                        <div class="form-text" style="font-size: 0.70rem;">Fuerza activa o concentración por unidad de dosificación.</div>
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-md-6">
+                                            <label class="form-label-sicm mb-1">Forma Farmacéutica <span class="text-danger">*</span></label>
+                                            <select name="forma_farmaceutica_id" class="form-select form-select-sm" required>
+                                                <option value="">-- Seleccionar Presentación --</option>
+                                                <?php foreach ($formasFarmaceuticas as $forma): ?>
+                                                    <option value="<?= $forma['id'] ?>" <?= ($medicamentoEdicion && (int) $medicamentoEdicion['forma_farmaceutica_id'] === (int) $forma['id']) ? 'selected' : '' ?>>
+                                                        <?= htmlspecialchars($forma['nombre']) ?>
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label-sicm mb-1">Stock Mínimo Sugerido (Umbral de Alerta)</label>
+                                            <input type="number" name="stock_minimo_sugerido" class="form-control form-control-sm"
+                                                min="1" max="99999" required
+                                                value="<?= (int) ($medicamentoEdicion['stock_minimo_sugerido'] ?? 20) ?>">
+                                            <div class="form-text" style="font-size: 0.70rem;">Dispara avisos automáticos de reposición en ambulatorios.</div>
+                                        </div>
                                     </div>
 
-                                    <div class="mb-3">
-                                        <label class="form-label-sicm">Forma Farmacéutica <span class="text-danger">*</span></label>
-                                        <select name="forma_farmaceutica_id" class="form-select form-select-sm" required>
-                                            <option value="">-- Seleccionar Presentación --</option>
-                                            <?php foreach ($formasFarmaceuticas as $forma): ?>
-                                                <option value="<?= $forma['id'] ?>" <?= ($medicamentoEdicion && (int) $medicamentoEdicion['forma_farmaceutica_id'] === (int) $forma['id']) ? 'selected' : '' ?>>
-                                                    <?= htmlspecialchars($forma['nombre']) ?>
-                                                </option>
-                                            <?php endforeach; ?>
-                                        </select>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label class="form-label-sicm">Stock Mínimo Sugerido (Umbral de Alerta)</label>
-                                        <input type="number" name="stock_minimo_sugerido" class="form-control form-control-sm"
-                                            min="1" max="99999" required
-                                            value="<?= (int) ($medicamentoEdicion['stock_minimo_sugerido'] ?? 20) ?>">
-                                        <div class="form-text" style="font-size: 0.70rem;">Dispara avisos automáticos de reposición en ambulatorios.</div>
-                                    </div>
-
-                                    <div class="mb-3 p-2 bg-light border rounded">
+                                    <div class="p-2.5 bg-light border rounded">
                                         <div class="form-check form-switch mb-0">
                                             <input class="form-check-input" type="checkbox" role="switch" id="switchCadenaFrio"
                                                 name="requiere_cadena_frio" value="1"
@@ -1347,29 +1360,26 @@ if ($tabDesconocida) {
                                             Refrigeración clínica continua entre <strong>2°C y 8°C</strong>. Su dispensación exige ambulatorios con equipo de frío certificado.
                                         </div>
                                     </div>
-
-                                    <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
-                                        <?php if ($medicamentoEdicion): ?>
-                                            <a href="index.php?tab=medicamentos&subtab=vademecum" class="btn btn-outline-secondary btn-sm">
-                                                Cancelar
-                                            </a>
-                                            <button type="submit" class="btn btn-primary btn-sm px-3 fw-semibold">
-                                                <i class="bi bi-check2-circle me-1"></i> Guardar Cambios
-                                            </button>
-                                        <?php else: ?>
-                                            <span class="text-muted small" style="font-size: 0.70rem;"><span class="text-danger">*</span> Campos requeridos</span>
-                                            <button type="submit" class="btn btn-primary btn-sm px-3 fw-semibold">
-                                                <i class="bi bi-plus-lg me-1"></i> Registrar Medicamento
-                                            </button>
-                                        <?php endif; ?>
-                                    </div>
-                                </form>
-                            </div>
+                                </div>
+                                <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-between">
+                                    <?php if ($medicamentoEdicion): ?>
+                                        <a href="index.php?tab=medicamentos&subtab=vademecum" class="btn btn-outline-secondary btn-sm">Cancelar edición</a>
+                                    <?php else: ?>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+                                    <?php endif; ?>
+                                    <button type="submit" class="btn btn-primary btn-sm px-3 fw-semibold">
+                                        <i class="bi <?= $medicamentoEdicion ? 'bi-check2-circle' : 'bi-plus-lg' ?> me-1"></i>
+                                        <?= $medicamentoEdicion ? 'Guardar Cambios' : 'Registrar Medicamento' ?>
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Tabla de Medicamentos -->
-                    <div class="col-xl-8 col-lg-7">
+                <div class="row g-3">
+                    <!-- Tabla de Medicamentos (100% de ancho) -->
+                    <div class="col-12">
                         <div class="card-sicm">
                             <div class="card-header-sicm d-flex flex-wrap justify-content-between align-items-center gap-2 py-2">
                                 <div class="d-flex align-items-center gap-2">
@@ -1377,6 +1387,10 @@ if ($tabDesconocida) {
                                         <i class="bi bi-list-check text-primary me-1"></i>
                                         Vademécum Municipal (<?= count($medicamentos) ?> fármacos)
                                     </h6>
+                                    <button type="button" class="btn btn-primary btn-sm px-3 d-inline-flex align-items-center gap-1 shadow-sm ms-2"
+                                        data-bs-toggle="modal" data-bs-target="#modalMedicamento">
+                                        <i class="bi bi-plus-lg me-1"></i>Registrar Fármaco
+                                    </button>
                                 </div>
                                 <form method="GET" action="index.php" class="d-flex flex-wrap align-items-center gap-1 m-0">
                                     <input type="hidden" name="tab" value="medicamentos">
@@ -1773,7 +1787,7 @@ if ($tabDesconocida) {
 
             <div class="row g-3">
                 <!-- Catálogo 1: Tipos de Ambulatorio -->
-                <div class="col-xl-6 col-lg-6">
+                <div class="col-12 mb-4">
                     <div class="card-sicm">
                         <div class="card-header-sicm d-flex justify-content-between align-items-center">
                             <div>
@@ -1856,7 +1870,7 @@ if ($tabDesconocida) {
                 </div>
 
                 <!-- Catálogo 2: Equipamiento Médico N:M -->
-                <div class="col-xl-6 col-lg-6">
+                <div class="col-12 mb-4">
                     <div class="card-sicm">
                         <div class="card-header-sicm d-flex justify-content-between align-items-center">
                             <div>
@@ -3171,23 +3185,19 @@ if ($tabDesconocida) {
                 </div>
             </div>
 
-            <div class="row g-3">
-                <!-- Columna Izquierda: Formulario de Registro / Edición -->
-                <div class="col-xl-4 col-lg-5">
-                    <div class="card-sicm">
-                        <div class="card-header-sicm d-flex justify-content-between align-items-center">
-                            <span class="fw-bold">
-                                <i class="bi <?= $pacienteEdicion ? 'bi-pencil-square' : 'bi-person-plus' ?> me-1"></i>
-                                <?= $pacienteEdicion ? 'Editar Paciente #' . (int) $pacienteEdicion['id'] : 'Registrar Nuevo Paciente' ?>
-                            </span>
-                            <?php if ($pacienteEdicion): ?>
-                                <a href="index.php?tab=pacientes" class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size: 0.75rem;">
-                                    <i class="bi bi-x me-1"></i>Cancelar edición
-                                </a>
-                            <?php endif; ?>
-                        </div>
-                        <div class="p-3">
-                            <form action="procesar.php" method="POST" id="form-paciente" novalidate>
+            <!-- Modal de Registro / Edición de Paciente -->
+            <div class="modal fade" id="modalPaciente" tabindex="-1" aria-labelledby="modalPacienteLabel" aria-hidden="true">
+                <div class="modal-dialog modal-lg modal-dialog-centered">
+                    <div class="modal-content border-0 shadow">
+                        <form action="procesar.php" method="POST" id="form-paciente" novalidate>
+                            <div class="modal-header bg-light py-2 px-3 border-bottom">
+                                <h6 class="modal-title fw-bold" id="modalPacienteLabel">
+                                    <i class="bi <?= $pacienteEdicion ? 'bi-pencil-square text-warning' : 'bi-person-plus-fill text-primary' ?> me-1"></i>
+                                    <?= $pacienteEdicion ? 'Editar Paciente #' . (int) $pacienteEdicion['id'] : 'Registrar Nuevo Paciente' ?>
+                                </h6>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                            </div>
+                            <div class="modal-body p-3">
                                 <input type="hidden" name="accion" value="guardar_paciente">
                                 <input type="hidden" name="id" value="<?= $pacienteEdicion ? (int) $pacienteEdicion['id'] : '' ?>">
 
@@ -3237,7 +3247,7 @@ if ($tabDesconocida) {
                                 </div>
 
                                 <!-- Vías de Contacto Dinámicas -->
-                                <div class="p-2.5 mb-3 bg-light rounded border">
+                                <div class="p-2.5 mb-2 bg-light rounded border">
                                     <div class="d-flex justify-content-between align-items-center mb-2">
                                         <span class="fw-semibold small text-dark">Vías de Contacto</span>
                                         <span class="text-muted small" style="font-size: 0.72rem;">Teléfonos, mensajería y contactos de emergencia</span>
@@ -3318,19 +3328,26 @@ if ($tabDesconocida) {
                                         </button>
                                     </div>
                                 </div>
-<div class="d-grid">
-                                    <button type="submit" class="btn btn-primary btn-sm fw-semibold py-1.5">
-                                        <i class="bi <?= $pacienteEdicion ? 'bi-check-circle-fill' : 'bi-plus-circle' ?> me-1"></i>
-                                        <?= $pacienteEdicion ? 'Actualizar Expediente' : 'Registrar Paciente' ?>
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
+                            </div>
+                            <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-between">
+                                <?php if ($pacienteEdicion): ?>
+                                    <a href="index.php?tab=pacientes" class="btn btn-outline-secondary btn-sm">Cancelar edición</a>
+                                <?php else: ?>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cerrar</button>
+                                <?php endif; ?>
+                                <button type="submit" class="btn btn-primary btn-sm px-3 fw-semibold">
+                                    <i class="bi <?= $pacienteEdicion ? 'bi-check-circle-fill' : 'bi-person-plus-fill' ?> me-1"></i>
+                                    <?= $pacienteEdicion ? 'Actualizar Expediente' : 'Registrar Paciente' ?>
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
+            </div>
 
-                <!-- Columna Derecha: Búsqueda y Padrón de Pacientes -->
-                <div class="col-xl-8 col-lg-7">
+            <div class="row g-3">
+                <!-- Columna: Búsqueda y Padrón de Pacientes (100% de ancho) -->
+                <div class="col-12">
                     <!-- Barra de Búsqueda Rápida y Filtros -->
                     <div class="card bg-white border shadow-sm p-3 mb-3">
                         <form method="GET" action="index.php" class="row g-2 align-items-center">
@@ -3368,13 +3385,18 @@ if ($tabDesconocida) {
 
                     <!-- Tabla Institucional de Pacientes -->
                     <div class="card-sicm shadow-sm">
-                        <div class="card-header-sicm d-flex justify-content-between align-items-center">
+                        <div class="card-header-sicm d-flex flex-wrap justify-content-between align-items-center gap-2">
                             <span class="fw-bold">
                                 <i class="bi bi-person-lines-fill me-1"></i> Padrón de Pacientes Registrados
                             </span>
-                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace" style="font-size: 0.74rem;">
-                                <?= number_format($totalPacientesFiltrados) ?> pacientes encontrados
-                            </span>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace" style="font-size: 0.74rem;">
+                                    <?= number_format($totalPacientesFiltrados) ?> pacientes encontrados
+                                </span>
+                                <button type="button" class="btn btn-primary btn-sm px-3 d-inline-flex align-items-center gap-1.5 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalPaciente">
+                                    <i class="bi bi-person-plus-fill me-1"></i>Registrar Paciente
+                                </button>
+                            </div>
                         </div>
                         <div class="table-responsive">
                             <table class="table table-hover align-middle mb-0 sicm-table" style="font-size: 0.82rem;">
@@ -4063,6 +4085,25 @@ if ($tabDesconocida) {
         });
     </script>
 
+    <!-- Auto-apertura de Modales en Modo Edición -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            <?php if ($tabActiva === 'centros' && !empty($centroEdicion)): ?>
+            const mCentro = document.getElementById('modalCentro');
+            if (mCentro) new bootstrap.Modal(mCentro).show();
+            <?php endif; ?>
+
+            <?php if ($tabActiva === 'medicamentos' && !empty($medicamentoEdicion)): ?>
+            const mMed = document.getElementById('modalMedicamento');
+            if (mMed) new bootstrap.Modal(mMed).show();
+            <?php endif; ?>
+
+            <?php if ($tabActiva === 'pacientes' && !empty($pacienteEdicion)): ?>
+            const mPac = document.getElementById('modalPaciente');
+            if (mPac) new bootstrap.Modal(mPac).show();
+            <?php endif; ?>
+        });
+    </script>
 
 </body>
 </html>
