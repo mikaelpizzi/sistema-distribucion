@@ -905,11 +905,6 @@ if ($tabDesconocida) {
                         <span class="sicm-breadcrumb-active"><?= htmlspecialchars($moduloNombre) ?></span>
                     </nav>
                 </div>
-                <div class="d-flex align-items-center gap-3">
-                    <span class="badge bg-success-subtle text-success border border-success-subtle d-none d-sm-inline-flex align-items-center gap-2 py-1 px-2.5" style="font-size: 0.72rem;">
-                        <span class="spinner-grow spinner-grow-sm text-success me-1.5" style="width: 7px; height: 7px;"></span> En línea
-                    </span>
-                </div>
             </header>
 
             <!-- CONTENEDOR FLUIDO DE TRABAJO -->
