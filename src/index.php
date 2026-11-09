@@ -73,12 +73,13 @@ if ($tabActiva === 'centros') {
     $recursosPorCentro = [];
     if (!empty($centros)) {
         $centroIds = array_map(fn($c) => (int)$c['id'], $centros);
-        $inCentros = implode(',', $centroIds);
-        $stmtRA = $pdo->query("SELECT cr.centro_salud_id, ro.nombre
+        $placeholders = implode(',', array_fill(0, count($centroIds), '?'));
+        $stmtRA = $pdo->prepare("SELECT cr.centro_salud_id, ro.nombre
                                FROM centro_recursos cr
                                INNER JOIN recursos_operativos ro ON ro.id = cr.recurso_id
-                               WHERE cr.operativo = 1 AND cr.centro_salud_id IN ({$inCentros})
+                               WHERE cr.operativo = 1 AND cr.centro_salud_id IN ({$placeholders})
                                ORDER BY ro.id ASC");
+        $stmtRA->execute($centroIds);
         while ($r = $stmtRA->fetch()) {
             $recursosPorCentro[(int) $r['centro_salud_id']][] = $r['nombre'];
         }
@@ -1018,11 +1019,12 @@ if ($tabActiva === 'centros') {
             $stmtCont->execute([':paciente_id' => $pacienteEncontrado['id']]);
             $contactosPaciente = $stmtCont->fetchAll(PDO::FETCH_ASSOC);
 
-            // Récipes Médicos Autorizados (activos y vigentes)
+            // Récipes Médicos Autorizados (activos)
             $stmtRec = $pdo->prepare("
                 SELECT t.id, t.paciente_id, t.medicamento_id, t.patologia_id, t.dosis_mensual,
                        t.fecha_emision_recipe, t.fecha_vencimiento_recipe, t.medico_prescriptor,
                        t.activo,
+                       (t.fecha_vencimiento_recipe < CURRENT_DATE) AS esta_vencido,
                        m.nombre_generico AS medicamento_nombre, m.concentracion AS medicamento_concentracion,
                        m.requiere_cadena_frio,
                        ff.nombre AS forma_farmaceutica,
@@ -1033,7 +1035,6 @@ if ($tabActiva === 'centros') {
                 JOIN patologias pat ON t.patologia_id = pat.id
                 WHERE t.paciente_id = :paciente_id
                   AND t.activo = 1
-                  AND t.fecha_vencimiento_recipe >= CURRENT_DATE
                 ORDER BY t.id DESC
             ");
             $stmtRec->execute([':paciente_id' => $pacienteEncontrado['id']]);
@@ -1100,8 +1101,9 @@ if ($tabActiva === 'centros') {
                p.cedula AS paciente_cedula, p.nombre_completo AS paciente_nombre, td.codigo AS tipo_doc_codigo,
                m.nombre_generico AS medicamento_nombre, m.concentracion AS medicamento_concentracion,
                ff.nombre AS forma_farmaceutica,
-               l.numero_lote, l.fecha_vencimiento AS lote_vencimiento,
-               dd.cantidad_entregada,
+               GROUP_CONCAT(DISTINCT l.numero_lote SEPARATOR ', ') AS numero_lote,
+               MIN(l.fecha_vencimiento) AS lote_vencimiento,
+               COALESCE(SUM(dd.cantidad_entregada), 0) AS cantidad_entregada,
                u.nombre AS operador_nombre
         FROM despachos d
         JOIN centros_salud cs ON d.centro_salud_id = cs.id
@@ -1114,6 +1116,7 @@ if ($tabActiva === 'centros') {
         LEFT JOIN lotes_inventario l ON dd.lote_id = l.id
         JOIN usuarios u ON d.usuario_id = u.id
         WHERE d.centro_salud_id = :cid
+        GROUP BY d.id, d.fecha_hora, d.periodo_mes_anio, d.observaciones, cs.codigo_sicm, cs.nombre, p.cedula, p.nombre_completo, td.codigo, m.nombre_generico, m.concentracion, ff.nombre, u.nombre
         ORDER BY d.id DESC
         LIMIT 20
     ");
@@ -1282,12 +1285,15 @@ if ($tabDesconocida) {
                 </div>
 
                 <?php if ($esAdmin): ?>
-                    <a href="procesar.php?accion=descargar_respaldo"
-                        class="btn btn-outline-secondary btn-sm w-100 mb-2 d-flex align-items-center justify-content-center py-1.5"
-                        style="font-size: 0.74rem; font-weight: 600;"
-                        title="Descargar snapshot caliente comprimido (.sql.gz)">
-                        <i class="bi bi-cloud-arrow-down me-2 text-primary"></i>Crear Respaldo
-                    </a>
+                    <form action="procesar.php" method="POST" class="mb-2">
+                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                        <input type="hidden" name="accion" value="descargar_respaldo">
+                        <button type="submit" class="btn btn-outline-secondary btn-sm w-100 d-flex align-items-center justify-content-center py-1.5"
+                            style="font-size: 0.74rem; font-weight: 600;"
+                            title="Descargar snapshot caliente comprimido (.sql.gz)">
+                            <i class="bi bi-cloud-arrow-down me-2 text-primary"></i>Crear Respaldo
+                        </button>
+                    </form>
                 <?php endif; ?>
 
                 <a href="logout.php" class="btn btn-outline-danger btn-sm w-100 d-flex align-items-center justify-content-center py-1.5"
@@ -4669,18 +4675,19 @@ if ($tabDesconocida) {
                                 <?php foreach ($recipesPaciente as $rec): ?>
                                     <?php
                                         $yaRetiro = $rec['ya_retiro'];
+                                        $estaVencido = !empty($rec['esta_vencido']);
                                         $hayStock = ($rec['stock_total_centro'] > 0);
                                         $reqFrio = ((int)$rec['requiere_cadena_frio'] === 1);
                                         $frioBloquea = ($reqFrio && !$centroTieneCadenaFrio);
                                     ?>
                                     <div class="col-12">
-                                        <div class="card border <?= $yaRetiro ? 'border-secondary-subtle bg-light' : ($hayStock && !$frioBloquea ? 'border-success-subtle' : 'border-warning-subtle') ?> shadow-sm">
+                                        <div class="card border <?= $yaRetiro ? 'border-secondary-subtle bg-light' : ($estaVencido ? 'border-danger-subtle bg-light' : ($hayStock && !$frioBloquea ? 'border-success-subtle' : 'border-warning-subtle')) ?> shadow-sm">
                                             <div class="card-body p-3">
                                                 <div class="row align-items-center g-3">
                                                     <!-- Columna 1: Datos Prescriptivos del Medicamento -->
                                                     <div class="col-lg-5 col-md-6">
                                                         <div class="d-flex align-items-start gap-2">
-                                                            <div class="p-2 rounded-2 <?= $yaRetiro ? 'bg-secondary-subtle text-secondary' : 'bg-primary-subtle text-primary' ?> mt-1">
+                                                            <div class="p-2 rounded-2 <?= $yaRetiro ? 'bg-secondary-subtle text-secondary' : ($estaVencido ? 'bg-danger-subtle text-danger' : 'bg-primary-subtle text-primary') ?> mt-1">
                                                                 <i class="bi bi-capsule fs-4"></i>
                                                             </div>
                                                             <div>
@@ -4700,6 +4707,13 @@ if ($tabDesconocida) {
                                                                 <div class="text-muted mt-1" style="font-size: 0.70rem;">
                                                                     <i class="bi bi-person-check me-1"></i> Prescriptor: <?= htmlspecialchars($rec['medico_prescriptor'] ?? 'MPPS') ?>
                                                                 </div>
+                                                                <?php if ($estaVencido): ?>
+                                                                    <div class="mt-1">
+                                                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle small">
+                                                                            <i class="bi bi-exclamation-triangle-fill me-1"></i> Récipe Vencido el <?= date('d/m/Y', strtotime($rec['fecha_vencimiento_recipe'])) ?>
+                                                                        </span>
+                                                                    </div>
+                                                                <?php endif; ?>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -4720,7 +4734,16 @@ if ($tabDesconocida) {
                                                             </div>
                                                         <?php endif; ?>
 
-                                                        <?php if ($yaRetiro): ?>
+                                                        <?php if ($estaVencido): ?>
+                                                            <div class="alert alert-danger border py-1.5 px-2 mb-0 small" style="font-size: 0.74rem;">
+                                                                <div class="fw-bold d-flex align-items-center gap-1 text-danger">
+                                                                    <i class="bi bi-exclamation-triangle-fill"></i> Récipe Vencido el <?= date('d/m/Y', strtotime($rec['fecha_vencimiento_recipe'])) ?>
+                                                                </div>
+                                                                <div class="text-muted mt-0.5">
+                                                                    La prescripción médica ha caducado. Se requiere evaluación facultativa para renovar la vigencia del récipe.
+                                                                </div>
+                                                            </div>
+                                                        <?php elseif ($yaRetiro): ?>
                                                             <div class="alert alert-danger border py-1.5 px-2 mb-0 small" style="font-size: 0.74rem;">
                                                                 <div class="fw-bold d-flex align-items-center gap-1 text-danger">
                                                                     <i class="bi bi-lock-fill"></i> Dotación Mensual Ya Retirada (Periodo <?= htmlspecialchars($periodoActual) ?>)
@@ -4770,7 +4793,12 @@ if ($tabDesconocida) {
 
                                                     <!-- Columna 3: Acción de Dispensación Asistencial -->
                                                     <div class="col-lg-3 col-md-12 text-lg-end text-start">
-                                                        <?php if ($yaRetiro): ?>
+                                                        <?php if ($estaVencido): ?>
+                                                            <button type="button" class="btn btn-outline-danger btn-sm px-3 w-100 w-lg-auto" disabled
+                                                                    title="Récipe médico vencido. Requiere renovación facultativa antes de dispensar.">
+                                                                <i class="bi bi-exclamation-triangle-fill me-1"></i> Récipe Vencido - Renovar Prescripción
+                                                            </button>
+                                                        <?php elseif ($yaRetiro): ?>
                                                             <button type="button" class="btn btn-secondary btn-sm px-3 w-100 w-lg-auto" disabled>
                                                                 <i class="bi bi-lock me-1"></i> Dotación Ya Retirada
                                                             </button>
@@ -4977,6 +5005,14 @@ if ($tabDesconocida) {
                                         </div>
                                     </div>
 
+                                    <div class="col-12" id="disp-alerta-parcial-col" style="display: none;">
+                                        <div class="alert alert-warning border py-2 px-3 mb-0 small" style="font-size: 0.74rem;">
+                                            <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                                            <strong>Aviso Clínico:</strong>
+                                            <span id="disp-txt-alerta-parcial"></span>
+                                        </div>
+                                    </div>
+
                                     <div class="col-md-6">
                                         <label class="form-label small fw-semibold text-secondary mb-1">
                                             <i class="bi bi-calendar-check me-1"></i> Periodo de Retiro Mensual
@@ -5072,6 +5108,17 @@ if ($tabDesconocida) {
                                     inputCant.max = maxVal;
                                     inputCant.value = maxVal;
                                     if (txtMax) txtMax.textContent = maxVal;
+
+                                    const alertCol = document.getElementById('disp-alerta-parcial-col');
+                                    const alertTxt = document.getElementById('disp-txt-alerta-parcial');
+                                    if (alertCol && alertTxt) {
+                                        if (stockLote < dosis) {
+                                            alertTxt.textContent = ` El stock del lote seleccionado (${stockLote} unid.) es inferior a la dosis autorizada (${dosis} unid./mes). La entrega parcial consumirá el cupo mensual del paciente en la red municipal.`;
+                                            alertCol.style.display = 'block';
+                                        } else {
+                                            alertCol.style.display = 'none';
+                                        }
+                                    }
                                 }
 
                                 selectLote.onchange = actualizarLimites;
@@ -5579,9 +5626,21 @@ if ($tabDesconocida) {
             if (mPac) new bootstrap.Modal(mPac).show();
             <?php endif; ?>
 
-            <?php if ($tabActiva === 'recipes' && !empty($recipeEdicion)): ?>
+            <?php if ($tabActiva === 'recipes'): ?>
+            const recEmision = document.getElementById('recipe_fecha_emision');
+            const recVenc = document.getElementById('recipe_fecha_vencimiento');
+            if (recEmision && recVenc) {
+                recEmision.addEventListener('change', function() {
+                    recVenc.min = this.value;
+                    if (recVenc.value && recVenc.value < this.value) {
+                        recVenc.value = this.value;
+                    }
+                });
+            }
+            <?php if (!empty($recipeEdicion)): ?>
             const mRec = document.getElementById('modalRecipe');
             if (mRec) new bootstrap.Modal(mRec).show();
+            <?php endif; ?>
             <?php endif; ?>
         });
     </script>
