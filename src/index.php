@@ -10,6 +10,7 @@ require_once __DIR__ . '/helpers/configuracion.php';
 
 $pdo = getDB();
 $usuario = requerirAutenticacion($pdo);
+establecerContextoAuditoriaSQL($pdo, (int)$usuario['id']);
 $esAdmin = ((int) $usuario['rol_id'] === 1);
 $centroUsuarioId = $usuario['centro_salud_id'];
 
@@ -69,13 +70,18 @@ if ($tabActiva === 'centros') {
     $centros = $stmtCentros->fetchAll();
 
     // Recursos asignados por centro (N:M)
-    $stmtRA = $pdo->query("SELECT cr.centro_salud_id, ro.nombre
-                           FROM centro_recursos cr
-                           INNER JOIN recursos_operativos ro ON ro.id = cr.recurso_id
-                           WHERE cr.operativo = 1 ORDER BY ro.id ASC");
     $recursosPorCentro = [];
-    while ($r = $stmtRA->fetch()) {
-        $recursosPorCentro[(int) $r['centro_salud_id']][] = $r['nombre'];
+    if (!empty($centros)) {
+        $centroIds = array_map(fn($c) => (int)$c['id'], $centros);
+        $inCentros = implode(',', $centroIds);
+        $stmtRA = $pdo->query("SELECT cr.centro_salud_id, ro.nombre
+                               FROM centro_recursos cr
+                               INNER JOIN recursos_operativos ro ON ro.id = cr.recurso_id
+                               WHERE cr.operativo = 1 AND cr.centro_salud_id IN ({$inCentros})
+                               ORDER BY ro.id ASC");
+        while ($r = $stmtRA->fetch()) {
+            $recursosPorCentro[(int) $r['centro_salud_id']][] = $r['nombre'];
+        }
     }
 
     // Catálogos para el formulario
@@ -679,9 +685,6 @@ if ($tabActiva === 'centros') {
     $wherePacientesSql = !empty($condPacientes) ? 'WHERE ' . implode(' AND ', $condPacientes) : '';
 
     // 4. Paginación de Pacientes
-    $totalRegistrosPacientes = (int) ($pdo->prepare("SELECT COUNT(*) FROM pacientes p LEFT JOIN tipos_documento td ON p.tipo_documento_id = td.id {$wherePacientesSql}")->execute($paramsPacientes) ? $pdo->query("SELECT FOUND_ROWS()")->fetchColumn() : 0);
-    
-    // Conteo exacto
     $stmtCountPac = $pdo->prepare("SELECT COUNT(*) FROM pacientes p LEFT JOIN tipos_documento td ON p.tipo_documento_id = td.id {$wherePacientesSql}");
     $stmtCountPac->execute($paramsPacientes);
     $totalRegistrosPacientes = (int) $stmtCountPac->fetchColumn();
@@ -1076,7 +1079,7 @@ if ($tabDesconocida) {
                 <?php if ($mensajeExito): ?>
                     <div class="alert alert-success alert-dismissible fade show d-flex align-items-center gap-2 py-2.5 px-3 mb-3 border shadow-sm" role="alert">
                         <i class="bi bi-check-circle-fill text-success fs-5 flex-shrink-0"></i>
-                        <div class="small fw-medium"><?= htmlspecialchars($mensajeExito) ?></div>
+                        <div class="small fw-medium"><?= htmlspecialchars((string) $mensajeExito, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></div>
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
                     </div>
                 <?php endif; ?>
@@ -1084,7 +1087,7 @@ if ($tabDesconocida) {
                 <?php if ($mensajeError): ?>
                     <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center gap-2 py-2.5 px-3 mb-3 border shadow-sm" role="alert">
                         <i class="bi bi-exclamation-octagon-fill text-danger fs-5 flex-shrink-0"></i>
-                        <div class="small fw-medium"><?= htmlspecialchars($mensajeError) ?></div>
+                        <div class="small fw-medium"><?= htmlspecialchars((string) $mensajeError, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></div>
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
                     </div>
                 <?php endif; ?>
@@ -1138,6 +1141,7 @@ if ($tabDesconocida) {
                                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                                 </div>
                                 <div class="modal-body p-3">
+                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
                                     <input type="hidden" name="accion" value="guardar_centro">
                                     <input type="hidden" name="id"
                                         value="<?= $centroEdicion ? (int) $centroEdicion['id'] : '' ?>">
@@ -1348,16 +1352,21 @@ if ($tabDesconocida) {
                                                                 class="btn btn-outline-primary btn-sm py-0 px-2"
                                                                 style="font-size: 0.74rem;">Editar</a>
                                                             <?php if ((int) $c['activo'] === 1): ?>
-                                                                <a href="procesar.php?accion=cambiar_estado_centro&id=<?= (int) $c['id'] ?>&estado=0"
-                                                                    class="btn btn-link text-danger p-0 ms-1 text-decoration-none"
-                                                                    onclick="return confirm('¿Desactivar ambulatorio?')"
-                                                                    title="Desactivar">✕</a>
+                                                                <form method="POST" action="procesar.php" class="d-inline" onsubmit="return confirm('¿Desactivar ambulatorio?');">
+                                                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                                                    <input type="hidden" name="accion" value="cambiar_estado_centro">
+                                                                    <input type="hidden" name="id" value="<?= (int) $c['id'] ?>">
+                                                                    <input type="hidden" name="estado" value="0">
+                                                                    <button type="submit" class="btn btn-link text-danger p-0 ms-1 text-decoration-none" title="Desactivar" style="font-size: 0.85rem; line-height: 1;">✕</button>
+                                                                </form>
                                                             <?php else: ?>
-                                                                <a href="procesar.php?accion=cambiar_estado_centro&id=<?= (int) $c['id'] ?>&estado=1"
-                                                                    class="btn btn-outline-success btn-sm py-0 px-1 ms-1"
-                                                                    style="font-size: 0.74rem;"
-                                                                    onclick="return confirm('¿Reactivar ambulatorio?')"
-                                                                    title="Reactivar">Reactivar</a>
+                                                                <form method="POST" action="procesar.php" class="d-inline" onsubmit="return confirm('¿Reactivar ambulatorio?');">
+                                                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                                                    <input type="hidden" name="accion" value="cambiar_estado_centro">
+                                                                    <input type="hidden" name="id" value="<?= (int) $c['id'] ?>">
+                                                                    <input type="hidden" name="estado" value="1">
+                                                                    <button type="submit" class="btn btn-outline-success btn-sm py-0 px-1 ms-1" style="font-size: 0.74rem;" title="Reactivar">Reactivar</button>
+                                                                </form>
                                                             <?php endif; ?>
                                                         <?php endif; ?>
                                                     </div>
@@ -1461,6 +1470,7 @@ if ($tabDesconocida) {
                                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                                 </div>
                                 <div class="modal-body p-3">
+                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
                                     <input type="hidden" name="accion" value="<?= $medicamentoEdicion ? 'editar_medicamento' : 'crear_medicamento' ?>">
                                     <?php if ($medicamentoEdicion): ?>
                                         <input type="hidden" name="id" value="<?= (int) $medicamentoEdicion['id'] ?>">
@@ -1649,6 +1659,7 @@ if ($tabDesconocida) {
                                                             </a>
                                                             <form method="POST" action="procesar.php" class="d-inline"
                                                                 onsubmit="return confirm('¿Confirma que desea <?= ((int) $med['activo'] === 1) ? 'descontinuar' : 'reactivar' ?> el medicamento <?= htmlspecialchars(addslashes($med['nombre_generico'])) ?>?');">
+                                                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
                                                                 <input type="hidden" name="accion" value="cambiar_estado_medicamento">
                                                                 <input type="hidden" name="id" value="<?= $med['id'] ?>">
                                                                 <button type="submit"
@@ -1685,6 +1696,7 @@ if ($tabDesconocida) {
                             </div>
                             <div class="card-body p-3">
                                 <form method="POST" action="procesar.php" novalidate id="form-patologia">
+                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
                                     <input type="hidden" name="accion" value="crear_patologia">
 
                                     <div class="mb-3">
@@ -1803,6 +1815,7 @@ if ($tabDesconocida) {
                                                     <td class="text-end">
                                                         <form method="POST" action="procesar.php" class="d-inline"
                                                             onsubmit="return confirm('¿Confirma que desea <?= ((int) $pat['activo'] === 1) ? 'desactivar' : 'reactivar' ?> la patología <?= htmlspecialchars(addslashes($pat['nombre'])) ?>?');">
+                                                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
                                                             <input type="hidden" name="accion" value="cambiar_estado_patologia">
                                                             <input type="hidden" name="id" value="<?= $pat['id'] ?>">
                                                             <button type="submit"
@@ -1837,6 +1850,7 @@ if ($tabDesconocida) {
                             </div>
                             <div class="card-body p-3">
                                 <form method="POST" action="procesar.php" novalidate id="form-forma">
+                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
                                     <input type="hidden" name="accion" value="crear_forma_farmaceutica">
 
                                     <div class="mb-3">
@@ -1957,6 +1971,7 @@ if ($tabDesconocida) {
                         </div>
                         <div class="p-3 bg-light border-top border-bottom">
                             <form action="procesar.php" method="POST" class="row g-2 align-items-end">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
                                 <input type="hidden" name="accion" value="crear_tipo_centro">
                                 <div class="col-md-4">
                                     <label class="form-label small fw-semibold mb-1">Código</label>
@@ -2012,11 +2027,15 @@ if ($tabDesconocida) {
                                                 <?php endif; ?>
                                             </td>
                                             <td class="text-end pe-3">
-                                                <a href="procesar.php?accion=toggle_tipo_centro&id=<?= (int) $t['id'] ?>&estado=<?= (int) $t['activo'] === 1 ? '0' : '1' ?>"
-                                                    class="btn btn-outline-secondary btn-sm py-0 px-2"
-                                                    style="font-size: 0.72rem;">
-                                                    <?= (int) $t['activo'] === 1 ? 'Desactivar' : 'Activar' ?>
-                                                </a>
+                                                <form method="POST" action="procesar.php" class="d-inline" onsubmit="return confirm('¿Confirma cambiar el estado de este tipo de centro?');">
+                                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                                    <input type="hidden" name="accion" value="toggle_tipo_centro">
+                                                    <input type="hidden" name="id" value="<?= (int) $t['id'] ?>">
+                                                    <input type="hidden" name="estado" value="<?= (int) $t['activo'] === 1 ? '0' : '1' ?>">
+                                                    <button type="submit" class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size: 0.72rem;">
+                                                        <?= (int) $t['activo'] === 1 ? 'Desactivar' : 'Activar' ?>
+                                                    </button>
+                                                </form>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
@@ -2041,6 +2060,7 @@ if ($tabDesconocida) {
                         </div>
                         <div class="p-3 bg-light border-top border-bottom">
                             <form action="procesar.php" method="POST" class="row g-2 align-items-end">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
                                 <input type="hidden" name="accion" value="crear_recurso">
                                 <div class="col-md-4">
                                     <label class="form-label small fw-semibold mb-1">Código</label>
@@ -2096,11 +2116,15 @@ if ($tabDesconocida) {
                                                 <?php endif; ?>
                                             </td>
                                             <td class="text-end pe-3">
-                                                <a href="procesar.php?accion=toggle_recurso&id=<?= (int) $r['id'] ?>&estado=<?= (int) $r['activo'] === 1 ? '0' : '1' ?>"
-                                                    class="btn btn-outline-secondary btn-sm py-0 px-2"
-                                                    style="font-size: 0.72rem;">
-                                                    <?= (int) $r['activo'] === 1 ? 'Desactivar' : 'Activar' ?>
-                                                </a>
+                                                <form method="POST" action="procesar.php" class="d-inline" onsubmit="return confirm('¿Confirma cambiar el estado de este equipamiento/recurso?');">
+                                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                                    <input type="hidden" name="accion" value="toggle_recurso">
+                                                    <input type="hidden" name="id" value="<?= (int) $r['id'] ?>">
+                                                    <input type="hidden" name="estado" value="<?= (int) $r['activo'] === 1 ? '0' : '1' ?>">
+                                                    <button type="submit" class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size: 0.72rem;">
+                                                        <?= (int) $r['activo'] === 1 ? 'Desactivar' : 'Activar' ?>
+                                                    </button>
+                                                </form>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
@@ -2130,6 +2154,7 @@ if ($tabDesconocida) {
                         </div>
                         <div class="p-3">
                             <form id="form-usuario" action="procesar.php" method="POST" novalidate>
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
                                 <input type="hidden" name="accion" value="guardar_usuario">
                                 <input type="hidden" id="u_id" name="id"
                                     value="<?= $usuarioEdicion ? (int) $usuarioEdicion['id'] : '' ?>">
@@ -2298,16 +2323,21 @@ if ($tabDesconocida) {
                                                             style="font-size: 0.74rem;">Editar</a>
                                                         <?php if ((int) $u['id'] !== (int) $usuario['id']): ?>
                                                             <?php if ((int) $u['activo'] === 1): ?>
-                                                                <a href="procesar.php?accion=cambiar_estado_usuario&id=<?= (int) $u['id'] ?>&estado=0"
-                                                                    class="btn btn-link text-danger p-0 ms-1 text-decoration-none"
-                                                                    onclick="return confirm('¿Desactivar operador?')"
-                                                                    title="Desactivar">✕</a>
+                                                                <form method="POST" action="procesar.php" class="d-inline" onsubmit="return confirm('¿Desactivar operador?');">
+                                                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                                                    <input type="hidden" name="accion" value="cambiar_estado_usuario">
+                                                                    <input type="hidden" name="id" value="<?= (int) $u['id'] ?>">
+                                                                    <input type="hidden" name="estado" value="0">
+                                                                    <button type="submit" class="btn btn-link text-danger p-0 ms-1 text-decoration-none" title="Desactivar" style="font-size: 0.85rem; line-height: 1;">✕</button>
+                                                                </form>
                                                             <?php else: ?>
-                                                                <a href="procesar.php?accion=cambiar_estado_usuario&id=<?= (int) $u['id'] ?>&estado=1"
-                                                                    class="btn btn-outline-success btn-sm py-0 px-1 ms-1"
-                                                                    style="font-size: 0.74rem;"
-                                                                    onclick="return confirm('¿Reactivar operador?')"
-                                                                    title="Reactivar">Reactivar</a>
+                                                                <form method="POST" action="procesar.php" class="d-inline" onsubmit="return confirm('¿Reactivar operador?');">
+                                                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                                                    <input type="hidden" name="accion" value="cambiar_estado_usuario">
+                                                                    <input type="hidden" name="id" value="<?= (int) $u['id'] ?>">
+                                                                    <input type="hidden" name="estado" value="1">
+                                                                    <button type="submit" class="btn btn-outline-success btn-sm py-0 px-1 ms-1" style="font-size: 0.74rem;" title="Reactivar">Reactivar</button>
+                                                                </form>
                                                             <?php endif; ?>
                                                         <?php else: ?>
                                                             <span class="text-muted small ms-1" style="font-size: 0.70rem;"
@@ -3191,6 +3221,7 @@ if ($tabDesconocida) {
                             </p>
 
                             <form action="procesar.php?accion=guardar_identidad_institucional" method="POST" enctype="multipart/form-data">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
                                 <div class="row g-3 mb-4">
                                     <!-- Nombre Oficial del Sistema -->
                                     <div class="col-md-8">
@@ -3379,6 +3410,7 @@ if ($tabDesconocida) {
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                             </div>
                             <div class="modal-body p-3">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
                                 <input type="hidden" name="accion" value="guardar_paciente">
                                 <input type="hidden" name="id" value="<?= $pacienteEdicion ? (int) $pacienteEdicion['id'] : '' ?>">
 
@@ -3673,7 +3705,7 @@ if ($tabDesconocida) {
                                                 </td>
                                                 <td class="text-end">
                                                     <div class="d-flex justify-content-end gap-1">
-                                                        <a href="index.php?tab=pacientes&editar_id=<?= (int)$p['id'] ?><?= $busquedaPaciente !== '' ? '&q_paciente=' . urlencode($busquedaPaciente) : '' ?><?= $filtroTipoDoc !== 'todos' ? '&tipo_doc=' . urlencode($filtroTipoDoc) : '' ?><?= $paginaActual > 1 ? '&p=' . $paginaActual : '' ?>"
+                                                        <a href="index.php?tab=pacientes&editar_id=<?= (int)$p['id'] ?><?= $busquedaPaciente !== '' ? '&q_paciente=' . urlencode($busquedaPaciente) : '' ?><?= $filtroTipoDoc !== 'todos' ? '&tipo_doc=' . urlencode($filtroTipoDoc) : '' ?><?= $paginaActual > 1 ? '&p_paciente=' . $paginaActual : '' ?>"
                                                             class="btn btn-sm btn-outline-primary py-0 px-2"
                                                             style="font-size: 0.74rem;" title="Editar Expediente">
                                                             <i class="bi bi-pencil-square"></i> Editar
@@ -3704,21 +3736,21 @@ if ($tabDesconocida) {
                                 <nav aria-label="Navegación del padrón">
                                     <ul class="pagination pagination-sm mb-0">
                                         <li class="page-item <?= ($paginaActual <= 1) ? 'disabled' : '' ?>">
-                                            <a class="page-link" href="index.php?tab=pacientes<?= $pagQuery ?>&p=<?= $paginaActual - 1 ?>">
+                                            <a class="page-link" href="index.php?tab=pacientes<?= $pagQuery ?>&p_paciente=<?= $paginaActual - 1 ?>">
                                                 <i class="bi bi-chevron-left"></i>
                                             </a>
                                         </li>
                                         <?php for ($pg = 1; $pg <= $totalPaginas; $pg++): ?>
                                             <?php if ($pg === 1 || $pg === $totalPaginas || ($pg >= $paginaActual - 2 && $pg <= $paginaActual + 2)): ?>
                                                 <li class="page-item <?= ($pg === $paginaActual) ? 'active' : '' ?>">
-                                                    <a class="page-link" href="index.php?tab=pacientes<?= $pagQuery ?>&p=<?= $pg ?>"><?= $pg ?></a>
+                                                    <a class="page-link" href="index.php?tab=pacientes<?= $pagQuery ?>&p_paciente=<?= $pg ?>"><?= $pg ?></a>
                                                 </li>
                                             <?php elseif ($pg === $paginaActual - 3 || $pg === $paginaActual + 3): ?>
                                                 <li class="page-item disabled"><span class="page-link">...</span></li>
                                             <?php endif; ?>
                                         <?php endfor; ?>
                                         <li class="page-item <?= ($paginaActual >= $totalPaginas) ? 'disabled' : '' ?>">
-                                            <a class="page-link" href="index.php?tab=pacientes<?= $pagQuery ?>&p=<?= $paginaActual + 1 ?>">
+                                            <a class="page-link" href="index.php?tab=pacientes<?= $pagQuery ?>&p_paciente=<?= $paginaActual + 1 ?>">
                                                 <i class="bi bi-chevron-right"></i>
                                             </a>
                                         </li>
@@ -3801,6 +3833,7 @@ if ($tabDesconocida) {
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                             </div>
                             <div class="modal-body p-3">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
                                 <input type="hidden" name="accion" value="guardar_recipe">
                                 <input type="hidden" name="id" value="<?= $recipeEdicion ? (int) $recipeEdicion['id'] : '' ?>">
 
@@ -4083,6 +4116,7 @@ if ($tabDesconocida) {
                                                         </a>
                                                         <form action="procesar.php" method="POST" class="d-inline"
                                                             onsubmit="return confirm('¿Confirma que desea <?= $activo ? 'desactivar' : 'reactivar' ?> el récipe #<?= (int) $r['id'] ?>?');">
+                                                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
                                                             <input type="hidden" name="accion" value="toggle_estado_recipe">
                                                             <input type="hidden" name="id" value="<?= (int) $r['id'] ?>">
                                                             <button type="submit"

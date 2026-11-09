@@ -20,6 +20,44 @@ if (!$usuario) {
 $usuarioSesionId = $usuario['id'];
 $esAdmin = ((int) $usuario['rol_id'] === 1);
 
+// Contexto SQL Forense para triggers de auditoría
+establecerContextoAuditoriaSQL(
+    $pdo,
+    $usuarioSesionId,
+    $_SESSION['sesion_ip'] ?? ($_SERVER['REMOTE_ADDR'] ?? null),
+    $_SESSION['sesion_user_agent'] ?? ($_SERVER['HTTP_USER_AGENT'] ?? null)
+);
+
+// Validación CSRF obligatoria para todas las solicitudes POST
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!validarCsrfToken($_POST['csrf_token'] ?? '')) {
+        $msg = 'Sesión de formulario expirada o inválida. Intente de nuevo.';
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            $_SESSION['mensaje_error'] = $msg;
+        }
+        $targetTab = 'centros';
+        if (str_contains($accion, 'tipo') || str_contains($accion, 'recurso')) {
+            $targetTab = 'maestras';
+        } elseif (str_contains($accion, 'usuario')) {
+            $targetTab = 'usuarios';
+        } elseif (str_contains($accion, 'paciente')) {
+            $targetTab = 'pacientes';
+        } elseif (str_contains($accion, 'recipe')) {
+            $targetTab = 'recipes';
+        } elseif (str_contains($accion, 'configuracion') || str_contains($accion, 'identidad')) {
+            $targetTab = 'configuracion';
+        } elseif (str_contains($accion, 'patologia')) {
+            $targetTab = 'medicamentos&subtab=patologias';
+        } elseif (str_contains($accion, 'forma')) {
+            $targetTab = 'medicamentos&subtab=formas';
+        } elseif (str_contains($accion, 'medicamento')) {
+            $targetTab = 'medicamentos&subtab=vademecum';
+        }
+        header("Location: index.php?tab={$targetTab}&error=" . urlencode($msg));
+        exit;
+    }
+}
+
 // Guardián RBAC: Las operaciones de configuración y altas son exclusivas de rol_admin
 $accionesSoloAdmin = [
     'guardar_centro',
@@ -203,8 +241,8 @@ try {
         // 2. SOFT DELETE / REACTIVACIÓN DE AMBULATORIO
         // ======================================================================
         case 'cambiar_estado_centro':
-            $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-            $nuevoEstado = isset($_GET['estado']) ? (int) $_GET['estado'] : null;
+            $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT) ?: filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+            $nuevoEstado = isset($_POST['estado']) ? (int) $_POST['estado'] : (isset($_GET['estado']) ? (int) $_GET['estado'] : null);
 
             if (!$id || ($nuevoEstado !== 0 && $nuevoEstado !== 1)) {
                 header('Location: index.php?tab=centros&error=' . urlencode('Solicitud inválida.'));
@@ -270,8 +308,8 @@ try {
             exit;
 
         case 'toggle_tipo_centro':
-            $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-            $st = isset($_GET['estado']) ? (int) $_GET['estado'] : null;
+            $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT) ?: filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+            $st = isset($_POST['estado']) ? (int) $_POST['estado'] : (isset($_GET['estado']) ? (int) $_GET['estado'] : null);
 
             if (!$id || ($st !== 0 && $st !== 1)) {
                 header('Location: index.php?tab=maestras&error=' . urlencode('Parámetros inválidos.'));
@@ -324,8 +362,8 @@ try {
             exit;
 
         case 'toggle_recurso':
-            $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-            $st = isset($_GET['estado']) ? (int) $_GET['estado'] : null;
+            $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT) ?: filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+            $st = isset($_POST['estado']) ? (int) $_POST['estado'] : (isset($_GET['estado']) ? (int) $_GET['estado'] : null);
 
             if (!$id || ($st !== 0 && $st !== 1)) {
                 header('Location: index.php?tab=maestras&error=' . urlencode('Parámetros inválidos.'));
@@ -488,8 +526,8 @@ try {
             break;
 
         case 'cambiar_estado_usuario':
-            $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-            $nuevoEstado = isset($_GET['estado']) ? (int) $_GET['estado'] : null;
+            $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT) ?: filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+            $nuevoEstado = isset($_POST['estado']) ? (int) $_POST['estado'] : (isset($_GET['estado']) ? (int) $_GET['estado'] : null);
 
             if (!$id || ($nuevoEstado !== 0 && $nuevoEstado !== 1)) {
                 header('Location: index.php?tab=usuarios&error=' . urlencode('Solicitud inválida.'));
@@ -1054,6 +1092,20 @@ try {
             $stmtCheckDoc->execute([':id' => $tipoDocumentoId]);
             if (!$stmtCheckDoc->fetch()) {
                 header('Location: index.php?tab=pacientes&error=' . urlencode('El tipo de documento seleccionado no existe en el catálogo.'));
+                exit;
+            }
+
+            // Validar unicidad de cédula / documento de identidad
+            $sqlUniq = "SELECT id FROM pacientes WHERE tipo_documento_id = :tipo AND cedula = :cedula";
+            $paramsUniq = [':tipo' => $tipoDocumentoId, ':cedula' => $cedula];
+            if ($id !== null) {
+                $sqlUniq .= " AND id != :id";
+                $paramsUniq[':id'] = $id;
+            }
+            $stmtUniq = $pdo->prepare($sqlUniq);
+            $stmtUniq->execute($paramsUniq);
+            if ($stmtUniq->fetch()) {
+                header('Location: index.php?tab=pacientes&error=' . urlencode('Ya existe un paciente registrado con este documento de identidad.'));
                 exit;
             }
 

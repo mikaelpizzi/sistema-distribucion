@@ -209,3 +209,26 @@ function cerrarSesion(): void
     session_destroy();
 }
 
+/**
+ * Obtiene o inicializa el token CSRF para la sesión activa.
+ */
+function obtenerCsrfToken(): string
+{
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+    return $_SESSION['csrf_token'];
+}
+
+/**
+ * Valida un token CSRF provisto contra el token de la sesión activa.
+ */
+function validarCsrfToken(?string $token): bool
+{
+    if (empty($_SESSION['csrf_token']) || empty($token)) {
+        return false;
+    }
+    return hash_equals($_SESSION['csrf_token'], $token);
+}
+
+
