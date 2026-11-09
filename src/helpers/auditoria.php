@@ -128,6 +128,8 @@ function resolverEntidadLegible(
         'formas_farmaceuticas'=> 'Forma Farmacéutica',
         'pacientes'           => 'Paciente / Padrón',
         'paciente_contactos'  => 'Contacto de Paciente',
+        'lotes_inventario'    => 'Lote de Inventario',
+        'despachos'           => 'Despacho Asistencial',
     ];
     $entidadGeneral = $nombresTablas[$tabla] ?? ucfirst(str_replace('_', ' ', $tabla ?: 'Sistema'));
 
@@ -221,6 +223,19 @@ function resolverEntidadLegible(
             $ced = $detalles['cedula'] ?? '';
             $titulo = $nombre ? ($nombre . ($ced ? " ({$ced})" : '')) : ($regId ? "Paciente [ID: {$regId}]" : 'Paciente');
             $subtitulo = $regId ? "Paciente [ID: {$regId}]" : 'Padrón de Pacientes';
+        }
+    } elseif ($tabla === 'lotes_inventario') {
+        if ($regId && isset($diccionarios['lotes'][$regId])) {
+            $l = $diccionarios['lotes'][$regId];
+            $numLote = $l['nombre'] ?? ($l['numero_lote'] ?? '');
+            $med = $l['medicamento'] ?? '';
+            $titulo = 'Lote ' . $numLote . (!empty($med) ? ' (' . $med . ')' : '');
+            $subtitulo = 'Lote de Inventario [ID: ' . $regId . ']';
+        } else {
+            $numLote = $detalles['numero_lote'] ?? ($detalles['nombre'] ?? null);
+            $med = $detalles['medicamento'] ?? '';
+            $titulo = $numLote ? ('Lote ' . $numLote . ($med ? " ({$med})" : '')) : ($regId ? "Lote [ID: {$regId}]" : 'Lote de Inventario');
+            $subtitulo = $regId ? "Lote de Inventario [ID: {$regId}]" : 'Lotes de Inventario';
         }
     } else {
         $evento = $detalles['evento'] ?? null;

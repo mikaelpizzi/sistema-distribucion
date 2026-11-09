@@ -841,6 +841,31 @@ BEGIN
     END IF;
 END$$
 
+-- 8.14 Auditoría Delta Celda por Celda en Lotes de Inventario
+DROP TRIGGER IF EXISTS trg_lotes_audit_delta$$
+CREATE TRIGGER trg_lotes_audit_delta
+AFTER UPDATE ON lotes_inventario
+FOR EACH ROW
+BEGIN
+    DECLARE v_ip VARCHAR(45);
+    SET v_ip = COALESCE(@app_client_ip, 'CONSOLA_DIRECTA');
+
+    IF NOT (OLD.numero_lote <=> NEW.numero_lote) THEN
+        INSERT INTO logs_cambios_campos (tabla_nombre, registro_id, campo_modificado, valor_anterior, valor_nuevo, usuario_app_id, db_user, connection_id, ip_origen, created_at)
+        VALUES ('lotes_inventario', NEW.id, 'numero_lote', OLD.numero_lote, NEW.numero_lote, @app_user_id, CURRENT_USER(), CONNECTION_ID(), v_ip, NOW());
+    END IF;
+
+    IF NOT (OLD.fecha_vencimiento <=> NEW.fecha_vencimiento) THEN
+        INSERT INTO logs_cambios_campos (tabla_nombre, registro_id, campo_modificado, valor_anterior, valor_nuevo, usuario_app_id, db_user, connection_id, ip_origen, created_at)
+        VALUES ('lotes_inventario', NEW.id, 'fecha_vencimiento', CAST(OLD.fecha_vencimiento AS CHAR), CAST(NEW.fecha_vencimiento AS CHAR), @app_user_id, CURRENT_USER(), CONNECTION_ID(), v_ip, NOW());
+    END IF;
+
+    IF NOT (OLD.cantidad_actual <=> NEW.cantidad_actual) THEN
+        INSERT INTO logs_cambios_campos (tabla_nombre, registro_id, campo_modificado, valor_anterior, valor_nuevo, usuario_app_id, db_user, connection_id, ip_origen, created_at)
+        VALUES ('lotes_inventario', NEW.id, 'cantidad_actual', CAST(OLD.cantidad_actual AS CHAR), CAST(NEW.cantidad_actual AS CHAR), @app_user_id, CURRENT_USER(), CONNECTION_ID(), v_ip, NOW());
+    END IF;
+END$$
+
 DELIMITER ;
 
 -- ============================================================================

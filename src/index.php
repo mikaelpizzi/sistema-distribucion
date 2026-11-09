@@ -330,6 +330,7 @@ if ($tabActiva === 'centros') {
     $nombresMedicamentos = [];
     $nombresPacientes = [];
     $nombresPatologias = [];
+    $nombresLotes = [];
     try {
         $nombresCentros = $pdo->query("SELECT id, nombre, codigo_sicm FROM centros_salud")->fetchAll(PDO::FETCH_UNIQUE);
         $nombresRecursos = $pdo->query("SELECT id, nombre, codigo FROM recursos_operativos")->fetchAll(PDO::FETCH_UNIQUE);
@@ -338,6 +339,7 @@ if ($tabActiva === 'centros') {
         $nombresMedicamentos = $pdo->query("SELECT id, nombre_generico AS nombre, concentracion FROM medicamentos")->fetchAll(PDO::FETCH_UNIQUE);
         $nombresPacientes = $pdo->query("SELECT id, nombre_completo AS nombre, cedula FROM pacientes")->fetchAll(PDO::FETCH_UNIQUE);
         $nombresPatologias = $pdo->query("SELECT id, nombre, codigo_cie10 FROM patologias")->fetchAll(PDO::FETCH_UNIQUE);
+        $nombresLotes = $pdo->query("SELECT l.id, l.numero_lote AS nombre, m.nombre_generico AS medicamento FROM lotes_inventario l JOIN medicamentos m ON l.medicamento_id = m.id")->fetchAll(PDO::FETCH_UNIQUE);
     } catch (Throwable $e) {
         error_log('[AUDITORIA DICCIONARIOS ERROR]: ' . $e->getMessage());
     }
@@ -350,6 +352,7 @@ if ($tabActiva === 'centros') {
         'medicamentos' => $nombresMedicamentos,
         'pacientes'    => $nombresPacientes,
         'patologias'   => $nombresPatologias,
+        'lotes'        => $nombresLotes,
     ];
 
     // Carga de usuarios registrados activos para el selector de auditoría
