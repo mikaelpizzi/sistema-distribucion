@@ -308,16 +308,41 @@ if ($tabActiva === 'centros') {
         $accionesUnicas = [];
     }
 
+    $camposModificadosUnicos = [];
+    try {
+        $camposModificadosUnicos = $pdo->query("SELECT DISTINCT campo_modificado FROM logs_cambios_campos ORDER BY campo_modificado ASC")->fetchAll(PDO::FETCH_COLUMN);
+    } catch (Throwable $e) {
+        $camposModificadosUnicos = [];
+    }
+
     // Diccionarios para resolución de nombres de entidades
-    $nombresCentros = $pdo->query("SELECT id, nombre, codigo_sicm FROM centros_salud")->fetchAll(PDO::FETCH_UNIQUE);
-    $nombresRecursos = $pdo->query("SELECT id, nombre, codigo FROM recursos_operativos")->fetchAll(PDO::FETCH_UNIQUE);
-    $nombresTipos = $pdo->query("SELECT id, nombre, codigo FROM tipos_centro_salud")->fetchAll(PDO::FETCH_UNIQUE);
-    $nombresUsuarios = $pdo->query("SELECT id, nombre, email FROM usuarios")->fetchAll(PDO::FETCH_UNIQUE);
+    $nombresCentros = [];
+    $nombresRecursos = [];
+    $nombresTipos = [];
+    $nombresUsuarios = [];
+    $nombresMedicamentos = [];
+    $nombresPacientes = [];
+    $nombresPatologias = [];
+    try {
+        $nombresCentros = $pdo->query("SELECT id, nombre, codigo_sicm FROM centros_salud")->fetchAll(PDO::FETCH_UNIQUE);
+        $nombresRecursos = $pdo->query("SELECT id, nombre, codigo FROM recursos_operativos")->fetchAll(PDO::FETCH_UNIQUE);
+        $nombresTipos = $pdo->query("SELECT id, nombre, codigo FROM tipos_centro_salud")->fetchAll(PDO::FETCH_UNIQUE);
+        $nombresUsuarios = $pdo->query("SELECT id, nombre, email FROM usuarios")->fetchAll(PDO::FETCH_UNIQUE);
+        $nombresMedicamentos = $pdo->query("SELECT id, nombre_generico AS nombre, concentracion FROM medicamentos")->fetchAll(PDO::FETCH_UNIQUE);
+        $nombresPacientes = $pdo->query("SELECT id, nombre_completo AS nombre, cedula FROM pacientes")->fetchAll(PDO::FETCH_UNIQUE);
+        $nombresPatologias = $pdo->query("SELECT id, nombre, codigo_cie10 FROM patologias")->fetchAll(PDO::FETCH_UNIQUE);
+    } catch (Throwable $e) {
+        error_log('[AUDITORIA DICCIONARIOS ERROR]: ' . $e->getMessage());
+    }
+
     $diccionariosEntidades = [
-        'centros' => $nombresCentros,
-        'recursos' => $nombresRecursos,
-        'tipos' => $nombresTipos,
-        'usuarios' => $nombresUsuarios
+        'centros'      => $nombresCentros,
+        'recursos'     => $nombresRecursos,
+        'tipos'        => $nombresTipos,
+        'usuarios'     => $nombresUsuarios,
+        'medicamentos' => $nombresMedicamentos,
+        'pacientes'    => $nombresPacientes,
+        'patologias'   => $nombresPatologias,
     ];
 
     // Carga de usuarios registrados activos para el selector de auditoría
@@ -348,6 +373,10 @@ if ($tabActiva === 'centros') {
     $filtroFechaDesde = trim($_GET['fecha_desde'] ?? '');
     $filtroFechaHasta = trim($_GET['fecha_hasta'] ?? '');
     $busquedaLog = trim($_GET['q_log'] ?? '');
+    $filtroCampo = trim($_GET['campo_filtro'] ?? 'todos');
+    if ($filtroCampo === '') {
+        $filtroCampo = 'todos';
+    }
 
     // Desplegable unificado de Severidad / Tipo
     $filtroTipo = $_GET['tipo_evento'] ?? '';
@@ -367,12 +396,13 @@ if ($tabActiva === 'centros') {
     $filtroAccion = $_GET['accion_filtro'] ?? 'todas';
     $hayFiltrosActivos = (
         ($subtabActiva === 'eventos' && $filtroAccion !== 'todas' && $filtroAccion !== '') ||
+        ($subtabActiva === 'deltas' && $filtroCampo !== 'todos' && $filtroCampo !== '') ||
         ($filtroTabla !== 'todas' && $filtroTabla !== '') ||
         ($filtroUsuario !== 'todos' && $filtroUsuario !== '') ||
         ($filtroRegistroId !== '') ||
         ($filtroFechaDesde !== '') ||
         ($filtroFechaHasta !== '') ||
-        ($filtroTipo !== 'todos' && $filtroTipo !== '') ||
+        ($subtabActiva === 'eventos' && $filtroTipo !== 'todos' && $filtroTipo !== '') ||
         ($busquedaLog !== '')
     );
 
@@ -495,6 +525,10 @@ if ($tabActiva === 'centros') {
         if ($filtroTabla !== 'todas' && $filtroTabla !== '') {
             $condDeltas[] = 'lcc.tabla_nombre = :tbl';
             $paramsDeltas[':tbl'] = $filtroTabla;
+        }
+        if ($filtroCampo !== 'todos' && $filtroCampo !== '') {
+            $condDeltas[] = 'lcc.campo_modificado = :campo_modificado';
+            $paramsDeltas[':campo_modificado'] = $filtroCampo;
         }
         if ($filtroRegistroId !== '' && is_numeric($filtroRegistroId)) {
             $condDeltas[] = 'lcc.registro_id = :reg_id';
@@ -2365,6 +2399,7 @@ if ($tabDesconocida) {
                         . "&tabla_filtro=" . urlencode($filtroTabla)
                         . "&usuario_filtro=" . urlencode($filtroUsuario)
                         . "&tipo_evento=" . urlencode($filtroTipo)
+                        . "&campo_filtro=" . urlencode($filtroCampo)
                         . "&registro_id=" . urlencode($filtroRegistroId)
                         . "&fecha_desde=" . urlencode($filtroFechaDesde)
                         . "&fecha_hasta=" . urlencode($filtroFechaHasta)
@@ -2466,25 +2501,43 @@ if ($tabDesconocida) {
                             </select>
                         </div>
 
-                        <!-- Col 2: Tipo de Evento / Severidad -->
-                        <div class="col-md-3 col-sm-6">
-                            <label class="form-label text-muted small fw-semibold mb-1 d-block" for="select-tipo-evento">
-                                Tipo de Evento / Severidad
-                            </label>
-                            <select name="tipo_evento" id="select-tipo-evento" class="form-select form-select-sm"
-                                title="Filtrar por severidad o tipo de evento">
-                                <option value="todos" <?= $filtroTipo === 'todos' ? 'selected' : '' ?>>Todos los eventos
-                                </option>
-                                <option value="alertas" <?= $filtroTipo === 'alertas' ? 'selected' : '' ?>>Solo alertas e
-                                    incidentes</option>
-                                <option value="anonimo" <?= $filtroTipo === 'anonimo' ? 'selected' : '' ?>>Sin autenticar /
-                                    Intentos anónimos</option>
-                                <option value="cli" <?= $filtroTipo === 'cli' ? 'selected' : '' ?>>Accesos directos por
-                                    terminal</option>
-                                <option value="info" <?= $filtroTipo === 'info' ? 'selected' : '' ?>>Operaciones habituales
-                                </option>
-                            </select>
-                        </div>
+                        <?php if ($subtabActiva === 'deltas'): ?>
+                            <!-- Col 2: Campo Modificado -->
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label text-muted small fw-semibold mb-1 d-block" for="select-campo-filtro">
+                                    Campo Modificado
+                                </label>
+                                <select name="campo_filtro" id="select-campo-filtro" class="form-select form-select-sm"
+                                    title="Filtrar por nombre de campo modificado">
+                                    <option value="todos" <?= $filtroCampo === 'todos' ? 'selected' : '' ?>>-- Todos los campos --</option>
+                                    <?php foreach ($camposModificadosUnicos as $cmp): ?>
+                                        <option value="<?= htmlspecialchars($cmp) ?>" <?= $filtroCampo === $cmp ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($cmp) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        <?php else: ?>
+                            <!-- Col 2: Tipo de Evento / Severidad -->
+                            <div class="col-md-3 col-sm-6">
+                                <label class="form-label text-muted small fw-semibold mb-1 d-block" for="select-tipo-evento">
+                                    Tipo de Evento / Severidad
+                                </label>
+                                <select name="tipo_evento" id="select-tipo-evento" class="form-select form-select-sm"
+                                    title="Filtrar por severidad o tipo de evento">
+                                    <option value="todos" <?= $filtroTipo === 'todos' ? 'selected' : '' ?>>Todos los eventos
+                                    </option>
+                                    <option value="alertas" <?= $filtroTipo === 'alertas' ? 'selected' : '' ?>>Solo alertas e
+                                        incidentes</option>
+                                    <option value="anonimo" <?= $filtroTipo === 'anonimo' ? 'selected' : '' ?>>Sin autenticar /
+                                        Intentos anónimos</option>
+                                    <option value="cli" <?= $filtroTipo === 'cli' ? 'selected' : '' ?>>Accesos directos por
+                                        terminal</option>
+                                    <option value="info" <?= $filtroTipo === 'info' ? 'selected' : '' ?>>Operaciones habituales
+                                    </option>
+                                </select>
+                            </div>
+                        <?php endif; ?>
 
                         <!-- Col 3: Operador / Usuario -->
                         <div class="col-md-3 col-sm-6">
@@ -2990,12 +3043,16 @@ if ($tabDesconocida) {
                                             <td>
                                                 <span
                                                     class="badge bg-light text-dark border"><?= htmlspecialchars($entidadMod['entidad']) ?></span>
-                                                <span class="code-tag">ID: <?= (int) $d['registro_id'] ?></span>
-                                                <?php if (!empty($entidadMod['nombre_corto'])): ?>
-                                                    <div class="text-muted small text-truncate"
-                                                        style="max-width: 180px; font-size: 0.70rem;"
-                                                        title="<?= htmlspecialchars($entidadMod['nombre_corto']) ?>">
-                                                        <?= htmlspecialchars($entidadMod['nombre_corto']) ?>
+                                                <span class="code-tag">ID: #<?= (int) $d['registro_id'] ?></span>
+                                                <?php 
+                                                $nomDesc = $entidadMod['nombre_descriptivo'] ?: ($entidadMod['nombre_corto'] ?? '');
+                                                if (!empty($nomDesc)): 
+                                                    $tooltipCompleto = $entidadMod['entidad'] . ': ' . $nomDesc . ' [ID: #' . (int) $d['registro_id'] . ']';
+                                                ?>
+                                                    <div class="text-dark small fw-semibold text-truncate mt-1"
+                                                        style="max-width: 220px; font-size: 0.76rem;"
+                                                        title="<?= htmlspecialchars($tooltipCompleto) ?>">
+                                                        <i class="bi bi-tag-fill me-1 text-primary opacity-75"></i><?= htmlspecialchars($nomDesc) ?>
                                                     </div>
                                                 <?php endif; ?>
                                             </td>
@@ -3078,6 +3135,7 @@ if ($tabDesconocida) {
                                 <?php
                                 $queryParams = "&subtab=deltas&tabla_filtro=" . urlencode($filtroTabla)
                                     . "&usuario_filtro=" . urlencode($filtroUsuario)
+                                    . "&campo_filtro=" . urlencode($filtroCampo)
                                     . "&tipo_evento=" . urlencode($filtroTipo)
                                     . "&registro_id=" . urlencode($filtroRegistroId)
                                     . "&fecha_desde=" . urlencode($filtroFechaDesde)

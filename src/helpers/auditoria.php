@@ -147,7 +147,9 @@ function resolverEntidadLegible(
     } elseif ($tabla === 'medicamentos') {
         if ($regId && isset($diccionarios['medicamentos'][$regId])) {
             $m = $diccionarios['medicamentos'][$regId];
-            $titulo = $m['nombre'] . (!empty($m['concentracion']) ? ' (' . $m['concentracion'] . ')' : '');
+            $nomMed = $m['nombre'] ?? ($m['nombre_generico'] ?? '');
+            $concMed = $m['concentracion'] ?? '';
+            $titulo = $nomMed . (!empty($concMed) ? ' (' . $concMed . ')' : '');
             $subtitulo = 'Medicamento [ID: ' . $regId . ']';
         } else {
             $nombre = $detalles['nombre_generico'] ?? ($detalles['nombre'] ?? null);
@@ -158,7 +160,8 @@ function resolverEntidadLegible(
     } elseif ($tabla === 'patologias') {
         if ($regId && isset($diccionarios['patologias'][$regId])) {
             $p = $diccionarios['patologias'][$regId];
-            $titulo = (!empty($p['codigo_cie10']) ? '[' . $p['codigo_cie10'] . '] ' : '') . $p['nombre'];
+            $nomPat = $p['nombre'] ?? '';
+            $titulo = (!empty($p['codigo_cie10']) ? '[' . $p['codigo_cie10'] . '] ' : '') . $nomPat;
             $subtitulo = 'Patología [ID: ' . $regId . ']';
         } else {
             $nombre = $detalles['nombre'] ?? null;
@@ -209,7 +212,9 @@ function resolverEntidadLegible(
     } elseif ($tabla === 'pacientes') {
         if ($regId && isset($diccionarios['pacientes'][$regId])) {
             $p = $diccionarios['pacientes'][$regId];
-            $titulo = $p['nombre_completo'] . (!empty($p['cedula']) ? ' (' . $p['cedula'] . ')' : '');
+            $nomPac = $p['nombre_completo'] ?? ($p['nombre'] ?? '');
+            $cedPac = $p['cedula'] ?? '';
+            $titulo = $nomPac . (!empty($cedPac) ? ' (' . $cedPac . ')' : '');
             $subtitulo = 'Paciente [ID: ' . $regId . ']';
         } else {
             $nombre = $detalles['nombre_completo'] ?? ($detalles['nombre'] ?? null);
@@ -223,11 +228,23 @@ function resolverEntidadLegible(
         $subtitulo = $regId ? "{$entidadGeneral} [ID: {$regId}]" : $entidadGeneral;
     }
 
+    // Determinamos si el título representa un nombre descriptivo real de la entidad
+    $nombreDescriptivo = '';
+    if ($titulo !== '' && $titulo !== $subtitulo && $titulo !== $entidadGeneral) {
+        if (!preg_match('/^.+\[ID:\s*\d+\]$/u', $titulo)) {
+            $nombreDescriptivo = $titulo;
+        }
+    }
+    if ($nombreDescriptivo === '' && !empty($detalles['nombre'])) {
+        $nombreDescriptivo = (string)$detalles['nombre'];
+    }
+
     return [
-        'titulo'        => $titulo,
-        'subtitulo'     => $subtitulo,
-        'entidad'       => $entidadGeneral,
-        'nombre_corto'  => ($titulo !== $subtitulo && !str_starts_with($titulo, $entidadGeneral)) ? $titulo : ''
+        'titulo'              => $titulo,
+        'subtitulo'           => $subtitulo,
+        'entidad'             => $entidadGeneral,
+        'nombre_corto'        => $nombreDescriptivo,
+        'nombre_descriptivo'  => $nombreDescriptivo
     ];
 }
 

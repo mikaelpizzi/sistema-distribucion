@@ -70,6 +70,36 @@ try {
     $registros = [];
     $maxIdRetornado = $desdeId;
 
+    // Diccionarios para resolución de nombres de entidades en telemetría
+    $nombresCentros = [];
+    $nombresRecursos = [];
+    $nombresTipos = [];
+    $nombresUsuarios = [];
+    $nombresMedicamentos = [];
+    $nombresPacientes = [];
+    $nombresPatologias = [];
+    try {
+        $nombresCentros = $pdo->query("SELECT id, nombre, codigo_sicm FROM centros_salud")->fetchAll(PDO::FETCH_UNIQUE);
+        $nombresRecursos = $pdo->query("SELECT id, nombre, codigo FROM recursos_operativos")->fetchAll(PDO::FETCH_UNIQUE);
+        $nombresTipos = $pdo->query("SELECT id, nombre, codigo FROM tipos_centro_salud")->fetchAll(PDO::FETCH_UNIQUE);
+        $nombresUsuarios = $pdo->query("SELECT id, nombre, email FROM usuarios")->fetchAll(PDO::FETCH_UNIQUE);
+        $nombresMedicamentos = $pdo->query("SELECT id, nombre_generico AS nombre, concentracion FROM medicamentos")->fetchAll(PDO::FETCH_UNIQUE);
+        $nombresPacientes = $pdo->query("SELECT id, nombre_completo AS nombre, cedula FROM pacientes")->fetchAll(PDO::FETCH_UNIQUE);
+        $nombresPatologias = $pdo->query("SELECT id, nombre, codigo_cie10 FROM patologias")->fetchAll(PDO::FETCH_UNIQUE);
+    } catch (Throwable $e) {
+        error_log('[STREAM DICCIONARIOS ERROR]: ' . $e->getMessage());
+    }
+
+    $diccionariosEntidades = [
+        'centros'      => $nombresCentros,
+        'recursos'     => $nombresRecursos,
+        'tipos'        => $nombresTipos,
+        'usuarios'     => $nombresUsuarios,
+        'medicamentos' => $nombresMedicamentos,
+        'pacientes'    => $nombresPacientes,
+        'patologias'   => $nombresPatologias,
+    ];
+
     if ($subtab === 'eventos') {
         $stmt = $pdo->prepare("
             SELECT l.log_id, l.fecha_hora, l.usuario_id, l.operador, l.rol_operador, l.email_operador,
@@ -135,7 +165,7 @@ try {
             }
 
             $esSesion = in_array($accion, ['INICIO_SESION', 'CIERRE_SESION', 'INTENTO_LOGIN_FALLIDO', 'INTENTO_LOGIN_RECHAZADO'], true);
-            $entidadInfo = resolverEntidadLegible($r['tabla_afectada'] ?? '', $r['registro_id'] !== null ? (int)$r['registro_id'] : null, $detalles);
+            $entidadInfo = resolverEntidadLegible($r['tabla_afectada'] ?? '', $r['registro_id'] !== null ? (int)$r['registro_id'] : null, $detalles, $diccionariosEntidades);
 
             $registros[] = [
                 'log_id'            => $id,
@@ -185,12 +215,18 @@ try {
             }
 
             $esConsolaDirecta = ($r['ip_origen'] === 'CONSOLA_DIRECTA' || $r['usuario_app_id'] === null);
-            $entidadInfo = resolverEntidadLegible($r['tabla_nombre'] ?? '', (int)$r['registro_id']);
+            $entidadInfo = resolverEntidadLegible($r['tabla_nombre'] ?? '', (int)$r['registro_id'], [], $diccionariosEntidades);
+            $nomDesc = $entidadInfo['nombre_descriptivo'] ?: ($entidadInfo['nombre_corto'] ?? '');
+            $tooltipCompleto = $entidadInfo['entidad'] . ($nomDesc ? ': ' . $nomDesc : '') . ' [ID: #' . (int)$r['registro_id'] . ']';
 
             $registros[] = [
                 'id'                 => $id,
                 'tabla_nombre'       => $r['tabla_nombre'],
                 'entidad_nombre'     => $entidadInfo['entidad'],
+                'entidad_titulo'     => $entidadInfo['titulo'],
+                'entidad_subtitulo'  => $entidadInfo['subtitulo'],
+                'nombre_descriptivo' => $nomDesc,
+                'tooltip_completo'   => $tooltipCompleto,
                 'registro_id'        => (int)$r['registro_id'],
                 'campo_modificado'   => $r['campo_modificado'],
                 'valor_anterior'     => $r['valor_anterior'],
