@@ -200,4 +200,80 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // =========================================================================
+    // 5. VALIDACIÓN DEL FORMULARIO DE RÉCIPES MÉDICOS
+    // =========================================================================
+    const formRecipe = document.getElementById('form-recipe');
+    if (formRecipe) {
+        formRecipe.addEventListener('submit', (e) => {
+            const pacSelect   = document.getElementById('recipe_paciente_id');
+            const medSelect   = document.getElementById('recipe_medicamento_id');
+            const patSelect   = document.getElementById('recipe_patologia_id');
+            const dosisInput  = document.getElementById('recipe_dosis_mensual');
+            const emision     = document.getElementById('recipe_fecha_emision');
+            const vencimiento = document.getElementById('recipe_fecha_vencimiento');
+            const medico      = document.getElementById('recipe_medico_prescriptor');
+
+            const erroresR = [];
+
+            if (!pacSelect || !pacSelect.value || parseInt(pacSelect.value, 10) <= 0) {
+                erroresR.push("Debe seleccionar un paciente registrado en el padrón.");
+                pacSelect?.classList.add('is-invalid');
+            } else {
+                pacSelect?.classList.remove('is-invalid');
+            }
+
+            if (!patSelect || !patSelect.value || parseInt(patSelect.value, 10) <= 0) {
+                erroresR.push("Debe seleccionar la patología CIE-10 diagnosticada.");
+                patSelect?.classList.add('is-invalid');
+            } else {
+                patSelect?.classList.remove('is-invalid');
+            }
+
+            if (!medSelect || !medSelect.value || parseInt(medSelect.value, 10) <= 0) {
+                erroresR.push("Debe seleccionar un medicamento del vademécum.");
+                medSelect?.classList.add('is-invalid');
+            } else {
+                medSelect?.classList.remove('is-invalid');
+            }
+
+            const dosisVal = dosisInput ? parseInt(dosisInput.value, 10) : 0;
+            if (!dosisInput || isNaN(dosisVal) || dosisVal <= 0) {
+                erroresR.push("La dosis mensual autorizada debe ser un número entero mayor a cero.");
+                dosisInput?.classList.add('is-invalid');
+            } else {
+                dosisInput?.classList.remove('is-invalid');
+            }
+
+            if (!emision || !emision.value) {
+                erroresR.push("Debe ingresar la fecha de emisión del récipe.");
+                emision?.classList.add('is-invalid');
+            } else {
+                emision?.classList.remove('is-invalid');
+            }
+
+            if (!vencimiento || !vencimiento.value) {
+                erroresR.push("Debe ingresar la fecha de vencimiento del récipe.");
+                vencimiento?.classList.add('is-invalid');
+            } else if (emision && emision.value && vencimiento.value < emision.value) {
+                erroresR.push("La fecha de vencimiento no puede ser anterior a la fecha de emisión.");
+                vencimiento.classList.add('is-invalid');
+            } else {
+                vencimiento?.classList.remove('is-invalid');
+            }
+
+            if (!medico || medico.value.trim().length < 3) {
+                erroresR.push("Debe indicar el nombre del médico prescriptor y su matrícula sanitaria MPPS.");
+                medico?.classList.add('is-invalid');
+            } else {
+                medico?.classList.remove('is-invalid');
+            }
+
+            if (erroresR.length > 0) {
+                e.preventDefault();
+                alert("Verifique los siguientes datos del récipe:\n• " + erroresR.join("\n• "));
+            }
+        });
+    }
 });

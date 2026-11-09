@@ -753,8 +753,11 @@ if ($tabActiva === 'centros') {
     $paramsRecipes = [];
 
     if ($busquedaRecipe !== '') {
-        $condRecipes[] = "(p.cedula LIKE :q OR p.nombre_completo LIKE :q OR m.nombre_generico LIKE :q OR t.medico_prescriptor LIKE :q)";
-        $paramsRecipes[':q'] = '%' . $busquedaRecipe . '%';
+        $condRecipes[] = "(p.cedula LIKE :q1 OR p.nombre_completo LIKE :q2 OR m.nombre_generico LIKE :q3 OR t.medico_prescriptor LIKE :q4)";
+        $paramsRecipes[':q1'] = '%' . $busquedaRecipe . '%';
+        $paramsRecipes[':q2'] = '%' . $busquedaRecipe . '%';
+        $paramsRecipes[':q3'] = '%' . $busquedaRecipe . '%';
+        $paramsRecipes[':q4'] = '%' . $busquedaRecipe . '%';
     }
 
     if ($filtroEstadoRecipe === 'vigentes') {
@@ -4587,6 +4590,11 @@ if ($tabDesconocida) {
             <?php if ($tabActiva === 'pacientes' && !empty($pacienteEdicion)): ?>
             const mPac = document.getElementById('modalPaciente');
             if (mPac) new bootstrap.Modal(mPac).show();
+            <?php endif; ?>
+
+            <?php if ($tabActiva === 'recipes' && !empty($recipeEdicion)): ?>
+            const mRec = document.getElementById('modalRecipe');
+            if (mRec) new bootstrap.Modal(mRec).show();
             <?php endif; ?>
         });
     </script>
