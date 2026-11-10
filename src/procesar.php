@@ -60,35 +60,47 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Guardián RBAC: Las operaciones de configuración y altas son exclusivas de rol_admin
-$accionesSoloAdmin = [
-    'guardar_centro',
-    'cambiar_estado_centro',
-    'crear_tipo_centro',
-    'toggle_tipo_centro',
-    'crear_recurso',
-    'toggle_recurso',
-    'guardar_usuario',
-    'cambiar_estado_usuario',
-    'descargar_respaldo',
-    'exportar_acta_pericial',
-    'guardar_identidad_institucional',
-    'crear_medicamento',
-    'editar_medicamento',
-    'cambiar_estado_medicamento',
-    'crear_patologia',
-    'cambiar_estado_patologia',
-    'crear_forma_farmaceutica'
+// Guardián RBAC: Validación basada en Matriz Dinámica de Permisos Atómicos
+$permisosPorAccion = [
+    'guardar_centro'                  => !empty($_POST['id']) ? 'CENTROS_EDITAR' : 'CENTROS_CREAR',
+    'cambiar_estado_centro'           => 'CENTROS_ESTADO',
+    'crear_tipo_centro'               => 'MAESTRAS_GESTIONAR',
+    'toggle_tipo_centro'              => 'MAESTRAS_GESTIONAR',
+    'crear_recurso'                   => 'MAESTRAS_GESTIONAR',
+    'toggle_recurso'                  => 'MAESTRAS_GESTIONAR',
+    'guardar_usuario'                 => 'USR_GESTIONAR',
+    'cambiar_estado_usuario'          => 'USR_GESTIONAR',
+    'descargar_respaldo'              => 'SISTEMA_RESPALDO',
+    'exportar_acta_pericial'          => 'AUDIT_EXPORTAR',
+    'guardar_identidad_institucional' => 'CONFIG_SISTEMA',
+    'crear_medicamento'               => 'MED_CREAR',
+    'editar_medicamento'              => 'MED_EDITAR',
+    'cambiar_estado_medicamento'      => 'MED_EDITAR',
+    'crear_patologia'                 => 'MAESTRAS_GESTIONAR',
+    'cambiar_estado_patologia'        => 'MAESTRAS_GESTIONAR',
+    'crear_forma_farmaceutica'        => 'MAESTRAS_GESTIONAR',
+    'guardar_paciente'                => 'PACIENTES_GESTIONAR',
+    'guardar_recipe'                  => 'RECIPES_GESTIONAR',
+    'toggle_estado_recipe'            => 'RECIPES_GESTIONAR',
+    'procesar_despacho_fefo'          => 'DESP_PROCESAR',
 ];
 
-if (in_array($accion, $accionesSoloAdmin, true) && !$esAdmin) {
-    registrarAuditoria($pdo, $usuarioSesionId, 'ACCESO_DENEGADO', 'seguridad', null, [
-        'evento' => 'Intento no autorizado de ejecutar operación administrativa',
-        'accion_solicitada' => $accion,
-        'rol_usuario' => $usuario['rol_nombre']
-    ]);
-    header('Location: index.php?error=' . urlencode('Acceso denegado: Se requieren privilegios de Administrador Central.'));
-    exit;
+if (isset($permisosPorAccion[$accion])) {
+    $permisoRequerido = $permisosPorAccion[$accion];
+    if (!tienePermiso($permisoRequerido)) {
+        registrarAuditoria($pdo, $usuarioSesionId, 'ACCESO_DENEGADO', 'seguridad', null, [
+            'evento'            => 'Intento no autorizado de ejecutar operación restringida',
+            'accion_solicitada' => $accion,
+            'permiso_requerido' => $permisoRequerido,
+            'rol_usuario'       => $usuario['rol_nombre'] ?? 'Sin rol'
+        ]);
+        $msg = "Acceso denegado: Su rol no posee el permiso atómico requerido [{$permisoRequerido}].";
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            $_SESSION['mensaje_error'] = $msg;
+        }
+        header('Location: index.php?error=' . urlencode($msg));
+        exit;
+    }
 }
 
 $archivoSubidoRuta = null;
@@ -628,8 +640,8 @@ try {
                     header('Location: index.php?tab=configuracion&error=' . urlencode('Sesión expirada o token CSRF inválido.'));
                     exit;
                 }
-            } elseif (!$esAdmin) {
-                header('Location: index.php?error=' . urlencode('Acceso denegado: Se requieren privilegios de Administrador Central.'));
+            } elseif (!tienePermiso('SISTEMA_RESPALDO')) {
+                header('Location: index.php?error=' . urlencode('Acceso denegado: Se requieren permisos de Respaldo de Base de Datos.'));
                 exit;
             }
 
@@ -709,8 +721,8 @@ try {
         // 5.1 EXPORTACIÓN PERICIAL DE AUDITORÍA FORENSE (CSV RFC 4180 STREAMING O(1))
         // ======================================================================
         case 'exportar_acta_pericial':
-            if (!$esAdmin) {
-                header('Location: index.php?error=' . urlencode('Acceso denegado: Se requieren privilegios de Administrador Central.'));
+            if (!tienePermiso('AUDIT_EXPORTAR')) {
+                header('Location: index.php?error=' . urlencode('Acceso denegado: Se requieren permisos para exportar trazabilidad de auditoría.'));
                 exit;
             }
 
@@ -2006,7 +2018,7 @@ try {
             $urlRetorno = 'index.php?tab=despachos' . ($qRetorno !== '' ? '&q_paciente=' . urlencode($qRetorno) : '');
 
             // Control de Jurisdicción Sanitaria
-            $centroSaludId = $esAdmin ? ($centroIdInput ?: (int)$usuario['centro_salud_id']) : (int)$usuario['centro_salud_id'];
+            $centroSaludId = puedeSupervisarTodaLaRed() ? ($centroIdInput ?: (int)$usuario['centro_salud_id']) : (int)$usuario['centro_salud_id'];
 
             if (!$tratamientoId || $tratamientoId <= 0) {
                 header("Location: {$urlRetorno}&error=" . urlencode('Tratamiento o récipe médico inválido.'));

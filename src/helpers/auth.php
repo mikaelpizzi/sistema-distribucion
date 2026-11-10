@@ -48,8 +48,60 @@ function obtenerUsuarioSesion(): ?array
         'rol_id'          => (int)($_SESSION['rol_id'] ?? 0),
         'rol_nombre'      => (string)($_SESSION['rol_nombre'] ?? ''),
         'centro_salud_id' => isset($_SESSION['centro_salud_id']) && $_SESSION['centro_salud_id'] !== null ? (int)$_SESSION['centro_salud_id'] : null,
-        'centro_nombre'   => (string)($_SESSION['centro_nombre'] ?? 'Red Municipal Central')
+        'centro_nombre'   => (string)($_SESSION['centro_nombre'] ?? 'Red Municipal Central'),
+        'permisos'        => (array)($_SESSION['usuario_permisos'] ?? [])
     ];
+}
+
+/**
+ * Consulta los códigos de permisos asociados al rol del usuario en la base de datos.
+ *
+ * @param PDO $pdo
+ * @param int $rolId
+ * @return array<string> Lista de códigos de permiso atómicos
+ */
+function cargarPermisosRol(PDO $pdo, int $rolId): array
+{
+    try {
+        $stmt = $pdo->prepare("
+            SELECT p.codigo
+            FROM permisos p
+            INNER JOIN rol_permisos rp ON rp.permiso_id = p.id
+            WHERE rp.rol_id = :rol_id
+        ");
+        $stmt->execute([':rol_id' => $rolId]);
+        return $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+    } catch (Throwable $e) {
+        return [];
+    }
+}
+
+/**
+ * Valida si el usuario activo cuenta con un permiso atómico específico.
+ */
+function tienePermiso(string $permiso): bool
+{
+    if (!isset($_SESSION['usuario_permisos']) || !is_array($_SESSION['usuario_permisos'])) {
+        if (!empty($_SESSION['rol_id'])) {
+            try {
+                $pdo = getDB();
+                $_SESSION['usuario_permisos'] = cargarPermisosRol($pdo, (int)$_SESSION['rol_id']);
+            } catch (Throwable $e) {
+                $_SESSION['usuario_permisos'] = [];
+            }
+        } else {
+            $_SESSION['usuario_permisos'] = [];
+        }
+    }
+    return in_array($permiso, $_SESSION['usuario_permisos'], true);
+}
+
+/**
+ * Determina si el usuario tiene alcance para supervisar todos los ambulatorios de la red.
+ */
+function puedeSupervisarTodaLaRed(): bool
+{
+    return tienePermiso('CENTROS_VER_GLOBAL') || (!isset($_SESSION['centro_salud_id']) || $_SESSION['centro_salud_id'] === null);
 }
 
 /**
@@ -118,6 +170,7 @@ function iniciarSesionUsuario(PDO $pdo, array $usuario): void
     $_SESSION['centro_nombre']     = $usuario['centro_nombre'] ?? 'Red Municipal Central';
     $_SESSION['sesion_user_agent'] = $_SERVER['HTTP_USER_AGENT'] ?? 'CLI';
     $_SESSION['sesion_ip']         = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+    $_SESSION['usuario_permisos']  = cargarPermisosRol($pdo, (int)$usuario['rol_id']);
 
     establecerContextoAuditoriaSQL(
         $pdo,
@@ -144,6 +197,12 @@ function requerirAutenticacion(PDO $pdo): array
     if (!$usuario) {
         header('Location: login.php?msg=' . urlencode('Su sesión ha expirado o requiere autenticación para ingresar.'));
         exit;
+    }
+
+    // Recargar permisos preventivamente si no existen en sesión activa
+    if (!isset($_SESSION['usuario_permisos']) || !is_array($_SESSION['usuario_permisos'])) {
+        $_SESSION['usuario_permisos'] = cargarPermisosRol($pdo, (int)$usuario['rol_id']);
+        $usuario['permisos'] = $_SESSION['usuario_permisos'];
     }
 
     // Actualizar timestamp de actividad en la sesión para forzar a PHP a actualizar

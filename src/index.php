@@ -22,15 +22,41 @@ $mensajeExito = $_GET['msg'] ?? ($_SESSION['mensaje_exito'] ?? null);
 $mensajeError = $_GET['error'] ?? ($_SESSION['mensaje_error'] ?? null);
 unset($_SESSION['mensaje_exito'], $_SESSION['mensaje_error']);
 
-// Protección RBAC: El Farmaceuta solo tiene acceso a las pestañas asistenciales de su ambulatorio
-$tabsAdmin = ['maestras', 'usuarios', 'auditoria', 'configuracion'];
-if (!$esAdmin && in_array($tabActiva, $tabsAdmin, true)) {
-    header('Location: index.php?tab=centros');
-    exit;
+// Protección RBAC Dinámica: Mapeo de Pestañas a Permisos Atómicos
+$permisosPorTab = [
+    'centros'       => 'CENTROS_VER',
+    'medicamentos'  => 'MED_VER',
+    'pacientes'     => 'PACIENTES_VER',
+    'recipes'       => 'RECIPES_VER',
+    'despachos'     => 'DESP_VER',
+    'auditoria'     => 'AUDIT_VER',
+    'usuarios'      => 'USR_VER',
+    'maestras'      => 'MAESTRAS_GESTIONAR',
+    'configuracion' => 'CONFIG_SISTEMA'
+];
+
+$puedeVerTodaLaRed = puedeSupervisarTodaLaRed();
+
+// Buscar primera pestaña para la cual el usuario tenga autorización activa
+$primeraTabAutorizada = null;
+foreach ($permisosPorTab as $tKey => $pReq) {
+    if (tienePermiso($pReq)) {
+        $primeraTabAutorizada = $tKey;
+        break;
+    }
 }
 
-$tabsValidas = ['centros', 'medicamentos', 'maestras', 'configuracion', 'usuarios', 'auditoria', 'pacientes', 'recipes', 'despachos'];
-$tabDesconocida = !in_array($tabActiva, $tabsValidas, true);
+if (!isset($permisosPorTab[$tabActiva]) || !tienePermiso($permisosPorTab[$tabActiva])) {
+    if ($primeraTabAutorizada !== null) {
+        header("Location: index.php?tab={$primeraTabAutorizada}");
+        exit;
+    } else {
+        die('No posee permisos activos para acceder a ningún módulo del sistema.');
+    }
+}
+
+$tabsValidas = array_keys($permisosPorTab);
+$tabDesconocida = false;
 
 // ============================================================================
 // CARGA CONDICIONAL DE DATOS SEGÚN LA PESTAÑA ACTIVA
@@ -42,8 +68,8 @@ if ($tabActiva === 'centros') {
     $condiciones = [];
     $params = [];
 
-    // Política de Lectura: El farmaceuta solo ve su ambulatorio asignado
-    if (!$esAdmin) {
+    // Política de Lectura: Jurisdicción asistencial central o ambulatorio asignado
+    if (!$puedeVerTodaLaRed) {
         $condiciones[] = 'c.id = :mi_centro_id';
         $params[':mi_centro_id'] = $centroUsuarioId;
     } else {
@@ -125,8 +151,8 @@ if ($tabActiva === 'centros') {
 
 
 } elseif ($tabActiva === 'usuarios') {
-    if (!$esAdmin) {
-        header('Location: index.php?tab=centros');
+    if (!tienePermiso('USR_VER')) {
+        header('Location: index.php');
         exit;
     }
 
@@ -649,8 +675,8 @@ if ($tabActiva === 'centros') {
         $maxDeltaId = (int) ($pdo->query("SELECT IFNULL(MAX(id), 0) FROM logs_cambios_campos")->fetchColumn() ?: 0);
     }
 } elseif ($tabActiva === 'configuracion') {
-    if (!$esAdmin) {
-        header('Location: index.php?tab=centros');
+    if (!tienePermiso('CONFIG_SISTEMA')) {
+        header('Location: index.php');
         exit;
     }
 
@@ -890,7 +916,7 @@ if ($tabActiva === 'centros') {
         ORDER BY nombre ASC
     ")->fetchAll(PDO::FETCH_ASSOC);
 
-    if ($esAdmin) {
+    if ($puedeVerTodaLaRed) {
         $centroOperativoId = !empty($_GET['centro_id']) ? (int)$_GET['centro_id'] : ($centroUsuarioId ?: ($catalogoCentros[0]['id'] ?? 1));
     } else {
         $centroOperativoId = (int)$centroUsuarioId;
@@ -1132,7 +1158,7 @@ if ($tabDesconocida) {
     $moduloNombre = 'Módulo No Localizado';
     $seccionNombre = 'Navegación';
 } elseif ($tabActiva === 'centros') {
-    $moduloNombre = $esAdmin ? 'Red de Ambulatorios' : 'Mi Ambulatorio';
+    $moduloNombre = $puedeVerTodaLaRed ? 'Red de Ambulatorios' : 'Mi Ambulatorio';
     $seccionNombre = 'Vademécum y Red';
 } elseif ($tabActiva === 'medicamentos') {
     $moduloNombre = 'Catálogo de Fármacos';
@@ -1197,80 +1223,102 @@ if ($tabDesconocida) {
                 <button type="button" class="btn-close d-lg-none" data-bs-dismiss="offcanvas" data-bs-target="#sidebarMenu" aria-label="Cerrar"></button>
             </div>
 
-            <!-- Enlaces agrupados semánticamente -->
+            <!-- Enlaces agrupados semánticamente con RBAC Dinámico -->
             <div class="sicm-sidebar-nav">
                 <!-- GESTIÓN CLÍNICA -->
-                <div class="sidebar-section-title">
-                    <i class="bi bi-heart-pulse"></i> Gestión Clínica
-                </div>
-                <a href="index.php?tab=pacientes" class="sidebar-nav-item <?= $tabActiva === 'pacientes' ? 'active' : '' ?>">
-                    <span class="d-flex align-items-center gap-2 text-truncate">
-                        <i class="bi bi-people nav-icon"></i>
-                        <span class="text-truncate">Pacientes</span>
-                    </span>
-                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size: 0.65rem;">1FN</span>
-                </a>
-                <a href="index.php?tab=recipes" class="sidebar-nav-item <?= $tabActiva === 'recipes' ? 'active' : '' ?>">
-                    <span class="d-flex align-items-center gap-2 text-truncate">
-                        <i class="bi bi-file-earmark-medical nav-icon"></i>
-                        <span class="text-truncate">Récipes Médicos</span>
-                    </span>
-                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size: 0.65rem;">Clínico</span>
-                </a>
-                <a href="index.php?tab=despachos" class="sidebar-nav-item <?= $tabActiva === 'despachos' ? 'active' : '' ?>">
-                    <span class="d-flex align-items-center gap-2 text-truncate">
-                        <i class="bi bi-box-seam nav-icon"></i>
-                        <span class="text-truncate">Dispensación FEFO</span>
-                    </span>
-                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size: 0.65rem;">Clínico</span>
-                </a>
+                <?php if (tienePermiso('PACIENTES_VER') || tienePermiso('RECIPES_VER') || tienePermiso('DESP_VER')): ?>
+                    <div class="sidebar-section-title">
+                        <i class="bi bi-heart-pulse"></i> Gestión Clínica
+                    </div>
+                    <?php if (tienePermiso('PACIENTES_VER')): ?>
+                        <a href="index.php?tab=pacientes" class="sidebar-nav-item <?= $tabActiva === 'pacientes' ? 'active' : '' ?>">
+                            <span class="d-flex align-items-center gap-2 text-truncate">
+                                <i class="bi bi-people nav-icon"></i>
+                                <span class="text-truncate">Pacientes</span>
+                            </span>
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size: 0.65rem;">1FN</span>
+                        </a>
+                    <?php endif; ?>
+                    <?php if (tienePermiso('RECIPES_VER')): ?>
+                        <a href="index.php?tab=recipes" class="sidebar-nav-item <?= $tabActiva === 'recipes' ? 'active' : '' ?>">
+                            <span class="d-flex align-items-center gap-2 text-truncate">
+                                <i class="bi bi-file-earmark-medical nav-icon"></i>
+                                <span class="text-truncate">Récipes Médicos</span>
+                            </span>
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size: 0.65rem;">Clínico</span>
+                        </a>
+                    <?php endif; ?>
+                    <?php if (tienePermiso('DESP_VER')): ?>
+                        <a href="index.php?tab=despachos" class="sidebar-nav-item <?= $tabActiva === 'despachos' ? 'active' : '' ?>">
+                            <span class="d-flex align-items-center gap-2 text-truncate">
+                                <i class="bi bi-box-seam nav-icon"></i>
+                                <span class="text-truncate">Dispensación FEFO</span>
+                            </span>
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size: 0.65rem;">Clínico</span>
+                        </a>
+                    <?php endif; ?>
+                <?php endif; ?>
 
                 <!-- VADEMÉCUM Y RED -->
-                <div class="sidebar-section-title mt-3">
-                    <i class="bi bi-capsule"></i> Vademécum y Red
-                </div>
-                <a href="index.php?tab=medicamentos" class="sidebar-nav-item <?= $tabActiva === 'medicamentos' ? 'active' : '' ?>">
-                    <span class="d-flex align-items-center gap-2 text-truncate">
-                        <i class="bi bi-prescription2 nav-icon"></i>
-                        <span class="text-truncate">Vademécum</span>
-                    </span>
-                </a>
-                <a href="index.php?tab=centros" class="sidebar-nav-item <?= $tabActiva === 'centros' ? 'active' : '' ?>">
-                    <span class="d-flex align-items-center gap-2 text-truncate">
-                        <i class="bi bi-hospital nav-icon"></i>
-                        <span class="text-truncate"><?= $esAdmin ? 'Red de Ambulatorios' : 'Mi Ambulatorio' ?></span>
-                    </span>
-                </a>
+                <?php if (tienePermiso('MED_VER') || tienePermiso('CENTROS_VER')): ?>
+                    <div class="sidebar-section-title mt-3">
+                        <i class="bi bi-capsule"></i> Vademécum y Red
+                    </div>
+                    <?php if (tienePermiso('MED_VER')): ?>
+                        <a href="index.php?tab=medicamentos" class="sidebar-nav-item <?= $tabActiva === 'medicamentos' ? 'active' : '' ?>">
+                            <span class="d-flex align-items-center gap-2 text-truncate">
+                                <i class="bi bi-prescription2 nav-icon"></i>
+                                <span class="text-truncate">Vademécum</span>
+                            </span>
+                        </a>
+                    <?php endif; ?>
+                    <?php if (tienePermiso('CENTROS_VER')): ?>
+                        <a href="index.php?tab=centros" class="sidebar-nav-item <?= $tabActiva === 'centros' ? 'active' : '' ?>">
+                            <span class="d-flex align-items-center gap-2 text-truncate">
+                                <i class="bi bi-hospital nav-icon"></i>
+                                <span class="text-truncate"><?= $puedeVerTodaLaRed ? 'Red de Ambulatorios' : 'Mi Ambulatorio' ?></span>
+                            </span>
+                        </a>
+                    <?php endif; ?>
+                <?php endif; ?>
 
-                <!-- ADMINISTRACIÓN Y CONTROL (Solo Administrador) -->
-                <?php if ($esAdmin): ?>
+                <!-- ADMINISTRACIÓN Y CONTROL -->
+                <?php if (tienePermiso('MAESTRAS_GESTIONAR') || tienePermiso('CONFIG_SISTEMA') || tienePermiso('USR_VER') || tienePermiso('AUDIT_VER')): ?>
                     <div class="sidebar-section-title mt-3">
                         <i class="bi bi-shield-check"></i> Administración Central
                     </div>
-                    <a href="index.php?tab=maestras" class="sidebar-nav-item <?= $tabActiva === 'maestras' ? 'active' : '' ?>">
-                        <span class="d-flex align-items-center gap-2 text-truncate">
-                            <i class="bi bi-sliders nav-icon"></i>
-                            <span class="text-truncate">Catálogos Maestros</span>
-                        </span>
-                    </a>
-                    <a href="index.php?tab=configuracion" class="sidebar-nav-item <?= $tabActiva === 'configuracion' ? 'active' : '' ?>">
-                        <span class="d-flex align-items-center gap-2 text-truncate">
-                            <i class="bi bi-building-gear nav-icon"></i>
-                            <span class="text-truncate">Identidad Institucional</span>
-                        </span>
-                    </a>
-                    <a href="index.php?tab=usuarios" class="sidebar-nav-item <?= $tabActiva === 'usuarios' ? 'active' : '' ?>">
-                        <span class="d-flex align-items-center gap-2 text-truncate">
-                            <i class="bi bi-person-badge nav-icon"></i>
-                            <span class="text-truncate">Operadores</span>
-                        </span>
-                    </a>
-                    <a href="index.php?tab=auditoria" class="sidebar-nav-item <?= $tabActiva === 'auditoria' ? 'active' : '' ?>">
-                        <span class="d-flex align-items-center gap-2 text-truncate">
-                            <i class="bi bi-journal-text nav-icon"></i>
-                            <span class="text-truncate">Auditoría Forense</span>
-                        </span>
-                    </a>
+                    <?php if (tienePermiso('MAESTRAS_GESTIONAR')): ?>
+                        <a href="index.php?tab=maestras" class="sidebar-nav-item <?= $tabActiva === 'maestras' ? 'active' : '' ?>">
+                            <span class="d-flex align-items-center gap-2 text-truncate">
+                                <i class="bi bi-sliders nav-icon"></i>
+                                <span class="text-truncate">Catálogos Maestros</span>
+                            </span>
+                        </a>
+                    <?php endif; ?>
+                    <?php if (tienePermiso('CONFIG_SISTEMA')): ?>
+                        <a href="index.php?tab=configuracion" class="sidebar-nav-item <?= $tabActiva === 'configuracion' ? 'active' : '' ?>">
+                            <span class="d-flex align-items-center gap-2 text-truncate">
+                                <i class="bi bi-building-gear nav-icon"></i>
+                                <span class="text-truncate">Identidad Institucional</span>
+                            </span>
+                        </a>
+                    <?php endif; ?>
+                    <?php if (tienePermiso('USR_VER')): ?>
+                        <a href="index.php?tab=usuarios" class="sidebar-nav-item <?= $tabActiva === 'usuarios' ? 'active' : '' ?>">
+                            <span class="d-flex align-items-center gap-2 text-truncate">
+                                <i class="bi bi-person-badge nav-icon"></i>
+                                <span class="text-truncate">Operadores</span>
+                            </span>
+                        </a>
+                    <?php endif; ?>
+                    <?php if (tienePermiso('AUDIT_VER')): ?>
+                        <a href="index.php?tab=auditoria" class="sidebar-nav-item <?= $tabActiva === 'auditoria' ? 'active' : '' ?>">
+                            <span class="d-flex align-items-center gap-2 text-truncate">
+                                <i class="bi bi-journal-text nav-icon"></i>
+                                <span class="text-truncate">Auditoría Forense</span>
+                            </span>
+                        </a>
+                    <?php endif; ?>
                 <?php endif; ?>
             </div>
 
@@ -1280,11 +1328,11 @@ if ($tabDesconocida) {
                     <div class="user-name text-truncate"><?= htmlspecialchars($usuario['nombre']) ?></div>
                     <div class="user-role text-truncate"><?= htmlspecialchars($usuario['rol_nombre']) ?></div>
                     <div class="user-center text-truncate">
-                        <i class="bi bi-geo-alt-fill me-1"></i><?= htmlspecialchars($esAdmin ? 'Administración Central' : ($usuario['centro_nombre'] ?? 'Red Municipal')) ?>
+                        <i class="bi bi-geo-alt-fill me-1"></i><?= htmlspecialchars($puedeVerTodaLaRed ? 'Supervisión Central Red' : ($usuario['centro_nombre'] ?? 'Red Municipal')) ?>
                     </div>
                 </div>
 
-                <?php if ($esAdmin): ?>
+                <?php if (tienePermiso('SISTEMA_RESPALDO')): ?>
                     <form action="procesar.php" method="POST" class="mb-2">
                         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
                         <input type="hidden" name="accion" value="descargar_respaldo">
@@ -1341,7 +1389,7 @@ if ($tabDesconocida) {
                 <?php endif; ?>
 
         <?php if ($tabActiva === 'centros'): ?>
-            <?php if (!$esAdmin): ?>
+            <?php if (!$puedeVerTodaLaRed): ?>
                 <!-- Ficha de Jurisdicción para Farmaceuta -->
                 <div class="card-sicm mb-3">
                     <div class="card-header-sicm d-flex justify-content-between align-items-center">
@@ -1375,7 +1423,7 @@ if ($tabDesconocida) {
                 </div>
             <?php endif; ?>
 
-            <?php if ($esAdmin): ?>
+            <?php if (tienePermiso('CENTROS_CREAR') || tienePermiso('CENTROS_EDITAR')): ?>
                 <!-- Modal de Registro / Edición de Ambulatorio -->
                 <div class="modal fade" id="modalCentro" tabindex="-1" aria-labelledby="modalCentroLabel" aria-hidden="true">
                     <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -1501,7 +1549,7 @@ if ($tabDesconocida) {
                             <div class="d-flex align-items-center gap-2">
                                 <span class="fw-bold"><i class="bi bi-hospital me-1"></i> Ambulatorios de la Red</span>
                                 <span class="badge bg-primary rounded-pill"><?= count($centros) ?></span>
-                                <?php if ($esAdmin): ?>
+                                <?php if (tienePermiso('CENTROS_CREAR')): ?>
                                     <button type="button" class="btn btn-primary btn-sm px-3 d-inline-flex align-items-center gap-1.5 shadow-sm ms-2"
                                         data-bs-toggle="modal" data-bs-target="#modalCentro">
                                         <i class="bi bi-plus-lg me-1"></i>Nuevo Ambulatorio
@@ -1589,16 +1637,20 @@ if ($tabDesconocida) {
                                                 </td>
                                                 <td class="text-end pe-3">
                                                     <div class="d-flex justify-content-end align-items-center gap-1">
-                                                        <a href="index.php?tab=auditoria&subtab=deltas&tabla=centros_salud&registro_id=<?= (int) $c['id'] ?>"
-                                                            class="btn btn-outline-info btn-sm py-0 px-2 text-decoration-none"
-                                                            style="font-size: 0.74rem;"
-                                                            title="Ver trazabilidad forense delta celda por celda">
-                                                            <i class="bi bi-clock-history me-1"></i>Historial
-                                                        </a>
-                                                        <?php if ($esAdmin): ?>
+                                                        <?php if (tienePermiso('AUDIT_VER')): ?>
+                                                            <a href="index.php?tab=auditoria&subtab=deltas&tabla=centros_salud&registro_id=<?= (int) $c['id'] ?>"
+                                                                class="btn btn-outline-info btn-sm py-0 px-2 text-decoration-none"
+                                                                style="font-size: 0.74rem;"
+                                                                title="Ver trazabilidad forense delta celda por celda">
+                                                                <i class="bi bi-clock-history me-1"></i>Historial
+                                                            </a>
+                                                        <?php endif; ?>
+                                                        <?php if (tienePermiso('CENTROS_EDITAR')): ?>
                                                             <a href="index.php?tab=centros&editar=<?= (int) $c['id'] ?>&estado=<?= htmlspecialchars($filtroEstado) ?>"
                                                                 class="btn btn-outline-primary btn-sm py-0 px-2"
                                                                 style="font-size: 0.74rem;">Editar</a>
+                                                        <?php endif; ?>
+                                                        <?php if (tienePermiso('CENTROS_ESTADO')): ?>
                                                             <?php if ((int) $c['activo'] === 1): ?>
                                                                 <form method="POST" action="procesar.php" class="d-inline" onsubmit="return confirm('¿Desactivar ambulatorio?');">
                                                                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
@@ -1802,10 +1854,12 @@ if ($tabDesconocida) {
                                         <i class="bi bi-list-check text-primary me-1"></i>
                                         Vademécum Municipal (<?= count($medicamentos) ?> fármacos)
                                     </h6>
+                                <?php if (tienePermiso('MED_CREAR')): ?>
                                     <button type="button" class="btn btn-primary btn-sm px-3 d-inline-flex align-items-center gap-1 shadow-sm ms-2"
                                         data-bs-toggle="modal" data-bs-target="#modalMedicamento">
                                         <i class="bi bi-plus-lg me-1"></i>Registrar Fármaco
                                     </button>
+                                <?php endif; ?>
                                 </div>
                                 <form method="GET" action="index.php" class="d-flex flex-wrap align-items-center gap-1 m-0">
                                     <input type="hidden" name="tab" value="medicamentos">
@@ -1893,30 +1947,32 @@ if ($tabDesconocida) {
                                                     </td>
                                                     <td class="text-end">
                                                         <div class="d-inline-flex gap-1">
-                                                            <?php if ($esAdmin): ?>
+                                                            <?php if (tienePermiso('AUDIT_VER')): ?>
                                                                 <a href="index.php?tab=auditoria&subtab=deltas&tabla=medicamentos&registro_id=<?= $med['id'] ?>"
                                                                     class="btn btn-outline-secondary btn-sm py-0.5 px-2"
                                                                     style="font-size: 0.75rem;" title="Ver Auditoría Delta celda por celda">
                                                                     <i class="bi bi-clock-history"></i> Historial
                                                                 </a>
                                                             <?php endif; ?>
-                                                            <a href="index.php?tab=medicamentos&subtab=vademecum&editar_med=<?= $med['id'] ?>"
-                                                                class="btn btn-outline-primary btn-sm py-0.5 px-2"
-                                                                style="font-size: 0.75rem;" title="Editar Especificaciones de Fármaco">
-                                                                <i class="bi bi-pencil-square"></i> Editar
-                                                            </a>
-                                                            <form method="POST" action="procesar.php" class="d-inline"
-                                                                onsubmit="return confirm('¿Confirma que desea <?= ((int) $med['activo'] === 1) ? 'descontinuar' : 'reactivar' ?> el medicamento <?= htmlspecialchars(addslashes($med['nombre_generico'])) ?>?');">
-                                                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
-                                                                <input type="hidden" name="accion" value="cambiar_estado_medicamento">
-                                                                <input type="hidden" name="id" value="<?= $med['id'] ?>">
-                                                                <button type="submit"
-                                                                    class="btn btn-sm py-0.5 px-2 <?= ((int) $med['activo'] === 1) ? 'btn-outline-warning' : 'btn-outline-success' ?>"
-                                                                    style="font-size: 0.75rem;"
-                                                                    title="<?= ((int) $med['activo'] === 1) ? 'Descontinuar fármaco' : 'Reactivar fármaco' ?>">
-                                                                    <?= ((int) $med['activo'] === 1) ? 'Desactivar' : 'Reactivar' ?>
-                                                                </button>
-                                                            </form>
+                                                            <?php if (tienePermiso('MED_EDITAR')): ?>
+                                                                <a href="index.php?tab=medicamentos&subtab=vademecum&editar_med=<?= $med['id'] ?>"
+                                                                    class="btn btn-outline-primary btn-sm py-0.5 px-2"
+                                                                    style="font-size: 0.75rem;" title="Editar Especificaciones de Fármaco">
+                                                                    <i class="bi bi-pencil-square"></i> Editar
+                                                                </a>
+                                                                <form method="POST" action="procesar.php" class="d-inline"
+                                                                    onsubmit="return confirm('¿Confirma que desea <?= ((int) $med['activo'] === 1) ? 'descontinuar' : 'reactivar' ?> el medicamento <?= htmlspecialchars(addslashes($med['nombre_generico'])) ?>?');">
+                                                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                                                    <input type="hidden" name="accion" value="cambiar_estado_medicamento">
+                                                                    <input type="hidden" name="id" value="<?= $med['id'] ?>">
+                                                                    <button type="submit"
+                                                                        class="btn btn-sm py-0.5 px-2 <?= ((int) $med['activo'] === 1) ? 'btn-outline-warning' : 'btn-outline-success' ?>"
+                                                                        style="font-size: 0.75rem;"
+                                                                        title="<?= ((int) $med['activo'] === 1) ? 'Descontinuar fármaco' : 'Reactivar fármaco' ?>">
+                                                                        <?= ((int) $med['activo'] === 1) ? 'Desactivar' : 'Reactivar' ?>
+                                                                    </button>
+                                                                </form>
+                                                            <?php endif; ?>
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -2388,97 +2444,99 @@ if ($tabDesconocida) {
         <!-- PESTAÑA: OPERADORES Y SEGURIDAD (ADMINISTRADOR CENTRAL)             -->
         <!-- ==================================================================== -->
 
-        <?php if ($tabActiva === 'usuarios' && $esAdmin): ?>
+        <?php if ($tabActiva === 'usuarios'): ?>
             <div class="row g-3">
-                <!-- Formulario Operador -->
-                <div class="col-xl-4 col-lg-5">
-                    <div class="card-sicm">
-                        <div class="card-header-sicm d-flex justify-content-between align-items-center">
-                            <span><?= $usuarioEdicion ? 'Editar Operador #' . (int) $usuarioEdicion['id'] : 'Nuevo Operador Sanitario' ?></span>
-                            <?php if ($usuarioEdicion): ?>
-                                <a href="index.php?tab=usuarios" class="small text-decoration-none text-muted">Cancelar
-                                    edición</a>
-                            <?php endif; ?>
-                        </div>
-                        <div class="p-3">
-                            <form id="form-usuario" action="procesar.php" method="POST" novalidate>
-                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
-                                <input type="hidden" name="accion" value="guardar_usuario">
-                                <input type="hidden" id="u_id" name="id"
-                                    value="<?= $usuarioEdicion ? (int) $usuarioEdicion['id'] : '' ?>">
+                <?php if (tienePermiso('USR_GESTIONAR')): ?>
+                    <!-- Formulario Operador -->
+                    <div class="col-xl-4 col-lg-5">
+                        <div class="card-sicm">
+                            <div class="card-header-sicm d-flex justify-content-between align-items-center">
+                                <span><?= $usuarioEdicion ? 'Editar Operador #' . (int) $usuarioEdicion['id'] : 'Nuevo Operador Sanitario' ?></span>
+                                <?php if ($usuarioEdicion): ?>
+                                    <a href="index.php?tab=usuarios" class="small text-decoration-none text-muted">Cancelar
+                                        edición</a>
+                                <?php endif; ?>
+                            </div>
+                            <div class="p-3">
+                                <form id="form-usuario" action="procesar.php" method="POST" novalidate>
+                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                    <input type="hidden" name="accion" value="guardar_usuario">
+                                    <input type="hidden" id="u_id" name="id"
+                                        value="<?= $usuarioEdicion ? (int) $usuarioEdicion['id'] : '' ?>">
 
-                                <div class="mb-2">
-                                    <label for="u_nombre" class="form-label small fw-semibold mb-1">Nombre Completo del
-                                        Funcionario</label>
-                                    <input type="text" class="form-control form-control-sm" id="u_nombre" name="nombre"
-                                        placeholder="Ej: Lcda. María Rivas" required maxlength="80"
-                                        value="<?= $usuarioEdicion ? htmlspecialchars($usuarioEdicion['nombre']) : '' ?>">
-                                </div>
-
-                                <div class="mb-2">
-                                    <label for="u_email" class="form-label small fw-semibold mb-1">Correo Institucional
-                                        Oficial</label>
-                                    <input type="email" class="form-control form-control-sm" id="u_email" name="email"
-                                        placeholder="ej: mrivas@salud.prueba.ve" required maxlength="120"
-                                        value="<?= $usuarioEdicion ? htmlspecialchars($usuarioEdicion['email']) : '' ?>">
-                                </div>
-
-                                <div class="mb-2">
-                                    <label for="u_rol_id" class="form-label small fw-semibold mb-1">Rol Operativo</label>
-                                    <select class="form-select form-select-sm" id="u_rol_id" name="rol_id" required>
-                                        <option value="">-- Seleccionar Rol --</option>
-                                        <?php foreach ($rolesCatalogo as $ro): ?>
-                                            <?php $selR = ($usuarioEdicion && (int) $usuarioEdicion['rol_id'] === (int) $ro['id']) ? 'selected' : ''; ?>
-                                            <option value="<?= (int) $ro['id'] ?>" <?= $selR ?>>
-                                                <?= (int) $ro['id'] === 1 ? 'Administrador Central (Acceso Global)' : 'Farmaceuta (Dispensación Sectorial)' ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-
-                                <div class="mb-2" id="wrap_centro_salud">
-                                    <label for="u_centro_salud_id" class="form-label small fw-semibold mb-1">
-                                        Ambulatorio de Adscripción <span class="text-danger">*</span>
-                                    </label>
-                                    <select class="form-select form-select-sm" id="u_centro_salud_id"
-                                        name="centro_salud_id">
-                                        <option value="">-- Seleccionar Ambulatorio --</option>
-                                        <?php foreach ($centrosDisponibles as $cs): ?>
-                                            <?php $selC = ($usuarioEdicion && (int) $usuarioEdicion['centro_salud_id'] === (int) $cs['id']) ? 'selected' : ''; ?>
-                                            <option value="<?= (int) $cs['id'] ?>" <?= $selC ?>>
-                                                <?= htmlspecialchars($cs['nombre']) ?>
-                                                (<?= htmlspecialchars($cs['codigo_sicm']) ?>)
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                    <div class="text-muted small mt-1" style="font-size: 0.70rem;">
-                                        Delimita la visibilidad estricta de inventario y dispensación del farmaceuta.
+                                    <div class="mb-2">
+                                        <label for="u_nombre" class="form-label small fw-semibold mb-1">Nombre Completo del
+                                            Funcionario</label>
+                                        <input type="text" class="form-control form-control-sm" id="u_nombre" name="nombre"
+                                            placeholder="Ej: Lcda. María Rivas" required maxlength="80"
+                                            value="<?= $usuarioEdicion ? htmlspecialchars($usuarioEdicion['nombre']) : '' ?>">
                                     </div>
-                                </div>
 
-                                <div class="mb-3">
-                                    <label for="u_password" class="form-label small fw-semibold mb-1">
-                                        Contraseña
-                                        <?= $usuarioEdicion ? '<span class="text-muted fw-normal">(Dejar en blanco para no cambiar)</span>' : '<span class="text-danger">*</span>' ?>
-                                    </label>
-                                    <input type="password" class="form-control form-control-sm" id="u_password"
-                                        name="password"
-                                        placeholder="<?= $usuarioEdicion ? 'Sin cambios' : 'Mín. 8 caracteres (A-Z, a-z, 0-9, !@#)' ?>"
-                                        maxlength="72" <?= $usuarioEdicion ? '' : 'required minlength="8"' ?>>
-                                </div>
+                                    <div class="mb-2">
+                                        <label for="u_email" class="form-label small fw-semibold mb-1">Correo Institucional
+                                            Oficial</label>
+                                        <input type="email" class="form-control form-control-sm" id="u_email" name="email"
+                                            placeholder="ej: mrivas@salud.prueba.ve" required maxlength="120"
+                                            value="<?= $usuarioEdicion ? htmlspecialchars($usuarioEdicion['email']) : '' ?>">
+                                    </div>
 
-                                <div class="d-flex gap-2">
-                                    <button type="submit" class="btn btn-primary btn-sm w-100 fw-semibold">
-                                        <?= $usuarioEdicion ? 'Actualizar Operador' : 'Guardar Operador' ?>
-                                    </button>
-                                </div>
-                            </form>
+                                    <div class="mb-2">
+                                        <label for="u_rol_id" class="form-label small fw-semibold mb-1">Rol Operativo</label>
+                                        <select class="form-select form-select-sm" id="u_rol_id" name="rol_id" required>
+                                            <option value="">-- Seleccionar Rol --</option>
+                                            <?php foreach ($rolesCatalogo as $ro): ?>
+                                                <?php $selR = ($usuarioEdicion && (int) $usuarioEdicion['rol_id'] === (int) $ro['id']) ? 'selected' : ''; ?>
+                                                <option value="<?= (int) $ro['id'] ?>" <?= $selR ?>>
+                                                    <?= (int) $ro['id'] === 1 ? 'Administrador Central (Acceso Global)' : ((int) $ro['id'] === 3 ? 'Auditor Sanitario (Control Forense)' : 'Farmaceuta (Dispensación Sectorial)') ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+
+                                    <div class="mb-2" id="wrap_centro_salud">
+                                        <label for="u_centro_salud_id" class="form-label small fw-semibold mb-1">
+                                            Ambulatorio de Adscripción <span class="text-danger">*</span>
+                                        </label>
+                                        <select class="form-select form-select-sm" id="u_centro_salud_id"
+                                            name="centro_salud_id">
+                                            <option value="">-- Seleccionar Ambulatorio --</option>
+                                            <?php foreach ($centrosDisponibles as $cs): ?>
+                                                <?php $selC = ($usuarioEdicion && (int) $usuarioEdicion['centro_salud_id'] === (int) $cs['id']) ? 'selected' : ''; ?>
+                                                <option value="<?= (int) $cs['id'] ?>" <?= $selC ?>>
+                                                    <?= htmlspecialchars($cs['nombre']) ?>
+                                                    (<?= htmlspecialchars($cs['codigo_sicm']) ?>)
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                        <div class="text-muted small mt-1" style="font-size: 0.70rem;">
+                                            Delimita la visibilidad estricta de inventario y dispensación del farmaceuta.
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label for="u_password" class="form-label small fw-semibold mb-1">
+                                            Contraseña
+                                            <?= $usuarioEdicion ? '<span class="text-muted fw-normal">(Dejar en blanco para no cambiar)</span>' : '<span class="text-danger">*</span>' ?>
+                                        </label>
+                                        <input type="password" class="form-control form-control-sm" id="u_password"
+                                            name="password"
+                                            placeholder="<?= $usuarioEdicion ? 'Sin cambios' : 'Mín. 8 caracteres (A-Z, a-z, 0-9, !@#)' ?>"
+                                            maxlength="72" <?= $usuarioEdicion ? '' : 'required minlength="8"' ?>>
+                                    </div>
+
+                                    <div class="d-flex gap-2">
+                                        <button type="submit" class="btn btn-primary btn-sm w-100 fw-semibold">
+                                            <?= $usuarioEdicion ? 'Actualizar Operador' : 'Guardar Operador' ?>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
                         </div>
                     </div>
-                </div>
+                <?php endif; ?>
 
                 <!-- Tabla Operadores -->
-                <div class="col-xl-8 col-lg-7">
+                <div class="<?= tienePermiso('USR_GESTIONAR') ? 'col-xl-8 col-lg-7' : 'col-12' ?>">
                     <div class="card-sicm">
                         <div class="card-header-sicm d-flex flex-wrap justify-content-between align-items-center gap-2">
                             <div class="d-flex align-items-center gap-2">
@@ -2538,16 +2596,15 @@ if ($tabDesconocida) {
                                                 </td>
                                                 <td>
                                                     <?php if ((int) $u['rol_id'] === 1): ?>
-                                                        <span
-                                                            class="badge bg-primary-subtle text-primary border border-primary-subtle">Admin
-                                                            Central</span>
+                                                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Admin Central</span>
+                                                    <?php elseif ((int) $u['rol_id'] === 3): ?>
+                                                        <span class="badge bg-info-subtle text-info border border-info-subtle">Auditor Sanitario</span>
                                                     <?php else: ?>
-                                                        <span
-                                                            class="badge bg-success-subtle text-success border border-success-subtle">Farmaceuta</span>
+                                                        <span class="badge bg-success-subtle text-success border border-success-subtle">Farmaceuta</span>
                                                     <?php endif; ?>
                                                 </td>
                                                 <td>
-                                                    <?php if ((int) $u['rol_id'] === 1 || empty($u['centro_salud_id'])): ?>
+                                                    <?php if ((int) $u['rol_id'] === 1 || (int) $u['rol_id'] === 3 || empty($u['centro_salud_id'])): ?>
                                                         <span class="badge bg-light text-secondary border">Red Municipal Completa</span>
                                                     <?php else: ?>
                                                         <div class="fw-semibold text-dark" style="font-size: 0.80rem;">
@@ -2566,30 +2623,39 @@ if ($tabDesconocida) {
                                                 </td>
                                                 <td class="text-end pe-3">
                                                     <div class="d-flex justify-content-end align-items-center gap-1">
-                                                        <a href="index.php?tab=usuarios&editar_u=<?= (int) $u['id'] ?>&estado_u=<?= htmlspecialchars($filtroEstadoU) ?>"
-                                                            class="btn btn-outline-primary btn-sm py-0 px-2"
-                                                            style="font-size: 0.74rem;">Editar</a>
-                                                        <?php if ((int) $u['id'] !== (int) $usuario['id']): ?>
-                                                            <?php if ((int) $u['activo'] === 1): ?>
-                                                                <form method="POST" action="procesar.php" class="d-inline" onsubmit="return confirm('¿Desactivar operador?');">
-                                                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
-                                                                    <input type="hidden" name="accion" value="cambiar_estado_usuario">
-                                                                    <input type="hidden" name="id" value="<?= (int) $u['id'] ?>">
-                                                                    <input type="hidden" name="estado" value="0">
-                                                                    <button type="submit" class="btn btn-link text-danger p-0 ms-1 text-decoration-none" title="Desactivar" style="font-size: 0.85rem; line-height: 1;">✕</button>
-                                                                </form>
+                                                        <?php if (tienePermiso('AUDIT_VER')): ?>
+                                                            <a href="index.php?tab=auditoria&subtab=deltas&tabla=usuarios&registro_id=<?= (int) $u['id'] ?>"
+                                                                class="btn btn-outline-info btn-sm py-0 px-2 text-decoration-none"
+                                                                style="font-size: 0.74rem;" title="Auditoría Delta">
+                                                                <i class="bi bi-clock-history me-1"></i>Historial
+                                                            </a>
+                                                        <?php endif; ?>
+                                                        <?php if (tienePermiso('USR_GESTIONAR')): ?>
+                                                            <a href="index.php?tab=usuarios&editar_u=<?= (int) $u['id'] ?>&estado_u=<?= htmlspecialchars($filtroEstadoU) ?>"
+                                                                class="btn btn-outline-primary btn-sm py-0 px-2"
+                                                                style="font-size: 0.74rem;">Editar</a>
+                                                            <?php if ((int) $u['id'] !== (int) $usuario['id']): ?>
+                                                                <?php if ((int) $u['activo'] === 1): ?>
+                                                                    <form method="POST" action="procesar.php" class="d-inline" onsubmit="return confirm('¿Desactivar operador?');">
+                                                                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                                                        <input type="hidden" name="accion" value="cambiar_estado_usuario">
+                                                                        <input type="hidden" name="id" value="<?= (int) $u['id'] ?>">
+                                                                        <input type="hidden" name="estado" value="0">
+                                                                        <button type="submit" class="btn btn-link text-danger p-0 ms-1 text-decoration-none" title="Desactivar" style="font-size: 0.85rem; line-height: 1;">✕</button>
+                                                                    </form>
+                                                                <?php else: ?>
+                                                                    <form method="POST" action="procesar.php" class="d-inline" onsubmit="return confirm('¿Reactivar operador?');">
+                                                                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                                                        <input type="hidden" name="accion" value="cambiar_estado_usuario">
+                                                                        <input type="hidden" name="id" value="<?= (int) $u['id'] ?>">
+                                                                        <input type="hidden" name="estado" value="1">
+                                                                        <button type="submit" class="btn btn-outline-success btn-sm py-0 px-1 ms-1" style="font-size: 0.74rem;" title="Reactivar">Reactivar</button>
+                                                                    </form>
+                                                                <?php endif; ?>
                                                             <?php else: ?>
-                                                                <form method="POST" action="procesar.php" class="d-inline" onsubmit="return confirm('¿Reactivar operador?');">
-                                                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
-                                                                    <input type="hidden" name="accion" value="cambiar_estado_usuario">
-                                                                    <input type="hidden" name="id" value="<?= (int) $u['id'] ?>">
-                                                                    <input type="hidden" name="estado" value="1">
-                                                                    <button type="submit" class="btn btn-outline-success btn-sm py-0 px-1 ms-1" style="font-size: 0.74rem;" title="Reactivar">Reactivar</button>
-                                                                </form>
+                                                                <span class="text-muted small ms-1" style="font-size: 0.70rem;"
+                                                                    title="Tu sesión actual">(Tú)</span>
                                                             <?php endif; ?>
-                                                        <?php else: ?>
-                                                            <span class="text-muted small ms-1" style="font-size: 0.70rem;"
-                                                                title="Tu sesión actual">(Tú)</span>
                                                         <?php endif; ?>
                                                     </div>
                                                 </td>
@@ -2687,18 +2753,20 @@ if ($tabDesconocida) {
                         $exportQuery .= "&accion_filtro=" . urlencode($filtroAccion);
                     }
                     ?>
-                    <?php if ($subtabActiva === 'eventos'): ?>
-                        <a href="procesar.php?accion=exportar_acta_pericial&<?= $exportQuery ?>"
-                            class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1 shadow-sm"
-                            style="font-size: 0.75rem;" title="Descargar bitácora de eventos filtrados en formato CSV">
-                            <i class="bi bi-file-earmark-arrow-down"></i> Exportar Eventos (CSV)
-                        </a>
-                    <?php else: ?>
-                        <a href="procesar.php?accion=exportar_acta_pericial&<?= $exportQuery ?>"
-                            class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1 shadow-sm"
-                            style="font-size: 0.75rem;" title="Descargar historial de modificaciones filtradas en formato CSV">
-                            <i class="bi bi-file-earmark-arrow-down"></i> Exportar Modificaciones (CSV)
-                        </a>
+                    <?php if (tienePermiso('AUDIT_EXPORTAR')): ?>
+                        <?php if ($subtabActiva === 'eventos'): ?>
+                            <a href="procesar.php?accion=exportar_acta_pericial&<?= $exportQuery ?>"
+                                class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1 shadow-sm"
+                                style="font-size: 0.75rem;" title="Descargar bitácora de eventos filtrados en formato CSV">
+                                <i class="bi bi-file-earmark-arrow-down"></i> Exportar Eventos (CSV)
+                            </a>
+                        <?php else: ?>
+                            <a href="procesar.php?accion=exportar_acta_pericial&<?= $exportQuery ?>"
+                                class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1 shadow-sm"
+                                style="font-size: 0.75rem;" title="Descargar historial de modificaciones filtradas en formato CSV">
+                                <i class="bi bi-file-earmark-arrow-down"></i> Exportar Modificaciones (CSV)
+                            </a>
+                        <?php endif; ?>
                     <?php endif; ?>
                 </div>
             </div>
@@ -3450,7 +3518,7 @@ if ($tabDesconocida) {
         <!-- ==================================================================== -->
         <!-- PESTAÑA: IDENTIDAD INSTITUCIONAL (WHITE-LABELING)                    -->
         <!-- ==================================================================== -->
-        <?php if ($tabActiva === 'configuracion' && $esAdmin): ?>
+        <?php if ($tabActiva === 'configuracion'): ?>
             <div class="row g-3">
                 <div class="col-xl-9 col-lg-11 mx-auto">
                     <div class="card-sicm">
@@ -3854,9 +3922,11 @@ if ($tabDesconocida) {
                                 <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace" style="font-size: 0.74rem;">
                                     <?= number_format($totalPacientesFiltrados) ?> pacientes encontrados
                                 </span>
-                                <button type="button" class="btn btn-primary btn-sm px-3 d-inline-flex align-items-center gap-1.5 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalPaciente">
-                                    <i class="bi bi-person-plus-fill me-1"></i>Registrar Paciente
-                                </button>
+                                <?php if (tienePermiso('PACIENTES_GESTIONAR')): ?>
+                                    <button type="button" class="btn btn-primary btn-sm px-3 d-inline-flex align-items-center gap-1.5 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalPaciente">
+                                        <i class="bi bi-person-plus-fill me-1"></i>Registrar Paciente
+                                    </button>
+                                <?php endif; ?>
                             </div>
                         </div>
                         <div class="table-responsive">
@@ -3944,21 +4014,25 @@ if ($tabDesconocida) {
                                                         <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle" style="font-size: 0.70rem;">
                                                             <i class="bi bi-file-earmark-medical me-0.5"></i><?= (int)($p['total_recipes'] ?? 0) ?> Récipes
                                                         </span>
-                                                        <a href="index.php?tab=recipes&paciente_id=<?= (int)$p['id'] ?>"
-                                                            class="btn btn-outline-primary btn-sm py-0 px-1.5 text-decoration-none"
-                                                            style="font-size: 0.72rem;" title="Prescribir o consultar récipe">
-                                                            <i class="bi bi-plus-circle me-1"></i>+ Récipe
-                                                        </a>
+                                                        <?php if (tienePermiso('RECIPES_GESTIONAR')): ?>
+                                                            <a href="index.php?tab=recipes&paciente_id=<?= (int)$p['id'] ?>"
+                                                                class="btn btn-outline-primary btn-sm py-0 px-1.5 text-decoration-none"
+                                                                style="font-size: 0.72rem;" title="Prescribir o consultar récipe">
+                                                                <i class="bi bi-plus-circle me-1"></i>+ Récipe
+                                                            </a>
+                                                        <?php endif; ?>
                                                     </div>
                                                 </td>
                                                 <td class="text-end">
                                                     <div class="d-flex justify-content-end gap-1">
-                                                        <a href="index.php?tab=pacientes&editar_id=<?= (int)$p['id'] ?><?= $busquedaPaciente !== '' ? '&q_paciente=' . urlencode($busquedaPaciente) : '' ?><?= $filtroTipoDoc !== 'todos' ? '&tipo_doc=' . urlencode($filtroTipoDoc) : '' ?><?= $paginaActual > 1 ? '&p_paciente=' . $paginaActual : '' ?>"
-                                                            class="btn btn-sm btn-outline-primary py-0 px-2"
-                                                            style="font-size: 0.74rem;" title="Editar Expediente">
-                                                            <i class="bi bi-pencil-square"></i> Editar
-                                                        </a>
-                                                        <?php if ($esAdmin): ?>
+                                                        <?php if (tienePermiso('PACIENTES_GESTIONAR')): ?>
+                                                            <a href="index.php?tab=pacientes&editar_id=<?= (int)$p['id'] ?><?= $busquedaPaciente !== '' ? '&q_paciente=' . urlencode($busquedaPaciente) : '' ?><?= $filtroTipoDoc !== 'todos' ? '&tipo_doc=' . urlencode($filtroTipoDoc) : '' ?><?= $paginaActual > 1 ? '&p_paciente=' . $paginaActual : '' ?>"
+                                                                class="btn btn-sm btn-outline-primary py-0 px-2"
+                                                                style="font-size: 0.74rem;" title="Editar Expediente">
+                                                                <i class="bi bi-pencil-square"></i> Editar
+                                                            </a>
+                                                        <?php endif; ?>
+                                                        <?php if (tienePermiso('AUDIT_VER')): ?>
                                                             <a href="index.php?tab=auditoria&subtab=deltas&tabla=pacientes&registro_id=<?= (int)$p['id'] ?>"
                                                                 class="btn btn-sm btn-outline-info py-0 px-2 text-decoration-none"
                                                                 style="font-size: 0.74rem;" title="Auditoría Delta Forense">
@@ -4253,9 +4327,11 @@ if ($tabDesconocida) {
                                 <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace" style="font-size: 0.74rem;">
                                     <?= number_format($totalRecipesFiltrados) ?> récipes registrados
                                 </span>
-                                <button type="button" class="btn btn-primary btn-sm px-3 d-inline-flex align-items-center gap-1.5 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalRecipe">
-                                    <i class="bi bi-plus-circle me-1"></i>Emitir Nuevo Récipe
-                                </button>
+                                <?php if (tienePermiso('RECIPES_GESTIONAR')): ?>
+                                    <button type="button" class="btn btn-primary btn-sm px-3 d-inline-flex align-items-center gap-1.5 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalRecipe">
+                                        <i class="bi bi-plus-circle me-1"></i>Emitir Nuevo Récipe
+                                    </button>
+                                <?php endif; ?>
                             </div>
                         </div>
                         <div class="table-responsive">
@@ -4357,23 +4433,25 @@ if ($tabDesconocida) {
                                                 </td>
                                                 <td class="text-end">
                                                     <div class="d-inline-flex align-items-center gap-1">
-                                                        <a href="index.php?tab=recipes&editar_id=<?= (int) $r['id'] ?>"
-                                                            class="btn btn-outline-secondary btn-sm py-0.5 px-1.5"
-                                                            title="Editar Récipe" style="font-size: 0.75rem;">
-                                                            <i class="bi bi-pencil-square"></i>
-                                                        </a>
-                                                        <form action="procesar.php" method="POST" class="d-inline"
-                                                            onsubmit="return confirm('¿Confirma que desea <?= $activo ? 'desactivar' : 'reactivar' ?> el récipe #<?= (int) $r['id'] ?>?');">
-                                                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
-                                                            <input type="hidden" name="accion" value="toggle_estado_recipe">
-                                                            <input type="hidden" name="id" value="<?= (int) $r['id'] ?>">
-                                                            <button type="submit"
-                                                                class="btn btn-sm py-0.5 px-1.5 <?= $activo ? 'btn-outline-warning' : 'btn-outline-success' ?>"
-                                                                style="font-size: 0.75rem;"
-                                                                title="<?= $activo ? 'Desactivar récipe' : 'Reactivar récipe' ?>">
-                                                                <i class="bi <?= $activo ? 'bi-toggle-on' : 'bi-toggle-off' ?>"></i>
-                                                            </button>
-                                                        </form>
+                                                        <?php if (tienePermiso('RECIPES_GESTIONAR')): ?>
+                                                            <a href="index.php?tab=recipes&editar_id=<?= (int) $r['id'] ?>"
+                                                                class="btn btn-outline-secondary btn-sm py-0.5 px-1.5"
+                                                                title="Editar Récipe" style="font-size: 0.75rem;">
+                                                                <i class="bi bi-pencil-square"></i>
+                                                            </a>
+                                                            <form action="procesar.php" method="POST" class="d-inline"
+                                                                onsubmit="return confirm('¿Confirma que desea <?= $activo ? 'desactivar' : 'reactivar' ?> el récipe #<?= (int) $r['id'] ?>?');">
+                                                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                                                <input type="hidden" name="accion" value="toggle_estado_recipe">
+                                                                <input type="hidden" name="id" value="<?= (int) $r['id'] ?>">
+                                                                <button type="submit"
+                                                                    class="btn btn-sm py-0.5 px-1.5 <?= $activo ? 'btn-outline-warning' : 'btn-outline-success' ?>"
+                                                                    style="font-size: 0.75rem;"
+                                                                    title="<?= $activo ? 'Desactivar récipe' : 'Reactivar récipe' ?>">
+                                                                    <i class="bi <?= $activo ? 'bi-toggle-on' : 'bi-toggle-off' ?>"></i>
+                                                                </button>
+                                                            </form>
+                                                        <?php endif; ?>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -4438,13 +4516,18 @@ if ($tabDesconocida) {
                                         <i class="bi bi-snow2 me-1"></i> Cadena de Frío Activa
                                     </span>
                                 <?php endif; ?>
+                                <?php if (!tienePermiso('DESP_PROCESAR')): ?>
+                                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle font-monospace" title="Rol de supervisión sanitaria en modo consulta">
+                                        <i class="bi bi-eye me-1"></i> Modo Fiscalización / Solo Lectura
+                                    </span>
+                                <?php endif; ?>
                             </div>
                             <div class="text-muted small mt-1" style="font-size: 0.74rem;">
                                 <i class="bi bi-pin-map me-1"></i> <?= htmlspecialchars($centroOperativo['direccion'] ?? 'Dirección municipal') ?>
                             </div>
                         </div>
                         <div class="col-md-5 text-md-end">
-                            <?php if ($esAdmin): ?>
+                            <?php if ($puedeVerTodaLaRed): ?>
                                 <form method="GET" action="index.php" class="d-inline-flex align-items-center gap-2 justify-content-md-end">
                                     <input type="hidden" name="tab" value="despachos">
                                     <?php if ($busquedaPaciente !== ''): ?>
@@ -4527,7 +4610,7 @@ if ($tabDesconocida) {
                 <div class="card-body p-3">
                     <form method="GET" action="index.php" class="row g-2 align-items-center">
                         <input type="hidden" name="tab" value="despachos">
-                        <?php if ($esAdmin): ?>
+                        <?php if ($puedeVerTodaLaRed): ?>
                             <input type="hidden" name="centro_id" value="<?= (int)$centroOperativoId ?>">
                         <?php endif; ?>
                         <div class="col-md-9 col-lg-10">
@@ -4539,7 +4622,7 @@ if ($tabDesconocida) {
                                        placeholder="Ingrese cédula de identidad o nombre del paciente..." 
                                        value="<?= htmlspecialchars($busquedaPaciente) ?>" autocomplete="off" autofocus required>
                                 <?php if ($busquedaPaciente !== ''): ?>
-                                    <a href="index.php?tab=despachos<?= $esAdmin ? '&centro_id=' . (int)$centroOperativoId : '' ?>" 
+                                    <a href="index.php?tab=despachos<?= $puedeVerTodaLaRed ? '&centro_id=' . (int)$centroOperativoId : '' ?>" 
                                        class="btn btn-outline-secondary" title="Limpiar consulta">
                                         <i class="bi bi-x-lg"></i>
                                     </a>
@@ -4561,7 +4644,7 @@ if ($tabDesconocida) {
                             </div>
                             <div class="list-group list-group-flush border rounded-2">
                                 <?php foreach ($pacientesCoincidentes as $pMatch): ?>
-                                    <a href="index.php?tab=despachos<?= $esAdmin ? '&centro_id=' . (int)$centroOperativoId : '' ?>&q_paciente=<?= urlencode($busquedaPaciente) ?>&paciente_id=<?= (int)$pMatch['id'] ?>"
+                                    <a href="index.php?tab=despachos<?= $puedeVerTodaLaRed ? '&centro_id=' . (int)$centroOperativoId : '' ?>&q_paciente=<?= urlencode($busquedaPaciente) ?>&paciente_id=<?= (int)$pMatch['id'] ?>"
                                        class="list-group-item list-group-item-action d-flex align-items-center justify-content-between p-2.5 small">
                                         <div>
                                             <span class="badge bg-light text-dark border font-monospace me-2">
@@ -4793,7 +4876,17 @@ if ($tabDesconocida) {
 
                                                     <!-- Columna 3: Acción de Dispensación Asistencial -->
                                                     <div class="col-lg-3 col-md-12 text-lg-end text-start">
-                                                        <?php if ($estaVencido): ?>
+                                                        <?php if (!tienePermiso('DESP_PROCESAR')): ?>
+                                                            <div class="d-flex flex-column align-items-lg-end align-items-start gap-1">
+                                                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle font-monospace" style="font-size: 0.72rem;">
+                                                                    <i class="bi bi-eye me-1"></i> Modo Fiscalización / Solo Lectura
+                                                                </span>
+                                                                <button type="button" class="btn btn-outline-secondary btn-sm px-3 w-100 w-lg-auto" disabled
+                                                                        title="Su rol cuenta con permisos de fiscalización y auditoría exclusivamente. Dispensación deshabilitada.">
+                                                                    <i class="bi bi-lock me-1"></i> Dispensación Restringida
+                                                                </button>
+                                                            </div>
+                                                        <?php elseif ($estaVencido): ?>
                                                             <button type="button" class="btn btn-outline-danger btn-sm px-3 w-100 w-lg-auto" disabled
                                                                     title="Récipe médico vencido. Requiere renovación facultativa antes de dispensar.">
                                                                 <i class="bi bi-exclamation-triangle-fill me-1"></i> Récipe Vencido - Renovar Prescripción
