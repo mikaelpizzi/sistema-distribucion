@@ -59,10 +59,89 @@ El esquema DDL implementado en [`docker/mysql/01_schema.sql`](docker/mysql/01_sc
 * **Justificación técnica:** Los `ENUM` queman la estructura relacional. Incorporar una nueva clasificación o rol en un entorno en producción exigiría ejecutar un `ALTER TABLE`, bloqueando la tabla físicamente (*Metadata Lock*). La normalización en 3FN permite incorporar clasificaciones en caliente mediante simples sentencias `INSERT`.
 
 ### 2.2. Módulo de Seguridad, Operadores y Acceso RBAC
-* **Tabla:** `usuarios`.
-* **Columnas clave:** `id` (PK), `email` (UNIQUE), `password_hash`, `rol_id` (FK), `centro_salud_id` (FK, NULLable), `activo` (TINYINT).
-* **Criterio adoptado:** Cada despacho y lote almacena el identificador del operador responsable (`usuario_id`). La columna `centro_salud_id` actúa como delimitador de jurisdicción: es `NULL` para el Administrador Central (acceso global a la red) y toma un valor entero no nulo para el Farmaceuta, restringiendo sus consultas estrictamente a su ambulatorio de adscripción.
-* **Política de borrado:** Borrado lógico (*Soft Delete*) mediante `activo = 0` para preservar la auditoría histórica de los despachos despachados por dicho operador.
+
+#### Modelo de Autorización Dinámica RBAC en 3FN (Parametrizable e Ilimitado)
+El sistema implementa un modelo estricto de **Control de Acceso Basado en Roles (RBAC)** en **Tercera Forma Normal (3FN)**, cumpliendo con la directiva arquitectónica de la cátedra que exige **permitir la creación y parametrización de roles personalizados en caliente sin alterar la estructura DDL de la base de datos**.
+
+A diferencia de soluciones frágiles basadas en columnas `ENUM('admin', 'farmaceuta')` o banderas booleanas agregadas horizontalmente en la tabla de usuarios (`es_admin`, `puede_despachar`), el SICM desacopla por completo los usuarios, los roles y los permisos atómicos a través de relaciones normalizadas:
+
+```text
++-----------------------+          +-----------------------+
+|    modulos_sistema    |          |         roles         |
++-----------------------+          +-----------------------+
+| PK id                 |          | PK id                 |
+|    codigo (UNIQUE)    |          |    nombre (UNIQUE)    |
+|    nombre             |          |    es_personalizado   |
+|    descripcion        |          |    descripcion        |
++-----------+-----------+          +-----------+-----------+
+            | 1                                | 1
+            | N                                |
++-----------v-----------+                      |
+|       permisos        |                      |
++-----------------------+                      |
+| PK id                 |                      | N
+| FK modulo_id          |          +-----------v-----------+
+|    codigo (UNIQUE)    |          |     rol_permisos      |
+|    nombre             |          +-----------------------+
+|    descripcion        |          | PK,FK rol_id          |
++-----------+-----------+          | PK,FK permiso_id      |
+            | 1                    +-----------------------+
+            | N                                ^
+            |                                  |
+            +----------------------------------+
+                                               | 1
+                                               | N
+                                   +-----------v-----------+
+                                   |       usuarios        |
+                                   +-----------------------+
+                                   | PK id                 |
+                                   |    email (UNIQUE)     |
+                                   |    password_hash      |
+                                   | FK rol_id             |
+                                   | FK centro_salud_id    |
+                                   |    activo             |
+                                   +-----------------------+
+```
+
+##### Características de Diseño Relacional:
+1. **Crecimiento Vertical (Sin DDL Locking):** La incorporación de un nuevo rol institucional (ej. `rol_coordinador_epidemiologico`, `rol_asistente_almacen`) se realiza mediante inserciones directas en las tablas `roles` (con `es_personalizado = 1`) y `rol_permisos`. No requiere sentencias `ALTER TABLE` que provoquen bloqueos de metadatos (*Metadata Locks*) en motores transaccionales InnoDB/MariaDB en alta concurrencia.
+2. **Cero Listas en JSON para Reglas de Negocio:** La asignación entre roles y permisos se almacena mediante la tabla puente normalizada `rol_permisos (rol_id, permiso_id)` con clave primaria compuesta y claves foráneas en cascada, garantizando integridad referencial y consultas indexadas instantáneas.
+3. **Delimitación de Jurisdicción Asistencial:** La columna `centro_salud_id` en la tabla `usuarios` actúa como delimitador geográfico. Si es `NULL` (o si el rol posee el permiso atómico `CENTROS_VER_GLOBAL`), el usuario supervisa toda la red asistencial municipal; si contiene un identificador válido, el operador queda circunscrito estrictamente a su ambulatorio de adscripción.
+4. **Política de Borrado Seguro:** Borrado lógico (*Soft Delete*) de operadores mediante `activo = 0` para preservar la trazabilidad histórica de los despachos y recepciones firmadas por dicho funcionario. Para roles personalizados, se permite eliminación física únicamente si no existen operadores asignados (`COUNT(usuarios) = 0`).
+
+##### Matriz Completa de Permisos Atómicos y Roles de Fábrica:
+
+| Módulo del Sistema | Código de Permiso | Nombre Descriptivo | Admin Central | Farmaceuta | Auditor |
+| :--- | :--- | :--- | :---: | :---: | :---: |
+| **Centros** | `CENTROS_VER` | Consultar red de ambulatorios | Sí | Sí | Sí |
+| **Centros** | `CENTROS_CREAR` | Registrar nuevo ambulatorio | Sí | No | No |
+| **Centros** | `CENTROS_EDITAR` | Modificar datos de ambulatorio | Sí | No | No |
+| **Centros** | `CENTROS_ESTADO` | Desactivar/Reactivar ambulatorio | Sí | No | No |
+| **Centros** | `CENTROS_VER_GLOBAL` | Supervisión municipal intercentros | Sí | No | Sí |
+| **Centros** | `MAESTRAS_GESTIONAR` | Administrar catálogos y roles RBAC | Sí | No | No |
+| **Medicamentos** | `MED_VER` | Consultar vademécum municipal | Sí | Sí | Sí |
+| **Medicamentos** | `MED_CREAR` | Registrar nuevo fármaco | Sí | No | No |
+| **Medicamentos** | `MED_EDITAR` | Editar especificaciones farmacológicas | Sí | No | No |
+| **Inventario** | `INV_VER` | Consultar existencias y lotes FEFO | Sí | Sí | Sí |
+| **Inventario** | `INV_REGISTRAR_LOTE` | Recepción e ingreso formal de lotes | Sí | Sí | No |
+| **Inventario** | `INV_AJUSTAR` | Declaración de mermas y averías | Sí | No | No |
+| **Despachos** | `PACIENTES_VER` | Consultar padrón de beneficiarios | Sí | Sí | Sí |
+| **Despachos** | `PACIENTES_GESTIONAR` | Registrar y editar pacientes y contactos | Sí | Sí | No |
+| **Despachos** | `RECIPES_VER` | Consultar prescripciones médicas | Sí | Sí | Sí |
+| **Despachos** | `RECIPES_GESTIONAR` | Emitir y conmutar vigencia de récipes | Sí | Sí | No |
+| **Despachos** | `DESP_VER` | Consultar despachos realizados | Sí | Sí | Sí |
+| **Despachos** | `DESP_PROCESAR` | Procesar dispensación FEFO atómica | Sí | Sí | No |
+| **Usuarios** | `USR_VER` | Consultar nómina de operadores | Sí | No | Sí |
+| **Usuarios** | `USR_GESTIONAR` | Crear, editar y asignar operadores | Sí | No | No |
+| **Usuarios** | `CONFIG_SISTEMA` | Configuración de identidad municipal | Sí | No | No |
+| **Usuarios** | `SISTEMA_RESPALDO` | Exportar respaldos en caliente | Sí | No | No |
+| **Auditoría** | `AUDIT_VER` | Inspección de bitácora WORM y deltas | Sí | No | Sí |
+| **Auditoría** | `AUDIT_EXPORTAR` | Exportación de actas periciales forenses | Sí | No | Sí |
+
+##### Casos de Uso Reales para Roles Dinámicos Parametrizables:
+* **Coordinador Epidemiológico Municipal:** Requiere supervisar todos los ambulatorios de la red (`CENTROS_VER_GLOBAL`, `CENTROS_VER`), analizar el vademécum (`MED_VER`), auditar prescripciones y beneficiarios (`RECIPES_VER`, `PACIENTES_VER`), sin facultades para alterar inventarios físicos ni dispensar medicamentos directamente.
+* **Asistente de Almacén y Suministros:** Asignado a un ambulatorio específico o depósito central con permisos para dar ingreso a lotes (`INV_REGISTRAR_LOTE`, `INV_VER`) e inspeccionar fármacos (`MED_VER`), sin acceso al padrón de pacientes ni a la emisión de prescripciones médicas.
+* **Director Médico de Ambulatorio:** Cuenta con permisos para gestionar pacientes (`PACIENTES_GESTIONAR`, `PACIENTES_VER`), emitir récipes institucionales (`RECIPES_GESTIONAR`, `RECIPES_VER`), monitorear el stock de su centro (`INV_VER`) y consultar los despachos ejecutados (`DESP_VER`), manteniendo restringida la configuración global del sistema y las bitácoras forenses.
 
 ### 2.3. Módulo de Red de Ambulatorios y Relación N:M
 * **Tablas:** `centros_salud`, `centro_recursos`, `recursos_operativos`.

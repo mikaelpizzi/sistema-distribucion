@@ -149,6 +149,36 @@ if ($tabActiva === 'centros') {
         ORDER BY r.id ASC
     ")->fetchAll();
 
+    // Gestión Dinámica de Roles RBAC y Matriz de Permisos en 3FN
+    $todosRoles = $pdo->query("
+        SELECT r.id, r.nombre, r.es_personalizado, r.descripcion, 
+               COUNT(DISTINCT u.id) AS total_usuarios, 
+               COUNT(DISTINCT rp.permiso_id) AS total_permisos 
+        FROM roles r 
+        LEFT JOIN usuarios u ON u.rol_id = r.id 
+        LEFT JOIN rol_permisos rp ON rp.rol_id = r.id 
+        GROUP BY r.id, r.nombre, r.es_personalizado, r.descripcion 
+        ORDER BY r.id ASC
+    ")->fetchAll();
+
+    $permisosCatalogo = $pdo->query("
+        SELECT p.id, p.codigo, p.nombre, p.descripcion, m.id AS modulo_id, m.nombre AS modulo_nombre 
+        FROM permisos p 
+        JOIN modulos_sistema m ON p.modulo_id = m.id 
+        ORDER BY m.id ASC, p.id ASC
+    ")->fetchAll();
+
+    $rolPermisosRaw = $pdo->query("SELECT rol_id, permiso_id FROM rol_permisos")->fetchAll();
+    $matrizRolPermisos = [];
+    foreach ($rolPermisosRaw as $rp) {
+        $matrizRolPermisos[(int)$rp['rol_id']][(int)$rp['permiso_id']] = true;
+    }
+
+    $permisosPorModulo = [];
+    foreach ($permisosCatalogo as $p) {
+        $permisosPorModulo[$p['modulo_nombre']][] = $p;
+    }
+
 
 } elseif ($tabActiva === 'usuarios') {
     if (!tienePermiso('USR_VER')) {
@@ -190,7 +220,7 @@ if ($tabActiva === 'centros') {
     $listaUsuarios = $stmtUsers->fetchAll();
 
     // Catálogos para el formulario de usuarios
-    $rolesCatalogo = $pdo->query("SELECT id, nombre FROM roles ORDER BY id ASC")->fetchAll();
+    $rolesCatalogo = $pdo->query("SELECT id, nombre, descripcion, es_personalizado FROM roles ORDER BY id ASC")->fetchAll();
     $centrosDisponibles = $pdo->query("SELECT id, codigo_sicm, nombre FROM centros_salud WHERE activo = 1 ORDER BY nombre ASC")->fetchAll();
 
     // Modo Edición
@@ -2261,6 +2291,245 @@ if ($tabDesconocida) {
             </div>
 
             <div class="row g-3">
+                <!-- ========================================================== -->
+                <!-- ROLES OPERATIVOS Y MATRIZ DE PERMISOS RBAC (PARAMETRIZABLE) -->
+                <!-- ========================================================== -->
+                <div class="col-12 mb-4">
+                    <div class="card-sicm">
+                        <div class="card-header-sicm d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="fw-bold">Roles Operativos y Matriz de Permisos RBAC</span>
+                                <span class="code-tag">roles</span>
+                                <span class="code-tag">rol_permisos</span>
+                            </div>
+                            <button class="btn btn-primary btn-sm py-1 px-3 fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#collapseNuevoRol" aria-expanded="false" aria-controls="collapseNuevoRol">
+                                <i class="bi bi-shield-plus me-1"></i>+ Registrar Nuevo Rol Personalizado
+                            </button>
+                        </div>
+                        <div class="px-3 pt-2 pb-1 text-muted small" style="font-size: 0.75rem;">
+                            Control de Acceso Basado en Roles (RBAC) normalizado en Tercera Forma Normal (3FN). Parametrización en caliente de perfiles institucionales y asignación granular sobre los 24 permisos atómicos de la red asistencial.
+                        </div>
+
+                        <!-- Formulario Colapsable: Registrar Nuevo Rol -->
+                        <div class="collapse p-3 bg-light border-top border-bottom" id="collapseNuevoRol">
+                            <form action="procesar.php" method="POST" id="form-crear-rol">
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                <input type="hidden" name="accion" value="crear_rol">
+
+                                <div class="card border mb-3">
+                                    <div class="card-header bg-white py-2 px-3 fw-semibold text-dark small">
+                                        <i class="bi bi-shield-lock-fill text-primary me-1"></i>Definición de Perfil Institucional
+                                    </div>
+                                    <div class="card-body p-3">
+                                        <div class="row g-2">
+                                            <div class="col-md-5">
+                                                <label class="form-label small fw-semibold mb-1">Nombre Técnico del Rol <span class="text-danger">*</span></label>
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text font-monospace bg-light">rol_</span>
+                                                    <input type="text" name="nombre" class="form-control form-control-sm font-monospace" placeholder="coordinador_epidemiologico" required maxlength="45" pattern="^[a-zA-Z0-9_]+$">
+                                                </div>
+                                                <div class="form-text" style="font-size: 0.70rem;">Se almacena con prefijo <code>rol_</code> en minúsculas y sin caracteres especiales.</div>
+                                            </div>
+                                            <div class="col-md-7">
+                                                <label class="form-label small fw-semibold mb-1">Descripción y Propósito Institucional <span class="text-danger">*</span></label>
+                                                <input type="text" name="descripcion" class="form-control form-control-sm" placeholder="Ej: Coordinación epidemiológica y dispensación de tratamientos crónicos" required maxlength="255">
+                                                <div class="form-text" style="font-size: 0.70rem;">Resumen del alcance asistencial del perfil en los ambulatorios.</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Matriz de Permisos Checkboxes -->
+                                <div class="card border mb-3">
+                                    <div class="card-header bg-white py-2 px-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                        <div class="small fw-bold text-dark">
+                                            <i class="bi bi-grid-3x3-gap-fill text-warning me-1"></i>Asignación de Permisos Atómicos por Módulo (24 Permisos en 3FN)
+                                        </div>
+                                        <div class="d-flex gap-2">
+                                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size: 0.70rem;" onclick="toggleCheckboxes('form-crear-rol', true)">Marcar Todos</button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size: 0.70rem;" onclick="toggleCheckboxes('form-crear-rol', false)">Desmarcar Todos</button>
+                                        </div>
+                                    </div>
+                                    <div class="card-body p-3">
+                                        <div class="row g-3">
+                                            <?php foreach ($permisosPorModulo as $moduloNom => $perms): ?>
+                                                <div class="col-md-6 col-xl-4">
+                                                    <div class="border rounded p-2 h-100 bg-light">
+                                                        <div class="fw-bold text-primary small border-bottom pb-1 mb-2 d-flex align-items-center gap-1">
+                                                            <i class="bi bi-folder2-open"></i> <?= htmlspecialchars($moduloNom) ?>
+                                                        </div>
+                                                        <?php foreach ($perms as $p): ?>
+                                                            <div class="form-check mb-1">
+                                                                <input class="form-check-input" type="checkbox" name="permisos[]" value="<?= (int)$p['id'] ?>" id="perm_new_<?= (int)$p['id'] ?>">
+                                                                <label class="form-check-label small" for="perm_new_<?= (int)$p['id'] ?>" title="<?= htmlspecialchars($p['descripcion'] ?? '') ?>">
+                                                                    <span class="fw-semibold text-dark"><?= htmlspecialchars($p['nombre']) ?></span>
+                                                                    <br><span class="code-tag" style="font-size: 0.65rem;"><?= htmlspecialchars($p['codigo']) ?></span>
+                                                                </label>
+                                                            </div>
+                                                        <?php endforeach; ?>
+                                                    </div>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex justify-content-end gap-2">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="collapse" data-bs-target="#collapseNuevoRol">Cancelar</button>
+                                    <button type="submit" class="btn btn-primary btn-sm px-3 fw-semibold">
+                                        <i class="bi bi-check2-circle me-1"></i>Guardar Rol y Asignar Permisos
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- Tabla de Roles Operativos -->
+                        <div class="table-responsive">
+                            <table class="table table-hover table-sm table-sicm mb-0">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 45px;">ID</th>
+                                        <th style="width: 170px;">Nombre del Rol</th>
+                                        <th style="width: 140px;">Tipo</th>
+                                        <th>Descripción Institucional</th>
+                                        <th style="width: 110px;" class="text-center">Operadores</th>
+                                        <th style="width: 120px;" class="text-center">Permisos</th>
+                                        <th style="width: 150px;" class="text-end pe-3">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($todosRoles as $r): ?>
+                                        <tr>
+                                            <td class="text-muted fw-bold">#<?= (int)$r['id'] ?></td>
+                                            <td><span class="code-tag"><?= htmlspecialchars($r['nombre']) ?></span></td>
+                                            <td>
+                                                <?php if ((int)$r['es_personalizado'] === 0): ?>
+                                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle">[ Base del Sistema ]</span>
+                                                <?php else: ?>
+                                                    <span class="badge bg-success-subtle text-success border border-success-subtle">[ Personalizado ]</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="small text-muted"><?= htmlspecialchars($r['descripcion'] ?? 'Sin descripción') ?></td>
+                                            <td class="text-center">
+                                                <?php if ((int)$r['total_usuarios'] > 0): ?>
+                                                    <span class="badge bg-light text-primary border" title="Operadores activos vinculados">
+                                                        <?= (int)$r['total_usuarios'] ?> <?= (int)$r['total_usuarios'] === 1 ? 'operador' : 'operadores' ?>
+                                                    </span>
+                                                <?php else: ?>
+                                                    <span class="text-muted small" style="font-size: 0.72rem;">0 operadores</span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge bg-light text-dark border font-monospace">
+                                                    <?= (int)$r['total_permisos'] ?> / <?= count($permisosCatalogo) ?>
+                                                </span>
+                                            </td>
+                                            <td class="text-end pe-3">
+                                                <div class="d-flex justify-content-end align-items-center gap-1">
+                                                    <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2" style="font-size: 0.72rem;" data-bs-toggle="modal" data-bs-target="#modalPermisosRol<?= (int)$r['id'] ?>" title="Modificar Matriz de Permisos">
+                                                        <i class="bi bi-gear-fill me-1"></i>Permisos
+                                                    </button>
+                                                    <?php if ((int)$r['es_personalizado'] === 1 && (int)$r['total_usuarios'] === 0): ?>
+                                                        <form method="POST" action="procesar.php" class="d-inline" onsubmit="return confirm('¿Confirma la eliminación definitiva del rol personalizado <?= htmlspecialchars($r['nombre']) ?>?');">
+                                                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                                            <input type="hidden" name="accion" value="eliminar_rol">
+                                                            <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
+                                                            <button type="submit" class="btn btn-outline-danger btn-sm py-0 px-2" style="font-size: 0.72rem;" title="Eliminar Rol sin operadores">
+                                                                <i class="bi bi-trash"></i> Eliminar
+                                                            </button>
+                                                        </form>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modales de Permisos para cada Rol -->
+                <?php foreach ($todosRoles as $r): ?>
+                    <div class="modal fade" id="modalPermisosRol<?= (int)$r['id'] ?>" tabindex="-1" aria-labelledby="modalRolLabel<?= (int)$r['id'] ?>" aria-hidden="true">
+                        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                            <div class="modal-content border-0 shadow">
+                                <form action="procesar.php" method="POST" id="form-edit-rol-<?= (int)$r['id'] ?>">
+                                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                    <input type="hidden" name="accion" value="actualizar_rol_permisos">
+                                    <input type="hidden" name="rol_id" value="<?= (int)$r['id'] ?>">
+
+                                    <div class="modal-header bg-light py-2 px-3 border-bottom">
+                                        <h6 class="modal-title fw-bold" id="modalRolLabel<?= (int)$r['id'] ?>">
+                                            <i class="bi bi-shield-lock text-primary me-1"></i>
+                                            Matriz de Permisos: <span class="font-monospace text-dark"><?= htmlspecialchars($r['nombre']) ?></span>
+                                            <?php if ((int)$r['es_personalizado'] === 0): ?>
+                                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle ms-1" style="font-size: 0.70rem;">Base del Sistema</span>
+                                            <?php else: ?>
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle ms-1" style="font-size: 0.70rem;">Personalizado</span>
+                                            <?php endif; ?>
+                                        </h6>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                                    </div>
+
+                                    <div class="modal-body p-3">
+                                        <div class="mb-3">
+                                            <label class="form-label small fw-semibold mb-1">Descripción y Alcance Institucional</label>
+                                            <input type="text" name="descripcion" class="form-control form-control-sm" value="<?= htmlspecialchars($r['descripcion'] ?? '') ?>" required maxlength="255">
+                                        </div>
+
+                                        <?php if ((int)$r['id'] === 1): ?>
+                                            <div class="alert alert-info py-2 px-3 small mb-3">
+                                                <i class="bi bi-info-circle me-1"></i>
+                                                El rol <strong>rol_admin</strong> es el Administrador Central de Seguridad y posee por diseño institucional todos los permisos del sistema.
+                                            </div>
+                                        <?php endif; ?>
+
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <span class="small fw-bold text-dark">
+                                                <i class="bi bi-grid-3x3-gap-fill text-muted me-1"></i>Permisos Asignados (RBAC en 3FN)
+                                            </span>
+                                            <div class="d-flex gap-2">
+                                                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size: 0.70rem;" onclick="toggleCheckboxes('form-edit-rol-<?= (int)$r['id'] ?>', true)">Marcar Todos</button>
+                                                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size: 0.70rem;" onclick="toggleCheckboxes('form-edit-rol-<?= (int)$r['id'] ?>', false)">Desmarcar Todos</button>
+                                            </div>
+                                        </div>
+
+                                        <div class="row g-2">
+                                            <?php foreach ($permisosPorModulo as $moduloNom => $perms): ?>
+                                                <div class="col-md-6">
+                                                    <div class="border rounded p-2 h-100 bg-light">
+                                                        <div class="fw-bold text-primary small border-bottom pb-1 mb-2 d-flex align-items-center gap-1">
+                                                            <i class="bi bi-folder2-open"></i> <?= htmlspecialchars($moduloNom) ?>
+                                                        </div>
+                                                        <?php foreach ($perms as $p): ?>
+                                                            <?php $checked = isset($matrizRolPermisos[(int)$r['id']][(int)$p['id']]); ?>
+                                                            <div class="form-check mb-1">
+                                                                <input class="form-check-input" type="checkbox" name="permisos[]" value="<?= (int)$p['id'] ?>" id="perm_<?= (int)$r['id'] ?>_<?= (int)$p['id'] ?>" <?= $checked ? 'checked' : '' ?>>
+                                                                <label class="form-check-label small" for="perm_<?= (int)$r['id'] ?>_<?= (int)$p['id'] ?>" title="<?= htmlspecialchars($p['descripcion'] ?? '') ?>">
+                                                                    <span class="fw-semibold text-dark"><?= htmlspecialchars($p['nombre']) ?></span>
+                                                                    <br><span class="code-tag" style="font-size: 0.65rem;"><?= htmlspecialchars($p['codigo']) ?></span>
+                                                                </label>
+                                                            </div>
+                                                        <?php endforeach; ?>
+                                                    </div>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    </div>
+
+                                    <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-between">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                                        <button type="submit" class="btn btn-primary btn-sm px-3 fw-semibold">
+                                            <i class="bi bi-check2-circle me-1"></i>Actualizar Permisos
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+
                 <!-- Catálogo 1: Tipos de Ambulatorio -->
                 <div class="col-12 mb-4">
                     <div class="card-sicm">
@@ -2487,7 +2756,17 @@ if ($tabDesconocida) {
                                             <?php foreach ($rolesCatalogo as $ro): ?>
                                                 <?php $selR = ($usuarioEdicion && (int) $usuarioEdicion['rol_id'] === (int) $ro['id']) ? 'selected' : ''; ?>
                                                 <option value="<?= (int) $ro['id'] ?>" <?= $selR ?>>
-                                                    <?= (int) $ro['id'] === 1 ? 'Administrador Central (Acceso Global)' : ((int) $ro['id'] === 3 ? 'Auditor Sanitario (Control Forense)' : 'Farmaceuta (Dispensación Sectorial)') ?>
+                                                    <?php
+                                                    if ((int) $ro['id'] === 1) {
+                                                        echo 'Administrador Central (Acceso Global)';
+                                                    } elseif ((int) $ro['id'] === 2) {
+                                                        echo 'Farmaceuta (Dispensación Sectorial)';
+                                                    } elseif ((int) $ro['id'] === 3) {
+                                                        echo 'Auditor Sanitario (Control Forense)';
+                                                    } else {
+                                                        echo htmlspecialchars($ro['nombre']) . (!empty($ro['descripcion']) ? ' - ' . htmlspecialchars($ro['descripcion']) : ' [Personalizado]');
+                                                    }
+                                                    ?>
                                                 </option>
                                             <?php endforeach; ?>
                                         </select>
@@ -2595,23 +2874,28 @@ if ($tabDesconocida) {
                                                     </div>
                                                 </td>
                                                 <td>
-                                                    <?php if ((int) $u['rol_id'] === 1): ?>
-                                                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Admin Central</span>
-                                                    <?php elseif ((int) $u['rol_id'] === 3): ?>
-                                                        <span class="badge bg-info-subtle text-info border border-info-subtle">Auditor Sanitario</span>
-                                                    <?php else: ?>
-                                                        <span class="badge bg-success-subtle text-success border border-success-subtle">Farmaceuta</span>
-                                                    <?php endif; ?>
+                                                    <?php
+                                                    $badgeRolClass = match ((int) $u['rol_id']) {
+                                                        1 => 'bg-primary-subtle text-primary border border-primary-subtle',
+                                                        2 => 'bg-success-subtle text-success border border-success-subtle',
+                                                        3 => 'bg-info-subtle text-info border border-info-subtle',
+                                                        default => 'bg-secondary-subtle text-secondary border border-secondary-subtle',
+                                                    };
+                                                    ?>
+                                                    <span class="badge <?= $badgeRolClass ?>">
+                                                        <?= htmlspecialchars($u['rol_nombre']) ?>
+                                                    </span>
                                                 </td>
                                                 <td>
-                                                    <?php if ((int) $u['rol_id'] === 1 || (int) $u['rol_id'] === 3 || empty($u['centro_salud_id'])): ?>
+                                                    <?php if (empty($u['centro_salud_id'])): ?>
                                                         <span class="badge bg-light text-secondary border">Red Municipal Completa</span>
                                                     <?php else: ?>
                                                         <div class="fw-semibold text-dark" style="font-size: 0.80rem;">
-                                                            <?= htmlspecialchars($u['centro_nombre']) ?>
+                                                            <?= htmlspecialchars($u['centro_nombre'] ?? 'Ambulatorio') ?>
                                                         </div>
-                                                        <span class="code-tag"
-                                                            style="font-size: 0.68rem;"><?= htmlspecialchars($u['centro_codigo']) ?></span>
+                                                        <?php if (!empty($u['centro_codigo'])): ?>
+                                                            <span class="code-tag" style="font-size: 0.68rem;"><?= htmlspecialchars($u['centro_codigo']) ?></span>
+                                                        <?php endif; ?>
                                                     <?php endif; ?>
                                                 </td>
                                                 <td>
@@ -5590,6 +5874,14 @@ if ($tabDesconocida) {
                 });
             }
         });
+
+        // Utilidad global para marcar/desmarcar todos los checkboxes de una matriz RBAC
+        function toggleCheckboxes(formId, checkState) {
+            const form = document.getElementById(formId);
+            if (!form) return;
+            const cbs = form.querySelectorAll('input[type="checkbox"][name="permisos[]"]');
+            cbs.forEach(cb => { cb.checked = checkState; });
+        }
     </script>
 
 

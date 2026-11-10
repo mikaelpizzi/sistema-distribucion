@@ -17,6 +17,7 @@ REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'app_salud_user'@'%';
 
 -- Tablas Maestras y Operativas con permiso de Lectura y Modificación
 GRANT SELECT, INSERT, UPDATE ON control_medicamentos_red.configuracion_institucional TO 'app_salud_user'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON control_medicamentos_red.roles TO 'app_salud_user'@'%';
 GRANT SELECT, INSERT, UPDATE ON control_medicamentos_red.centros_salud TO 'app_salud_user'@'%';
 GRANT SELECT, INSERT, UPDATE ON control_medicamentos_red.medicamentos TO 'app_salud_user'@'%';
 GRANT SELECT, INSERT, UPDATE ON control_medicamentos_red.patologias TO 'app_salud_user'@'%';
@@ -39,7 +40,6 @@ GRANT SELECT, INSERT ON control_medicamentos_red.logs_auditoria TO 'app_salud_us
 GRANT SELECT, INSERT ON control_medicamentos_red.logs_cambios_campos TO 'app_salud_user'@'%';
 
 -- Tablas de Catálogo y Seguridad de Configuración (Solo Lectura)
-GRANT SELECT ON control_medicamentos_red.roles TO 'app_salud_user'@'%';
 GRANT SELECT ON control_medicamentos_red.modulos_sistema TO 'app_salud_user'@'%';
 GRANT SELECT ON control_medicamentos_red.permisos TO 'app_salud_user'@'%';
 GRANT SELECT ON control_medicamentos_red.tipos_documento TO 'app_salud_user'@'%';

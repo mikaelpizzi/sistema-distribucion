@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['mensaje_error'] = $msg;
         }
         $targetTab = 'centros';
-        if (str_contains($accion, 'tipo') || str_contains($accion, 'recurso')) {
+        if (str_contains($accion, 'tipo') || str_contains($accion, 'recurso') || str_contains($accion, 'rol')) {
             $targetTab = 'maestras';
         } elseif (str_contains($accion, 'usuario')) {
             $targetTab = 'usuarios';
@@ -68,6 +68,9 @@ $permisosPorAccion = [
     'toggle_tipo_centro'              => 'MAESTRAS_GESTIONAR',
     'crear_recurso'                   => 'MAESTRAS_GESTIONAR',
     'toggle_recurso'                  => 'MAESTRAS_GESTIONAR',
+    'crear_rol'                       => 'MAESTRAS_GESTIONAR',
+    'actualizar_rol_permisos'         => 'MAESTRAS_GESTIONAR',
+    'eliminar_rol'                    => 'MAESTRAS_GESTIONAR',
     'guardar_usuario'                 => 'USR_GESTIONAR',
     'cambiar_estado_usuario'          => 'USR_GESTIONAR',
     'descargar_respaldo'              => 'SISTEMA_RESPALDO',
@@ -434,6 +437,192 @@ try {
             ]);
 
             header('Location: index.php?tab=maestras&msg=' . urlencode('Disponibilidad de equipamiento actualizada.'));
+            exit;
+
+        // ======================================================================
+        // 3.1 GESTIÓN DINÁMICA DE ROLES Y MATRIZ DE PERMISOS RBAC EN 3FN
+        // ======================================================================
+        case 'crear_rol':
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                header('Location: index.php?tab=maestras');
+                exit;
+            }
+
+            $rawNombre = trim($_POST['nombre'] ?? '');
+            $descripcion = trim($_POST['descripcion'] ?? '');
+
+            // Normalización del nombre técnico del rol: 'rol_' + slug limpio
+            $rawNombre = strtolower($rawNombre);
+            if (str_starts_with($rawNombre, 'rol_')) {
+                $rawNombre = substr($rawNombre, 4);
+            }
+            $rawNombre = preg_replace('/[^a-z0-9_]/', '', $rawNombre);
+            $nombreRol = 'rol_' . $rawNombre;
+
+            if (strlen($rawNombre) < 2 || mb_strlen($descripcion, 'UTF-8') < 3) {
+                header('Location: index.php?tab=maestras&error=' . urlencode('Identificador de rol (mín. 2 caracteres tras rol_) y Descripción institucional son obligatorios.'));
+                exit;
+            }
+
+            // Validar unicidad en la base de datos
+            $stmtCheck = $pdo->prepare("SELECT id FROM roles WHERE nombre = :n");
+            $stmtCheck->execute([':n' => $nombreRol]);
+            if ($stmtCheck->fetch()) {
+                header('Location: index.php?tab=maestras&error=' . urlencode("El rol '{$nombreRol}' ya se encuentra registrado en el sistema."));
+                exit;
+            }
+
+            $permisosSeleccionados = $_POST['permisos'] ?? [];
+            if (!is_array($permisosSeleccionados)) {
+                $permisosSeleccionados = [];
+            }
+
+            $pdo->beginTransaction();
+            $stmtInsRol = $pdo->prepare("INSERT INTO roles (nombre, es_personalizado, descripcion) VALUES (:n, 1, :d)");
+            $stmtInsRol->execute([':n' => $nombreRol, ':d' => $descripcion]);
+            $nuevoRolId = (int) $pdo->lastInsertId();
+
+            $totalAsignados = 0;
+            if (!empty($permisosSeleccionados)) {
+                $stmtInsPerm = $pdo->prepare("INSERT INTO rol_permisos (rol_id, permiso_id) VALUES (:r, :p)");
+                foreach ($permisosSeleccionados as $pId) {
+                    $pId = (int) $pId;
+                    if ($pId > 0) {
+                        $stmtInsPerm->execute([':r' => $nuevoRolId, ':p' => $pId]);
+                        $totalAsignados++;
+                    }
+                }
+            }
+            $pdo->commit();
+
+            registrarAuditoria($pdo, $usuarioSesionId, 'CREAR_ROL_RBAC', 'roles', $nuevoRolId, [
+                'evento' => 'Creación de nuevo rol institucional parametrizable en 3FN',
+                'nombre' => $nombreRol,
+                'descripcion' => $descripcion,
+                'total_permisos_asignados' => $totalAsignados
+            ]);
+
+            header('Location: index.php?tab=maestras&msg=' . urlencode("Rol personalizado '{$nombreRol}' registrado exitosamente con {$totalAsignados} permiso(s) asignado(s)."));
+            exit;
+
+        case 'actualizar_rol_permisos':
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                header('Location: index.php?tab=maestras');
+                exit;
+            }
+
+            $rolId = filter_input(INPUT_POST, 'rol_id', FILTER_VALIDATE_INT);
+            $descripcion = trim($_POST['descripcion'] ?? '');
+
+            if (!$rolId || mb_strlen($descripcion, 'UTF-8') < 3) {
+                header('Location: index.php?tab=maestras&error=' . urlencode('Identificador de rol y Descripción institucional son requeridos.'));
+                exit;
+            }
+
+            $stmtR = $pdo->prepare("SELECT id, nombre, es_personalizado, descripcion FROM roles WHERE id = :id");
+            $stmtR->execute([':id' => $rolId]);
+            $rol = $stmtR->fetch();
+
+            if (!$rol) {
+                header('Location: index.php?tab=maestras&error=' . urlencode('El rol solicitado no existe.'));
+                exit;
+            }
+
+            $permisosSeleccionados = $_POST['permisos'] ?? [];
+            if (!is_array($permisosSeleccionados)) {
+                $permisosSeleccionados = [];
+            }
+
+            // Blindaje de seguridad para rol_admin (id=1): nunca debe quedar sin permisos de administración
+            if ((int) $rolId === 1 && empty($permisosSeleccionados)) {
+                $todosPermisos = $pdo->query("SELECT id FROM permisos")->fetchAll(PDO::FETCH_COLUMN);
+                $permisosSeleccionados = $todosPermisos;
+            }
+
+            $pdo->beginTransaction();
+            // Actualizar descripción
+            $stmtUpd = $pdo->prepare("UPDATE roles SET descripcion = :d WHERE id = :id");
+            $stmtUpd->execute([':d' => $descripcion, ':id' => $rolId]);
+
+            // Reemplazar asignación atómica de permisos
+            $stmtDel = $pdo->prepare("DELETE FROM rol_permisos WHERE rol_id = :id");
+            $stmtDel->execute([':id' => $rolId]);
+
+            $totalAsignados = 0;
+            if (!empty($permisosSeleccionados)) {
+                $stmtIns = $pdo->prepare("INSERT INTO rol_permisos (rol_id, permiso_id) VALUES (:r, :p)");
+                foreach ($permisosSeleccionados as $pId) {
+                    $pId = (int) $pId;
+                    if ($pId > 0) {
+                        $stmtIns->execute([':r' => $rolId, ':p' => $pId]);
+                        $totalAsignados++;
+                    }
+                }
+            }
+            $pdo->commit();
+
+            // Si el usuario activo pertenece a este rol, refrescar de inmediato sus permisos en sesión
+            if ((int) $usuario['rol_id'] === (int) $rolId) {
+                $_SESSION['usuario_permisos'] = cargarPermisosRol($pdo, (int) $rolId);
+            }
+
+            registrarAuditoria($pdo, $usuarioSesionId, 'ACTUALIZAR_ROL_PERMISOS', 'roles', $rolId, [
+                'evento' => 'Actualización de matriz RBAC y alcance funcional de rol',
+                'nombre' => $rol['nombre'],
+                'descripcion' => $descripcion,
+                'total_permisos_asignados' => $totalAsignados
+            ]);
+
+            header('Location: index.php?tab=maestras&msg=' . urlencode("Matriz de permisos de '{$rol['nombre']}' sincronizada exitosamente ({$totalAsignados} permisos asignados)."));
+            exit;
+
+        case 'eliminar_rol':
+            if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                header('Location: index.php?tab=maestras');
+                exit;
+            }
+
+            $rolId = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+            if (!$rolId) {
+                header('Location: index.php?tab=maestras&error=' . urlencode('Identificador de rol no válido.'));
+                exit;
+            }
+
+            $stmtR = $pdo->prepare("SELECT id, nombre, es_personalizado FROM roles WHERE id = :id");
+            $stmtR->execute([':id' => $rolId]);
+            $rol = $stmtR->fetch();
+
+            if (!$rol) {
+                header('Location: index.php?tab=maestras&error=' . urlencode('El rol solicitado no existe.'));
+                exit;
+            }
+
+            if ((int) $rol['es_personalizado'] !== 1) {
+                header('Location: index.php?tab=maestras&error=' . urlencode("Los roles base del sistema ('{$rol['nombre']}') forman parte del núcleo y no pueden ser eliminados."));
+                exit;
+            }
+
+            // Validar que no tenga usuarios asignados
+            $stmtU = $pdo->prepare("SELECT COUNT(*) FROM usuarios WHERE rol_id = :id");
+            $stmtU->execute([':id' => $rolId]);
+            $numUsuarios = (int) $stmtU->fetchColumn();
+
+            if ($numUsuarios > 0) {
+                header('Location: index.php?tab=maestras&error=' . urlencode("No se puede eliminar el rol '{$rol['nombre']}' porque tiene {$numUsuarios} operador(es) asignado(s). Reasigne primero a los funcionarios."));
+                exit;
+            }
+
+            $pdo->beginTransaction();
+            $pdo->prepare("DELETE FROM rol_permisos WHERE rol_id = :id")->execute([':id' => $rolId]);
+            $pdo->prepare("DELETE FROM roles WHERE id = :id")->execute([':id' => $rolId]);
+            $pdo->commit();
+
+            registrarAuditoria($pdo, $usuarioSesionId, 'ELIMINAR_ROL_RBAC', 'roles', $rolId, [
+                'evento' => 'Eliminación definitiva de rol personalizado sin operadores activos',
+                'nombre' => $rol['nombre']
+            ]);
+
+            header('Location: index.php?tab=maestras&msg=' . urlencode("Rol personalizado '{$rol['nombre']}' eliminado exitosamente."));
             exit;
 
         // ======================================================================
@@ -2113,7 +2302,7 @@ try {
     }
 
     $targetTab = 'centros';
-    if (str_contains($accion, 'tipo') || str_contains($accion, 'recurso')) {
+    if (str_contains($accion, 'tipo') || str_contains($accion, 'recurso') || str_contains($accion, 'rol')) {
         $targetTab = 'maestras';
     } elseif (str_contains($accion, 'usuario')) {
         $targetTab = 'usuarios';
