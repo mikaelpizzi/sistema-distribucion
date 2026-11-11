@@ -1,3 +1,9 @@
+-- ============================================================================
+-- SISTEMA INTEGRADO DE CONTROL DE MEDICAMENTOS (SICM) - AMBULATORIOS MUNICIPALES
+-- Archivo: docker/mysql/05_seeders.sql
+-- Módulo: Carga Canónica de Datos Maestros, Roles, Permisos y Cuentas Iniciales
+-- ============================================================================
+
 USE control_medicamentos_red;
 
 -- ============================================================================
@@ -264,4 +270,4 @@ INSERT INTO logs_auditoria (usuario_id, accion, tabla_afectada, registro_id, det
      'version_esquema', '2.0.0-3FN-WORM',
      'estado', 'OPERATIVO'
  ), 
- '127.0.0.1', 'DatabaseSeeder/02_seeders.sql', NOW());
+ '127.0.0.1', 'DatabaseSeeder/05_seeders.sql', NOW());

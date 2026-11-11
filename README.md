@@ -21,7 +21,7 @@ El sistema fue diseñado respondiendo a tres problemáticas críticas detectadas
 
 ## 2. Implementación del Esquema de Datos y Correspondencia con la Propuesta
 
-El esquema DDL implementado en [`docker/mysql/01_schema.sql`](docker/mysql/01_schema.sql) sigue con exactitud la propuesta arquitectónica original, cumpliendo con la Tercera Forma Normal (3FN), integridad referencial y las políticas forenses definidas para el proyecto.
+El esquema de base de datos modularizado en [`docker/mysql/01_tables.sql`](docker/mysql/01_tables.sql), [`02_routines.sql`](docker/mysql/02_routines.sql), [`03_triggers.sql`](docker/mysql/03_triggers.sql) y [`04_views.sql`](docker/mysql/04_views.sql) sigue con exactitud la propuesta arquitectónica original, cumpliendo con la Tercera Forma Normal (3FN), integridad referencial y las políticas forenses definidas para el proyecto.
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────┐
@@ -210,8 +210,12 @@ A diferencia de soluciones frágiles basadas en columnas `ENUM('admin', 'farmace
 sistema-distribucion/
 ├── docker/
 │   ├── mysql/
-│   │   ├── 01_schema.sql             # Esquema DDL en 3FN, índices B+, vistas y triggers WORM
-│   │   └── 02_seeders.sql            # Datos maestros canónicos y cuentas operativas iniciales
+│   │   ├── 01_tables.sql             # Tablas en 3FN estricta, claves PK/FK, checks e índices B+
+│   │   ├── 02_routines.sql           # Funciones determinísticas y SP transaccional FEFO (ACID)
+│   │   ├── 03_triggers.sql           # Centinelas WORM, cadena de frío y auditoría delta
+│   │   ├── 04_views.sql              # Vistas relacionales de inventario, auditoría y ambulatorios
+│   │   ├── 05_seeders.sql            # Datos maestros canónicos y matriz RBAC de permisos
+│   │   └── 06_privileges.sql         # Privilegios granulares DML (Principio de Menor Privilegio)
 │   └── php/
 │       └── Dockerfile                # Imagen PHP 8.3 Apache con PDO y cliente MariaDB
 ├── docker-compose.yml                # Orquestación de contenedores y red interna bridge
@@ -291,7 +295,7 @@ Diseñado para el primer arranque del sistema cuando la base de datos se encuent
 5. Al enviar el formulario, el sistema crea la cuenta administrativa raíz y **auto-bloquea permanentemente el asistente**, redirigiendo al panel de control.
 
 ### Credenciales de Demostración
-Si el sistema fue inicializado con los datos de prueba (o mediante `02_seeders.sql`), dispone de los siguientes perfiles:
+Si el sistema fue inicializado con los datos de prueba (o mediante `05_seeders.sql`), dispone de los siguientes perfiles:
 
 | Perfil / Rol | Correo Institucional | Contraseña | Alcance y Jurisdicción (RBAC) |
 | :--- | :--- | :--- | :--- |

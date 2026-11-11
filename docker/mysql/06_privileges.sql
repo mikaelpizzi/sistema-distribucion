@@ -1,6 +1,6 @@
 -- ============================================================================
 -- PRIVILEGIOS DE MENOR ACCESO (LEAST PRIVILEGE) PARA USUARIO DE APLICACIÓN
--- Archivo: docker/mysql/03_privileges.sql
+-- Archivo: docker/mysql/06_privileges.sql
 -- Base de datos: control_medicamentos_red
 -- Usuario objetivo: app_salud_user
 -- ============================================================================
