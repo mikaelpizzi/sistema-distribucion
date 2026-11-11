@@ -1,0 +1,324 @@
+/**
+ * SICM - Sistema Integrado de Control de Medicamentos
+ * Estilos Desacoplados de Autenticación y Asistente de Configuración (Auth & Setup)
+ */
+
+:root {
+    --auth-bg-page: #f8fafc;
+    --auth-card-bg: #ffffff;
+    --auth-border-card: #e2e8f0;
+    --auth-border-input: #cbd5e1;
+    --auth-text-main: #0f172a;
+    --auth-text-muted: #64748b;
+    --auth-text-label: #334155;
+    --auth-primary: #0d6efd;
+    --auth-primary-hover: #0b5ed7;
+}
+
+body.auth-layout {
+    background-color: var(--auth-bg-page);
+    color: var(--auth-text-main);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+}
+
+.auth-card {
+    max-width: 410px;
+    width: 100%;
+    background-color: var(--auth-card-bg);
+    border: 1px solid var(--auth-border-card);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    padding: 2.25rem 2rem;
+}
+
+.auth-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--auth-text-main);
+    line-height: 1.3;
+}
+
+.auth-subtitle {
+    font-size: 0.8125rem;
+    color: var(--auth-text-muted);
+    margin-bottom: 1.75rem;
+}
+
+.auth-card .form-label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--auth-text-label);
+    margin-bottom: 0.35rem;
+}
+
+.auth-card .form-control {
+    background-color: #ffffff;
+    border: 1px solid var(--auth-border-input);
+    color: var(--auth-text-main);
+    font-size: 0.875rem;
+    padding: 0.55rem 0.75rem;
+    border-radius: 6px;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.auth-card .form-control:focus {
+    background-color: #ffffff;
+    border-color: #3b82f6;
+    color: var(--auth-text-main);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.auth-card .form-control::placeholder {
+    color: #94a3b8;
+}
+
+.btn-toggle-eye {
+    background-color: #ffffff;
+    border: 1px solid var(--auth-border-input);
+    border-left: none;
+    color: var(--auth-text-muted);
+    padding: 0 0.75rem;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+    cursor: pointer;
+    transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.btn-toggle-eye:hover {
+    color: var(--auth-text-main);
+    background-color: #f8fafc;
+}
+
+.btn-submit {
+    background-color: var(--auth-primary);
+    border: 1px solid var(--auth-primary);
+    color: #ffffff;
+    font-size: 0.875rem;
+    font-weight: 600;
+    padding: 0.6rem 1rem;
+    border-radius: 6px;
+    width: 100%;
+    transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn-submit:hover:not(:disabled) {
+    background-color: var(--auth-primary-hover);
+    border-color: #0a58ca;
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(13, 110, 253, 0.25);
+}
+
+.btn-submit:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ============================================================================
+   ESTILOS ESPECÍFICOS PARA SETUP (ASISTENTE DE INSTALACIÓN / MODO OSCURO)
+   ============================================================================ */
+body.setup-layout {
+    --setup-bg-page: #0f172a;
+    --setup-border-subtle: #1e293b;
+    --setup-border-input: #334155;
+    --setup-input-bg: #1e293b;
+    --setup-text-main: #f8fafc;
+    --setup-text-muted: #94a3b8;
+    --setup-text-label: #cbd5e1;
+    --setup-primary: #2563eb;
+    --setup-primary-hover: #1d4ed8;
+    --setup-success: #22c55e;
+    --setup-danger: #ef4444;
+
+    background-color: var(--setup-bg-page);
+    color: var(--setup-text-main);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem;
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+.setup-container {
+    max-width: 440px;
+    width: 100%;
+}
+
+.setup-layout .auth-title {
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--setup-text-main);
+    margin-bottom: 0.25rem;
+    line-height: 1.35;
+}
+
+.setup-layout .auth-subtitle {
+    font-size: 0.825rem;
+    color: var(--setup-text-muted);
+    margin-bottom: 1.75rem;
+}
+
+.setup-layout .form-label {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--setup-text-label);
+    margin-bottom: 0.35rem;
+}
+
+.setup-layout .form-control {
+    background-color: var(--setup-input-bg);
+    border: 1px solid var(--setup-border-input);
+    color: var(--setup-text-main);
+    font-size: 0.875rem;
+    padding: 0.55rem 0.75rem;
+    border-radius: 6px;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.setup-layout .form-control:focus {
+    background-color: var(--setup-input-bg);
+    border-color: var(--setup-primary);
+    color: var(--setup-text-main);
+    box-shadow: 0 0 0 1px var(--setup-primary);
+}
+
+.setup-layout .form-control::placeholder {
+    color: #64748b;
+}
+
+.setup-layout .form-control.is-valid {
+    border-color: var(--setup-success) !important;
+    box-shadow: none !important;
+}
+
+.setup-layout .form-control.is-invalid {
+    border-color: var(--setup-danger) !important;
+    box-shadow: none !important;
+}
+
+.feedback-msg {
+    font-size: 0.73rem;
+    margin-top: 0.25rem;
+    display: none;
+}
+
+.feedback-msg.show-invalid {
+    display: block;
+    color: #fca5a5;
+}
+
+.feedback-msg.show-valid {
+    display: block;
+    color: #86efac;
+}
+
+/* Password Criteria & Strength Bar */
+.strength-container {
+    margin-top: 0.4rem;
+}
+
+.strength-track {
+    height: 4px;
+    background-color: #334155;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.strength-bar {
+    height: 100%;
+    width: 0%;
+    transition: width 0.25s ease, background-color 0.25s ease;
+}
+
+.criteria-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.25rem 0.5rem;
+    margin-top: 0.4rem;
+}
+
+.crit-item {
+    font-size: 0.71rem;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    transition: color 0.15s ease;
+    user-select: none;
+}
+
+.crit-item.met {
+    color: #4ade80;
+    font-weight: 500;
+}
+
+.crit-icon {
+    font-size: 0.65rem;
+    width: 12px;
+    text-align: center;
+}
+
+.crit-item.met .crit-icon::before {
+    content: "●";
+}
+
+.crit-item:not(.met) .crit-icon::before {
+    content: "○";
+}
+
+.setup-layout .btn-toggle-eye {
+    background-color: var(--setup-input-bg);
+    border: 1px solid var(--setup-border-input);
+    border-left: none;
+    color: var(--setup-text-muted);
+    padding: 0 0.75rem;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+    cursor: pointer;
+    transition: color 0.15s ease;
+}
+
+.setup-layout .btn-toggle-eye:hover {
+    color: var(--setup-text-main);
+    background-color: var(--setup-input-bg);
+}
+
+.setup-layout .btn-submit {
+    background-color: var(--setup-primary);
+    border: 1px solid var(--setup-primary);
+    color: #ffffff;
+    font-size: 0.875rem;
+    font-weight: 500;
+    padding: 0.6rem 1rem;
+    border-radius: 6px;
+    width: 100%;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.setup-layout .btn-submit:hover:not(:disabled) {
+    background-color: var(--setup-primary-hover);
+    border-color: var(--setup-primary-hover);
+    color: #ffffff;
+}
+
+.alert-setup {
+    font-size: 0.8125rem;
+    padding: 0.6rem 0.85rem;
+    border-radius: 6px;
+    margin-bottom: 1.25rem;
+    background-color: rgba(239, 68, 68, 0.12);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #fca5a5;
+}

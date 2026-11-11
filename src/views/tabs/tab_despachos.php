@@ -1,3 +1,252 @@
+<?php
+// src/views/tabs/tab_despachos.php
+// SICM | Módulo Autosuficiente: Dispensación Asistencial FEFO
+declare(strict_types=1);
+
+$moduloNombre = 'Dispensación FEFO';
+$seccionNombre = 'Gestión Clínica';
+
+// 1. Catálogo de Centros de Salud y Control de Jurisdicción
+$catalogoCentros = $pdo->query("
+    SELECT id, codigo_sicm, nombre, direccion
+    FROM centros_salud
+    WHERE activo = 1
+    ORDER BY nombre ASC
+")->fetchAll(PDO::FETCH_ASSOC);
+
+if ($puedeVerTodaLaRed) {
+    $centroOperativoId = !empty($_GET['centro_id']) ? (int) $_GET['centro_id'] : ($centroUsuarioId ?: ($catalogoCentros[0]['id'] ?? 1));
+} else {
+    $centroOperativoId = (int) $centroUsuarioId;
+}
+
+$centroOperativo = null;
+foreach ($catalogoCentros as $c) {
+    if ((int) $c['id'] === $centroOperativoId) {
+        $centroOperativo = $c;
+        break;
+    }
+}
+if (!$centroOperativo && !empty($catalogoCentros)) {
+    $centroOperativo = $catalogoCentros[0];
+    $centroOperativoId = (int) $centroOperativo['id'];
+}
+
+// Comprobar soporte de cadena de frío en el ambulatorio operativo
+$stmtFrio = $pdo->prepare("
+    SELECT COUNT(*)
+    FROM centro_recursos cr
+    JOIN recursos_operativos ro ON cr.recurso_id = ro.id
+    WHERE cr.centro_salud_id = :cid
+      AND ro.codigo = 'CADENA_FRIO'
+      AND cr.operativo = 1
+");
+$stmtFrio->execute([':cid' => $centroOperativoId]);
+$centroTieneCadenaFrio = ((int) $stmtFrio->fetchColumn()) > 0;
+
+$periodoActual = date('Y-m');
+
+// 2. Cuadro de Mando Superior (3 KPIs Institucionales)
+$paramsKpi = [':periodo' => $periodoActual, ':centro_id' => $centroOperativoId];
+
+// Despachos este Mes
+$stmtKpi1 = $pdo->prepare("
+    SELECT COUNT(*)
+    FROM despachos
+    WHERE periodo_mes_anio = :periodo AND centro_salud_id = :centro_id
+");
+$stmtKpi1->execute($paramsKpi);
+$kpiDespachosMes = (int) $stmtKpi1->fetchColumn();
+
+// Pacientes Atendidos
+$stmtKpi2 = $pdo->prepare("
+    SELECT COUNT(DISTINCT t.paciente_id)
+    FROM despachos d
+    JOIN tratamientos_autorizados t ON d.tratamiento_id = t.id
+    WHERE d.periodo_mes_anio = :periodo AND d.centro_salud_id = :centro_id
+");
+$stmtKpi2->execute($paramsKpi);
+$kpiPacientesAtendidos = (int) $stmtKpi2->fetchColumn();
+
+// Unidades Entregadas
+$stmtKpi3 = $pdo->prepare("
+    SELECT COALESCE(SUM(dd.cantidad_entregada), 0)
+    FROM despachos d
+    JOIN despacho_detalles dd ON dd.despacho_id = d.id
+    WHERE d.periodo_mes_anio = :periodo AND d.centro_salud_id = :centro_id
+");
+$stmtKpi3->execute($paramsKpi);
+$kpiUnidadesEntregadas = (int) $stmtKpi3->fetchColumn();
+
+// 3. Buscador Asistencial de Paciente
+$busquedaPaciente = trim($_GET['q_paciente'] ?? '');
+$pacienteEncontrado = null;
+$pacientesCoincidentes = [];
+$contactosPaciente = [];
+$recipesPaciente = [];
+
+if ($busquedaPaciente !== '') {
+    $stmtPac = $pdo->prepare("
+        SELECT p.id, p.cedula, p.nombre_completo, p.fecha_nacimiento, p.direccion_residencia,
+               td.codigo AS tipo_doc_codigo, td.nombre AS tipo_doc_nombre,
+               TIMESTAMPDIFF(YEAR, p.fecha_nacimiento, CURDATE()) AS edad
+        FROM pacientes p
+        LEFT JOIN tipos_documento td ON p.tipo_documento_id = td.id
+        WHERE p.cedula = :q_exacta
+           OR p.cedula LIKE :q_like1
+           OR p.nombre_completo LIKE :q_like2
+        ORDER BY (p.cedula = :q_exacta2) DESC, p.nombre_completo ASC
+        LIMIT 10
+    ");
+    $stmtPac->execute([
+        ':q_exacta' => $busquedaPaciente,
+        ':q_exacta2' => $busquedaPaciente,
+        ':q_like1' => '%' . $busquedaPaciente . '%',
+        ':q_like2' => '%' . $busquedaPaciente . '%'
+    ]);
+    $pacientesCoincidentes = $stmtPac->fetchAll(PDO::FETCH_ASSOC);
+
+    $pacienteSelId = !empty($_GET['paciente_id']) ? (int) $_GET['paciente_id'] : null;
+    if ($pacienteSelId) {
+        foreach ($pacientesCoincidentes as $pac) {
+            if ((int) $pac['id'] === $pacienteSelId) {
+                $pacienteEncontrado = $pac;
+                break;
+            }
+        }
+        if (!$pacienteEncontrado) {
+            $stmtSingle = $pdo->prepare("
+                SELECT p.id, p.cedula, p.nombre_completo, p.fecha_nacimiento, p.direccion_residencia,
+                       td.codigo AS tipo_doc_codigo, td.nombre AS tipo_doc_nombre,
+                       TIMESTAMPDIFF(YEAR, p.fecha_nacimiento, CURDATE()) AS edad
+                FROM pacientes p
+                LEFT JOIN tipos_documento td ON p.tipo_documento_id = td.id
+                WHERE p.id = :id
+            ");
+            $stmtSingle->execute([':id' => $pacienteSelId]);
+            $pacienteEncontrado = $stmtSingle->fetch(PDO::FETCH_ASSOC) ?: null;
+        }
+    } elseif (count($pacientesCoincidentes) === 1) {
+        $pacienteEncontrado = $pacientesCoincidentes[0];
+    }
+
+    if ($pacienteEncontrado) {
+        // Vías de Contacto Normalizadas 1FN
+        $stmtCont = $pdo->prepare("
+            SELECT pc.id, pc.valor, pc.es_principal, pc.nombre_contacto_emergencia,
+                   tc.codigo AS tipo_contacto_codigo, tc.nombre AS tipo_contacto_nombre
+            FROM paciente_contactos pc
+            JOIN tipos_contacto tc ON pc.tipo_contacto_id = tc.id
+            WHERE pc.paciente_id = :paciente_id
+            ORDER BY pc.es_principal DESC, pc.id ASC
+        ");
+        $stmtCont->execute([':paciente_id' => $pacienteEncontrado['id']]);
+        $contactosPaciente = $stmtCont->fetchAll(PDO::FETCH_ASSOC);
+
+        // Récipes Médicos Autorizados (activos)
+        $stmtRec = $pdo->prepare("
+            SELECT t.id, t.paciente_id, t.medicamento_id, t.patologia_id, t.dosis_mensual,
+                   t.fecha_emision_recipe, t.fecha_vencimiento_recipe, t.medico_prescriptor,
+                   t.activo,
+                   (t.fecha_vencimiento_recipe < CURRENT_DATE) AS esta_vencido,
+                   m.nombre_generico AS medicamento_nombre, m.concentracion AS medicamento_concentracion,
+                   m.requiere_cadena_frio,
+                   ff.nombre AS forma_farmaceutica,
+                   pat.codigo_cie10 AS patologia_cie10, pat.nombre AS patologia_nombre
+            FROM tratamientos_autorizados t
+            JOIN medicamentos m ON t.medicamento_id = m.id
+            LEFT JOIN formas_farmaceuticas ff ON m.forma_farmaceutica_id = ff.id
+            JOIN patologias pat ON t.patologia_id = pat.id
+            WHERE t.paciente_id = :paciente_id
+              AND t.activo = 1
+            ORDER BY t.id DESC
+        ");
+        $stmtRec->execute([':paciente_id' => $pacienteEncontrado['id']]);
+        $recipesCrudos = $stmtRec->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($recipesCrudos as $rec) {
+            // Comprobar si ya retiró este mes (uk_retiro_mensual)
+            $stmtRetiro = $pdo->prepare("
+                SELECT d.id, d.fecha_hora, d.periodo_mes_anio, d.observaciones,
+                       cs.nombre AS centro_nombre, u.nombre AS operador_nombre,
+                       dd.cantidad_entregada, l.numero_lote
+                FROM despachos d
+                JOIN centros_salud cs ON d.centro_salud_id = cs.id
+                JOIN usuarios u ON d.usuario_id = u.id
+                LEFT JOIN despacho_detalles dd ON dd.despacho_id = d.id
+                LEFT JOIN lotes_inventario l ON dd.lote_id = l.id
+                WHERE d.tratamiento_id = :tid AND d.periodo_mes_anio = :periodo
+                LIMIT 1
+            ");
+            $stmtRetiro->execute([
+                ':tid' => $rec['id'],
+                ':periodo' => $periodoActual
+            ]);
+            $despachoPrevio = $stmtRetiro->fetch(PDO::FETCH_ASSOC) ?: null;
+
+            // Consulta de lotes FEFO disponibles en el ambulatorio: fecha_vencimiento ASC, id ASC
+            $stmtLotes = $pdo->prepare("
+                SELECT l.id, l.numero_lote, l.fecha_vencimiento, l.cantidad_actual,
+                       DATEDIFF(l.fecha_vencimiento, CURDATE()) AS dias_para_vencer,
+                       fn_evaluar_caducidad_lote(l.fecha_vencimiento) AS estado_caducidad
+                FROM lotes_inventario l
+                WHERE l.centro_salud_id = :cid
+                  AND l.medicamento_id = :mid
+                  AND l.cantidad_actual > 0
+                  AND l.fecha_vencimiento >= CURDATE()
+                ORDER BY l.fecha_vencimiento ASC, l.id ASC
+            ");
+            $stmtLotes->execute([
+                ':cid' => $centroOperativoId,
+                ':mid' => $rec['medicamento_id']
+            ]);
+            $lotesDisponibles = $stmtLotes->fetchAll(PDO::FETCH_ASSOC);
+
+            $stockTotalAmbulatorio = 0;
+            foreach ($lotesDisponibles as $lt) {
+                $stockTotalAmbulatorio += (int) $lt['cantidad_actual'];
+            }
+
+            $rec['despacho_previo'] = $despachoPrevio;
+            $rec['ya_retiro'] = ($despachoPrevio !== null);
+            $rec['lotes_fefo'] = $lotesDisponibles;
+            $rec['stock_total_centro'] = $stockTotalAmbulatorio;
+            $rec['lote_prioritario'] = !empty($lotesDisponibles) ? $lotesDisponibles[0] : null;
+
+            $recipesPaciente[] = $rec;
+        }
+    }
+}
+
+// 4. Historial de Despachos Recientes en este Ambulatorio
+$stmtHist = $pdo->prepare("
+    SELECT d.id, d.fecha_hora, d.periodo_mes_anio, d.observaciones,
+           cs.codigo_sicm AS centro_codigo, cs.nombre AS centro_nombre,
+           p.cedula AS paciente_cedula, p.nombre_completo AS paciente_nombre, td.codigo AS tipo_doc_codigo,
+           m.nombre_generico AS medicamento_nombre, m.concentracion AS medicamento_concentracion,
+           ff.nombre AS forma_farmaceutica,
+           GROUP_CONCAT(DISTINCT l.numero_lote SEPARATOR ', ') AS numero_lote,
+           MIN(l.fecha_vencimiento) AS lote_vencimiento,
+           COALESCE(SUM(dd.cantidad_entregada), 0) AS cantidad_entregada,
+           u.nombre AS operador_nombre
+    FROM despachos d
+    JOIN centros_salud cs ON d.centro_salud_id = cs.id
+    JOIN tratamientos_autorizados t ON d.tratamiento_id = t.id
+    JOIN pacientes p ON t.paciente_id = p.id
+    LEFT JOIN tipos_documento td ON p.tipo_documento_id = td.id
+    JOIN medicamentos m ON t.medicamento_id = m.id
+    LEFT JOIN formas_farmaceuticas ff ON m.forma_farmaceutica_id = ff.id
+    LEFT JOIN despacho_detalles dd ON dd.despacho_id = d.id
+    LEFT JOIN lotes_inventario l ON dd.lote_id = l.id
+    JOIN usuarios u ON d.usuario_id = u.id
+    WHERE d.centro_salud_id = :cid
+    GROUP BY d.id, d.fecha_hora, d.periodo_mes_anio, d.observaciones, cs.codigo_sicm, cs.nombre, p.cedula, p.nombre_completo, td.codigo, m.nombre_generico, m.concentracion, ff.nombre, u.nombre
+    ORDER BY d.id DESC
+    LIMIT 20
+");
+$stmtHist->execute([':cid' => $centroOperativoId]);
+$ultimosDespachos = $stmtHist->fetchAll(PDO::FETCH_ASSOC);
+?>
 <!-- BARRA DE JURISDICCIÓN Y AMBULATORIO CLÍNICO OPERATIVO -->
                         <div class="card bg-white border shadow-sm mb-3">
                             <div class="card-body p-3">

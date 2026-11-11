@@ -1,3 +1,136 @@
+<?php
+// src/views/tabs/tab_recipes.php
+// SICM | Módulo Autosuficiente: Récipes Médicos y Tratamientos Autorizados
+declare(strict_types=1);
+
+$moduloNombre = 'Récipes Médicos';
+$seccionNombre = 'Gestión Clínica';
+
+// 1. Catálogos Normalizados para Selectores Clínicos
+$catalogoPacientes = $pdo->query("
+    SELECT p.id, p.cedula, td.codigo AS tipo_doc_codigo, p.nombre_completo
+    FROM pacientes p
+    LEFT JOIN tipos_documento td ON p.tipo_documento_id = td.id
+    ORDER BY p.nombre_completo ASC
+")->fetchAll(PDO::FETCH_ASSOC);
+
+$catalogoMedicamentos = $pdo->query("
+    SELECT m.id, m.nombre_generico, m.concentracion, ff.nombre AS forma_nombre
+    FROM medicamentos m
+    LEFT JOIN formas_farmaceuticas ff ON m.forma_farmaceutica_id = ff.id
+    WHERE m.activo = 1
+    ORDER BY m.nombre_generico ASC
+")->fetchAll(PDO::FETCH_ASSOC);
+
+$catalogoPatologias = $pdo->query("
+    SELECT id, codigo_cie10, nombre
+    FROM patologias
+    WHERE activo = 1
+    ORDER BY nombre ASC
+")->fetchAll(PDO::FETCH_ASSOC);
+
+// 2. Métricas del Cuadro de Mando de Récipes (KPIs Institucionales)
+$kpiTotalRecipes = (int) ($pdo->query("SELECT COUNT(*) FROM tratamientos_autorizados")->fetchColumn() ?: 0);
+$kpiRecipesVigentes = (int) ($pdo->query("SELECT COUNT(*) FROM tratamientos_autorizados WHERE activo = 1 AND fecha_vencimiento_recipe >= CURRENT_DATE")->fetchColumn() ?: 0);
+$kpiRecipesVencidos = (int) ($pdo->query("SELECT COUNT(*) FROM tratamientos_autorizados WHERE fecha_vencimiento_recipe < CURRENT_DATE OR activo = 0")->fetchColumn() ?: 0);
+
+// 3. Parámetros de Búsqueda y Filtros
+$busquedaRecipe = trim($_GET['q_recipe'] ?? '');
+$filtroEstadoRecipe = trim($_GET['filtro_estado'] ?? 'todos');
+$filtroPatologiaRecipe = trim($_GET['filtro_patologia'] ?? 'todas');
+$filtroPacienteId = !empty($_GET['paciente_id']) ? (int) $_GET['paciente_id'] : null;
+
+$condRecipes = [];
+$paramsRecipes = [];
+
+if ($busquedaRecipe !== '') {
+    $condRecipes[] = "(p.cedula LIKE :q1 OR p.nombre_completo LIKE :q2 OR m.nombre_generico LIKE :q3 OR t.medico_prescriptor LIKE :q4)";
+    $paramsRecipes[':q1'] = '%' . $busquedaRecipe . '%';
+    $paramsRecipes[':q2'] = '%' . $busquedaRecipe . '%';
+    $paramsRecipes[':q3'] = '%' . $busquedaRecipe . '%';
+    $paramsRecipes[':q4'] = '%' . $busquedaRecipe . '%';
+}
+
+if ($filtroEstadoRecipe === 'vigentes') {
+    $condRecipes[] = "(t.activo = 1 AND t.fecha_vencimiento_recipe >= CURRENT_DATE)";
+} elseif ($filtroEstadoRecipe === 'vencidos') {
+    $condRecipes[] = "(t.fecha_vencimiento_recipe < CURRENT_DATE OR t.activo = 0)";
+}
+
+if ($filtroPatologiaRecipe !== 'todas' && $filtroPatologiaRecipe !== '' && ctype_digit($filtroPatologiaRecipe)) {
+    $condRecipes[] = "t.patologia_id = :patologia_id";
+    $paramsRecipes[':patologia_id'] = (int) $filtroPatologiaRecipe;
+}
+
+if ($filtroPacienteId !== null && $filtroPacienteId > 0) {
+    $condRecipes[] = "t.paciente_id = :paciente_id";
+    $paramsRecipes[':paciente_id'] = $filtroPacienteId;
+}
+
+$whereRecipesSql = !empty($condRecipes) ? 'WHERE ' . implode(' AND ', $condRecipes) : '';
+
+// 4. Conteo y Paginación
+$stmtCountRec = $pdo->prepare("
+    SELECT COUNT(*)
+    FROM tratamientos_autorizados t
+    JOIN pacientes p ON t.paciente_id = p.id
+    LEFT JOIN tipos_documento td ON p.tipo_documento_id = td.id
+    JOIN medicamentos m ON t.medicamento_id = m.id
+    LEFT JOIN formas_farmaceuticas ff ON m.forma_farmaceutica_id = ff.id
+    JOIN patologias pat ON t.patologia_id = pat.id
+    {$whereRecipesSql}
+");
+$stmtCountRec->execute($paramsRecipes);
+$totalRegistrosRecipes = (int) $stmtCountRec->fetchColumn();
+$totalRecipesFiltrados = $totalRegistrosRecipes;
+
+$limitePorPagina = 15;
+$paginaActual = max(1, (int) ($_GET['p_recipe'] ?? 1));
+$totalPaginas = max(1, (int) ceil($totalRegistrosRecipes / $limitePorPagina));
+if ($paginaActual > $totalPaginas) {
+    $paginaActual = $totalPaginas;
+}
+$offsetRecipes = ($paginaActual - 1) * $limitePorPagina;
+
+// 5. Consulta Principal de Récipes
+$sqlRecipes = "
+    SELECT t.id, t.paciente_id, t.medicamento_id, t.patologia_id, t.dosis_mensual,
+           t.fecha_emision_recipe, t.fecha_vencimiento_recipe, t.medico_prescriptor,
+           t.activo, t.created_at,
+           (t.fecha_vencimiento_recipe < CURRENT_DATE) AS esta_vencido,
+           p.cedula AS paciente_cedula, p.nombre_completo AS paciente_nombre,
+           td.codigo AS tipo_doc_codigo,
+           m.nombre_generico AS medicamento_nombre, m.concentracion AS medicamento_concentracion,
+           ff.nombre AS forma_nombre,
+           pat.codigo_cie10 AS patologia_cie10, pat.nombre AS patologia_nombre
+    FROM tratamientos_autorizados t
+    JOIN pacientes p ON t.paciente_id = p.id
+    LEFT JOIN tipos_documento td ON p.tipo_documento_id = td.id
+    JOIN medicamentos m ON t.medicamento_id = m.id
+    LEFT JOIN formas_farmaceuticas ff ON m.forma_farmaceutica_id = ff.id
+    JOIN patologias pat ON t.patologia_id = pat.id
+    {$whereRecipesSql}
+    ORDER BY t.id DESC
+    LIMIT :limite OFFSET :offset
+";
+$stmtRec = $pdo->prepare($sqlRecipes);
+foreach ($paramsRecipes as $k => $v) {
+    $stmtRec->bindValue($k, $v);
+}
+$stmtRec->bindValue(':limite', $limitePorPagina, PDO::PARAM_INT);
+$stmtRec->bindValue(':offset', $offsetRecipes, PDO::PARAM_INT);
+$stmtRec->execute();
+$recipes = $stmtRec->fetchAll(PDO::FETCH_ASSOC);
+
+// 6. Carga de Récipe para Edición si aplica
+$recipeEdicion = null;
+if (!empty($_GET['editar_id']) || !empty($_GET['editar'])) {
+    $edId = (int) (!empty($_GET['editar_id']) ? $_GET['editar_id'] : $_GET['editar']);
+    $stmtEd = $pdo->prepare("SELECT * FROM tratamientos_autorizados WHERE id = :id");
+    $stmtEd->execute([':id' => $edId]);
+    $recipeEdicion = $stmtEd->fetch(PDO::FETCH_ASSOC) ?: null;
+}
+?>
 <!-- Cuadro de Mando de Récipes (3 Tarjetas KPIs Institucionales) -->
                         <div class="row g-2 mb-3">
                             <div class="col-sm-6 col-md-4">

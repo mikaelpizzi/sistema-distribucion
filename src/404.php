@@ -37,62 +37,10 @@ $faviconMime = str_ends_with(strtolower($faviconRuta), '.svg') ? 'image/svg+xml'
     <link rel="icon" type="<?= $faviconMime ?>" href="<?= htmlspecialchars($faviconRuta) ?>">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <style>
-        :root {
-            --bg-page: #f8fafc;
-            --card-bg: #ffffff;
-            --border-card: #e2e8f0;
-            --text-main: #0f172a;
-            --text-muted: #64748b;
-            --primary: #0d6efd;
-        }
-
-        body {
-            background-color: var(--bg-page);
-            color: var(--text-main);
-            font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 1.5rem;
-            margin: 0;
-            -webkit-font-smoothing: antialiased;
-        }
-
-        .error-card {
-            max-width: 540px;
-            width: 100%;
-            background-color: var(--card-bg);
-            border: 1px solid var(--border-card);
-            border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-            padding: 2.25rem;
-            text-align: center;
-        }
-
-        .icon-badge {
-            width: 72px;
-            height: 72px;
-            border-radius: 50%;
-            background-color: rgba(13, 110, 253, 0.1);
-            color: var(--primary);
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 1.25rem;
-        }
-
-        .code-badge {
-            font-size: 0.8rem;
-            letter-spacing: 0.08em;
-            font-weight: 700;
-        }
-    </style>
+    <link href="public/css/app.css?v=<?= filemtime(__DIR__ . '/public/css/app.css') ?>" rel="stylesheet">
 </head>
 
-<body>
+<body class="error-layout">
 
     <div class="error-card">
         <!-- Identidad Institucional -->

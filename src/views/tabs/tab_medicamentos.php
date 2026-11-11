@@ -1,3 +1,95 @@
+<?php
+// src/views/tabs/tab_medicamentos.php
+// SICM | Módulo Autosuficiente: Catálogo de Fármacos y Vademécum
+declare(strict_types=1);
+
+$moduloNombre = 'Catálogo de Fármacos';
+$seccionNombre = 'Vademécum y Red';
+
+$subtabMedicamentos = $_GET['subtab'] ?? 'vademecum';
+if (!in_array($subtabMedicamentos, ['vademecum', 'patologias', 'formas'], true)) {
+    $subtabMedicamentos = 'vademecum';
+}
+
+// 1. KPIs Rápidos Institucionales
+$kpiMedicamentosActivos = (int) $pdo->query("SELECT COUNT(*) FROM medicamentos WHERE activo = 1")->fetchColumn();
+$kpiCadenaFrio = (int) $pdo->query("SELECT COUNT(*) FROM medicamentos WHERE activo = 1 AND requiere_cadena_frio = 1")->fetchColumn();
+$kpiPatologiasCie = (int) $pdo->query("SELECT COUNT(*) FROM patologias WHERE activo = 1")->fetchColumn();
+
+// 2. Catálogo de Formas Farmacéuticas con conteo de medicamentos vinculados
+$formasFarmaceuticas = $pdo->query("
+    SELECT ff.id, ff.nombre, COUNT(m.id) AS total_medicamentos
+    FROM formas_farmaceuticas ff
+    LEFT JOIN medicamentos m ON m.forma_farmaceutica_id = ff.id
+    GROUP BY ff.id, ff.nombre
+    ORDER BY ff.nombre ASC
+")->fetchAll(PDO::FETCH_ASSOC);
+
+// 3. Vademécum de Medicamentos
+$filtroEstadoMed = $_GET['estado_med'] ?? 'todos';
+$busquedaMed = trim($_GET['q_med'] ?? '');
+$condMed = [];
+$paramsMed = [];
+
+if ($filtroEstadoMed === 'activos') {
+    $condMed[] = 'm.activo = 1';
+} elseif ($filtroEstadoMed === 'descontinuados') {
+    $condMed[] = 'm.activo = 0';
+}
+
+if ($busquedaMed !== '') {
+    $condMed[] = '(m.nombre_generico LIKE :qm1 OR m.concentracion LIKE :qm2 OR ff.nombre LIKE :qm3)';
+    $paramsMed[':qm1'] = '%' . $busquedaMed . '%';
+    $paramsMed[':qm2'] = '%' . $busquedaMed . '%';
+    $paramsMed[':qm3'] = '%' . $busquedaMed . '%';
+}
+
+$whereMed = !empty($condMed) ? 'WHERE ' . implode(' AND ', $condMed) : '';
+$sqlMed = "SELECT m.*, ff.nombre AS forma_nombre
+           FROM medicamentos m
+           LEFT JOIN formas_farmaceuticas ff ON m.forma_farmaceutica_id = ff.id
+           {$whereMed}
+           ORDER BY m.nombre_generico ASC";
+$stmtMed = $pdo->prepare($sqlMed);
+$stmtMed->execute($paramsMed);
+$medicamentos = $stmtMed->fetchAll(PDO::FETCH_ASSOC);
+
+// 4. Catálogo CIE-10 de Patologías
+$filtroEstadoPat = $_GET['estado_pat'] ?? 'todos';
+$busquedaPat = trim($_GET['q_pat'] ?? '');
+$condPat = [];
+$paramsPat = [];
+
+if ($filtroEstadoPat === 'activos') {
+    $condPat[] = 'p.activo = 1';
+} elseif ($filtroEstadoPat === 'inactivos') {
+    $condPat[] = 'p.activo = 0';
+}
+
+if ($busquedaPat !== '') {
+    $condPat[] = '(p.codigo_cie10 LIKE :qp1 OR p.nombre LIKE :qp2 OR p.descripcion LIKE :qp3)';
+    $paramsPat[':qp1'] = '%' . $busquedaPat . '%';
+    $paramsPat[':qp2'] = '%' . $busquedaPat . '%';
+    $paramsPat[':qp3'] = '%' . $busquedaPat . '%';
+}
+
+$wherePat = !empty($condPat) ? 'WHERE ' . implode(' AND ', $condPat) : '';
+$sqlPat = "SELECT p.* FROM patologias p {$wherePat} ORDER BY p.codigo_cie10 ASC";
+$stmtPat = $pdo->prepare($sqlPat);
+$stmtPat->execute($paramsPat);
+$patologias = $stmtPat->fetchAll(PDO::FETCH_ASSOC);
+
+// Edición si aplica
+$medicamentoEdicion = null;
+$editarMId = filter_input(INPUT_GET, 'editar_m', FILTER_VALIDATE_INT)
+    ?: filter_input(INPUT_GET, 'editar_med', FILTER_VALIDATE_INT)
+    ?: filter_input(INPUT_GET, 'editar', FILTER_VALIDATE_INT);
+if ($editarMId) {
+    $stmtMEd = $pdo->prepare("SELECT * FROM medicamentos WHERE id = :id");
+    $stmtMEd->execute([':id' => $editarMId]);
+    $medicamentoEdicion = $stmtMEd->fetch(PDO::FETCH_ASSOC);
+}
+?>
 <!-- Cuadro de Mando de Vademécum (3 Tarjetas KPIs Institucionales) -->
                     <div class="row g-2 mb-3">
                         <div class="col-sm-6 col-md-4">

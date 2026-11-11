@@ -1,3 +1,62 @@
+<?php
+// src/views/tabs/tab_usuarios.php
+// SICM | Módulo Autosuficiente: Operadores y Roles
+declare(strict_types=1);
+
+if (!tienePermiso('USR_VER')) {
+    header('Location: index.php');
+    exit;
+}
+
+$moduloNombre = 'Operadores y Roles';
+$seccionNombre = 'Seguridad y Control';
+
+$filtroEstadoU = $_GET['estado_u'] ?? 'activos';
+$busquedaU = trim($_GET['q_u'] ?? '');
+$condU = [];
+$paramsU = [];
+
+if ($filtroEstadoU === 'inactivos') {
+    $condU[] = 'u.activo = 0';
+} elseif ($filtroEstadoU !== 'todos') {
+    $condU[] = 'u.activo = 1';
+}
+
+if ($busquedaU !== '') {
+    $condU[] = '(u.nombre LIKE :qu1 OR u.email LIKE :qu2 OR cs.nombre LIKE :qu3)';
+    $paramsU[':qu1'] = '%' . $busquedaU . '%';
+    $paramsU[':qu2'] = '%' . $busquedaU . '%';
+    $paramsU[':qu3'] = '%' . $busquedaU . '%';
+}
+
+$whereU = !empty($condU) ? 'WHERE ' . implode(' AND ', $condU) : '';
+
+$stmtUsers = $pdo->prepare("
+    SELECT u.id, u.nombre, u.email, u.rol_id, r.nombre AS rol_nombre, 
+           u.centro_salud_id, cs.nombre AS centro_nombre, cs.codigo_sicm AS centro_codigo, 
+           u.activo, u.created_at, u.updated_at
+    FROM usuarios u
+    INNER JOIN roles r ON r.id = u.rol_id
+    LEFT JOIN centros_salud cs ON cs.id = u.centro_salud_id
+    {$whereU}
+    ORDER BY u.id ASC
+");
+$stmtUsers->execute($paramsU);
+$listaUsuarios = $stmtUsers->fetchAll();
+
+// Catálogos para el formulario de usuarios
+$rolesCatalogo = $pdo->query("SELECT id, nombre, descripcion, es_personalizado FROM roles ORDER BY id ASC")->fetchAll();
+$centrosDisponibles = $pdo->query("SELECT id, codigo_sicm, nombre FROM centros_salud WHERE activo = 1 ORDER BY nombre ASC")->fetchAll();
+
+// Modo Edición
+$usuarioEdicion = null;
+$editarUId = filter_input(INPUT_GET, 'editar_u', FILTER_VALIDATE_INT);
+if ($editarUId) {
+    $stmtUEd = $pdo->prepare("SELECT id, nombre, email, rol_id, centro_salud_id, activo FROM usuarios WHERE id = :id");
+    $stmtUEd->execute([':id' => $editarUId]);
+    $usuarioEdicion = $stmtUEd->fetch();
+}
+?>
 <div class="row g-3">
                         <?php if (tienePermiso('USR_GESTIONAR')): ?>
                             <!-- Formulario Operador -->

@@ -1,3 +1,11 @@
+<?php
+// src/views/tabs/tab_404.php
+// SICM | Vista de Módulo No Localizado
+declare(strict_types=1);
+
+$moduloNombre = 'Módulo No Localizado';
+$seccionNombre = 'Navegación';
+?>
 <div class="row justify-content-center my-4">
                         <div class="col-xl-7 col-lg-9 text-center">
                             <div class="card bg-white border rounded-3 p-4 p-md-5 shadow-sm">

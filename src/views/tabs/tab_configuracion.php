@@ -1,3 +1,16 @@
+<?php
+// src/views/tabs/tab_configuracion.php
+// SICM | Módulo Autosuficiente: Identidad Institucional y Parametrización
+declare(strict_types=1);
+
+if (!tienePermiso('CONFIG_SISTEMA')) {
+    header('Location: index.php');
+    exit;
+}
+
+$moduloNombre = 'Identidad Institucional';
+$seccionNombre = 'Configuración';
+?>
 <div class="row g-3">
                         <div class="col-xl-9 col-lg-11 mx-auto">
                             <div class="card-sicm">

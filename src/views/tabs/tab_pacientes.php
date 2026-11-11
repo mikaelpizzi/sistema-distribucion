@@ -1,3 +1,112 @@
+<?php
+// src/views/tabs/tab_pacientes.php
+// SICM | Módulo Autosuficiente: Padrón de Pacientes
+declare(strict_types=1);
+
+$moduloNombre = 'Padrón de Pacientes';
+$seccionNombre = 'Gestión Clínica';
+
+// 1. Catálogos Normalizados de Tipos de Documento y Vías de Contacto (Cero Hardcoding)
+$catalogoTiposDoc = $pdo->query("SELECT * FROM tipos_documento ORDER BY id ASC")->fetchAll(PDO::FETCH_ASSOC);
+$catalogoTiposContacto = $pdo->query("SELECT * FROM tipos_contacto ORDER BY id ASC")->fetchAll(PDO::FETCH_ASSOC);
+
+// 2. Métricas del Padrón Municipal (KPIs Institucionales)
+$kpiTotalPacientes = (int) ($pdo->query("SELECT COUNT(*) FROM pacientes")->fetchColumn() ?: 0);
+$kpiConContactos = (int) ($pdo->query("SELECT COUNT(DISTINCT paciente_id) FROM paciente_contactos")->fetchColumn() ?: 0);
+$kpiNuevosMes = (int) ($pdo->query("SELECT COUNT(*) FROM pacientes WHERE DATE_FORMAT(created_at, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')")->fetchColumn() ?: 0);
+
+// 3. Parámetros de Búsqueda y Filtros
+$busquedaPaciente = trim($_GET['q_paciente'] ?? '');
+$filtroTipoDoc = trim($_GET['tipo_doc'] ?? 'todos');
+
+$condPacientes = [];
+$paramsPacientes = [];
+
+if ($busquedaPaciente !== '') {
+    $condPacientes[] = "(p.cedula LIKE :q OR p.nombre_completo LIKE :q OR EXISTS (SELECT 1 FROM paciente_contactos pc_sub WHERE pc_sub.paciente_id = p.id AND pc_sub.valor LIKE :q))";
+    $paramsPacientes[':q'] = '%' . $busquedaPaciente . '%';
+}
+
+if ($filtroTipoDoc !== 'todos' && $filtroTipoDoc !== '') {
+    if (ctype_digit($filtroTipoDoc)) {
+        $condPacientes[] = "p.tipo_documento_id = :tipo_doc_id";
+        $paramsPacientes[':tipo_doc_id'] = (int) $filtroTipoDoc;
+    } else {
+        $condPacientes[] = "td.codigo = :tipo_doc_cod";
+        $paramsPacientes[':tipo_doc_cod'] = strtoupper($filtroTipoDoc);
+    }
+}
+
+$wherePacientesSql = !empty($condPacientes) ? 'WHERE ' . implode(' AND ', $condPacientes) : '';
+
+// 4. Paginación de Pacientes
+$stmtCountPac = $pdo->prepare("SELECT COUNT(*) FROM pacientes p LEFT JOIN tipos_documento td ON p.tipo_documento_id = td.id {$wherePacientesSql}");
+$stmtCountPac->execute($paramsPacientes);
+$totalRegistrosPacientes = (int) $stmtCountPac->fetchColumn();
+$totalPacientesFiltrados = $totalRegistrosPacientes;
+
+$limitePorPagina = 20;
+$paginaActual = max(1, (int) ($_GET['p_paciente'] ?? 1));
+$totalPaginas = max(1, (int) ceil($totalRegistrosPacientes / $limitePorPagina));
+if ($paginaActual > $totalPaginas) {
+    $paginaActual = $totalPaginas;
+}
+$offsetPacientes = ($paginaActual - 1) * $limitePorPagina;
+
+// 5. Consulta de Pacientes
+$sqlPacientes = "
+    SELECT p.id, p.tipo_documento_id, td.codigo AS tipo_doc_codigo, td.nombre AS tipo_doc_nombre,
+           p.cedula, p.nombre_completo, p.fecha_nacimiento, p.direccion_residencia, p.created_at,
+           (SELECT COUNT(*) FROM tratamientos_autorizados ta WHERE ta.paciente_id = p.id) AS total_recipes
+    FROM pacientes p
+    LEFT JOIN tipos_documento td ON p.tipo_documento_id = td.id
+    {$wherePacientesSql}
+    ORDER BY p.id DESC
+    LIMIT :limite OFFSET :offset
+";
+$stmtPac = $pdo->prepare($sqlPacientes);
+foreach ($paramsPacientes as $k => $v) {
+    $stmtPac->bindValue($k, $v);
+}
+$stmtPac->bindValue(':limite', $limitePorPagina, PDO::PARAM_INT);
+$stmtPac->bindValue(':offset', $offsetPacientes, PDO::PARAM_INT);
+$stmtPac->execute();
+$pacientes = $stmtPac->fetchAll(PDO::FETCH_ASSOC);
+
+// 6. Carga de vías de contacto normalizadas (1FN)
+$pacienteIds = array_column($pacientes, 'id');
+$contactosPorPaciente = [];
+if (!empty($pacienteIds)) {
+    $inClause = implode(',', array_map('intval', $pacienteIds));
+    $sqlContactos = "
+        SELECT pc.*, tc.codigo AS tipo_contacto_codigo, tc.nombre AS tipo_nombre,
+               pc.nombre_contacto_emergencia AS titular
+        FROM paciente_contactos pc
+        LEFT JOIN tipos_contacto tc ON pc.tipo_contacto_id = tc.id
+        WHERE pc.paciente_id IN ({$inClause})
+        ORDER BY pc.es_principal DESC, pc.id ASC
+    ";
+    $stmtC = $pdo->query($sqlContactos);
+    while ($row = $stmtC->fetch(PDO::FETCH_ASSOC)) {
+        $contactosPorPaciente[$row['paciente_id']][] = $row;
+    }
+}
+
+// 7. Carga de paciente para edición si aplica
+$pacienteEdicion = null;
+$contactosEdicion = [];
+if (!empty($_GET['editar_id']) || !empty($_GET['editar'])) {
+    $edId = (int) (!empty($_GET['editar_id']) ? $_GET['editar_id'] : $_GET['editar']);
+    $stmtEd = $pdo->prepare("SELECT * FROM pacientes WHERE id = :id");
+    $stmtEd->execute([':id' => $edId]);
+    $pacienteEdicion = $stmtEd->fetch(PDO::FETCH_ASSOC) ?: null;
+    if ($pacienteEdicion) {
+        $stmtCEd = $pdo->prepare("SELECT * FROM paciente_contactos WHERE paciente_id = :id ORDER BY es_principal DESC, id ASC");
+        $stmtCEd->execute([':id' => $edId]);
+        $contactosEdicion = $stmtCEd->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+?>
 <!-- Cuadro de Mando del Padrón (3 Tarjetas KPIs Institucionales) -->
                     <div class="row g-2 mb-3">
                         <div class="col-sm-6 col-md-4">

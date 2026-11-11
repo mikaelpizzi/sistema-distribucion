@@ -1,3 +1,78 @@
+<?php
+// src/views/tabs/tab_centros.php
+// SICM | Módulo Autosuficiente: Red de Ambulatorios
+declare(strict_types=1);
+
+$moduloNombre = $puedeVerTodaLaRed ? 'Red de Ambulatorios' : 'Mi Ambulatorio';
+$seccionNombre = 'Vademécum y Red';
+
+$filtroEstado = $_GET['estado'] ?? 'activos';
+$busqueda = trim($_GET['q'] ?? '');
+$condiciones = [];
+$params = [];
+
+// Política de Lectura: Jurisdicción asistencial central o ambulatorio asignado
+if (!$puedeVerTodaLaRed) {
+    $condiciones[] = 'c.id = :mi_centro_id';
+    $params[':mi_centro_id'] = $centroUsuarioId;
+} else {
+    if ($filtroEstado === 'inactivos') {
+        $condiciones[] = 'c.activo = 0';
+    } elseif ($filtroEstado !== 'todos') {
+        $condiciones[] = 'c.activo = 1';
+    }
+}
+
+if ($busqueda !== '') {
+    $condiciones[] = '(c.nombre LIKE :q1 OR c.codigo_sicm LIKE :q2 OR c.direccion LIKE :q3 OR c.medico_director LIKE :q4)';
+    $params[':q1'] = '%' . $busqueda . '%';
+    $params[':q2'] = '%' . $busqueda . '%';
+    $params[':q3'] = '%' . $busqueda . '%';
+    $params[':q4'] = '%' . $busqueda . '%';
+}
+
+$whereSql = !empty($condiciones) ? 'WHERE ' . implode(' AND ', $condiciones) : '';
+$stmtCentros = $pdo->prepare("SELECT c.id, c.codigo_sicm, c.nombre, c.tipo_centro_id, c.tipo_nombre, c.tipo_codigo,
+                                     c.medico_director, c.horario_atencion, c.direccion, c.telefono_principal, c.activo
+                              FROM vw_centros_salud c {$whereSql} ORDER BY c.id DESC");
+$stmtCentros->execute($params);
+$centros = $stmtCentros->fetchAll();
+
+// Recursos asignados por centro (N:M)
+$recursosPorCentro = [];
+if (!empty($centros)) {
+    $centroIds = array_map(fn($c) => (int) $c['id'], $centros);
+    $placeholders = implode(',', array_fill(0, count($centroIds), '?'));
+    $stmtRA = $pdo->prepare("SELECT cr.centro_salud_id, ro.nombre
+                           FROM centro_recursos cr
+                           INNER JOIN recursos_operativos ro ON ro.id = cr.recurso_id
+                           WHERE cr.operativo = 1 AND cr.centro_salud_id IN ({$placeholders})
+                           ORDER BY ro.id ASC");
+    $stmtRA->execute($centroIds);
+    while ($r = $stmtRA->fetch()) {
+        $recursosPorCentro[(int) $r['centro_salud_id']][] = $r['nombre'];
+    }
+}
+
+// Catálogos para el formulario
+$tiposCentro = $pdo->query("SELECT id, codigo, nombre FROM tipos_centro_salud WHERE activo = 1 ORDER BY id ASC")->fetchAll();
+$catalogoRecursosActivos = $pdo->query("SELECT id, nombre, descripcion FROM recursos_operativos WHERE activo = 1 ORDER BY id ASC")->fetchAll();
+
+// Modo Edición
+$centroEdicion = null;
+$recursosEdicionIds = [];
+$editarId = filter_input(INPUT_GET, 'editar', FILTER_VALIDATE_INT);
+if ($editarId) {
+    $stmtEd = $pdo->prepare("SELECT * FROM centros_salud WHERE id = :id");
+    $stmtEd->execute([':id' => $editarId]);
+    $centroEdicion = $stmtEd->fetch();
+    if ($centroEdicion) {
+        $stmtRecEd = $pdo->prepare("SELECT recurso_id FROM centro_recursos WHERE centro_salud_id = :id");
+        $stmtRecEd->execute([':id' => $editarId]);
+        $recursosEdicionIds = array_map('intval', $stmtRecEd->fetchAll(PDO::FETCH_COLUMN));
+    }
+}
+?>
 <?php if (!$puedeVerTodaLaRed): ?>
                         <!-- Ficha de Jurisdicción para Farmaceuta -->
                         <div class="card-sicm mb-3">

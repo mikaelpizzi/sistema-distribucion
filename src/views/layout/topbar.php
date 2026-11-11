@@ -7,9 +7,9 @@
                         <span class="d-none d-md-inline small fw-semibold text-secondary">Menú</span>
                     </button>
                     <nav class="sicm-breadcrumb" aria-label="breadcrumb">
-                        <span class="text-secondary"><?= htmlspecialchars($seccionNombre) ?></span>
+                        <span class="text-secondary"><?= htmlspecialchars($seccionNombre ?? 'Vademécum y Red') ?></span>
                         <i class="bi bi-chevron-right text-muted" style="font-size: 0.65rem;"></i>
-                        <span class="sicm-breadcrumb-active"><?= htmlspecialchars($moduloNombre) ?></span>
+                        <span class="sicm-breadcrumb-active"><?= htmlspecialchars($moduloNombre ?? 'Red Asistencial') ?></span>
                     </nav>
                 </div>
             </header>

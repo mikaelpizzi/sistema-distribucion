@@ -1,3 +1,58 @@
+<?php
+// src/views/tabs/tab_maestras.php
+// SICM | Módulo Autosuficiente: Catálogos Maestros y Matriz RBAC
+declare(strict_types=1);
+
+$moduloNombre = 'Catálogos Maestros';
+$seccionNombre = 'Configuración';
+
+// Catálogos con contador de integridad (cuántos ambulatorios dependen de cada fila)
+$tiposCentro = $pdo->query("
+    SELECT t.id, t.codigo, t.nombre, t.descripcion, t.activo, COUNT(cs.id) AS total_centros
+    FROM tipos_centro_salud t
+    LEFT JOIN centros_salud cs ON cs.tipo_centro_id = t.id
+    GROUP BY t.id, t.codigo, t.nombre, t.descripcion, t.activo
+    ORDER BY t.id ASC
+")->fetchAll();
+
+$todosRecursos = $pdo->query("
+    SELECT r.id, r.codigo, r.nombre, r.descripcion, r.activo, COUNT(cr.centro_salud_id) AS total_centros
+    FROM recursos_operativos r
+    LEFT JOIN centro_recursos cr ON cr.recurso_id = r.id
+    GROUP BY r.id, r.codigo, r.nombre, r.descripcion, r.activo
+    ORDER BY r.id ASC
+")->fetchAll();
+
+// Gestión Dinámica de Roles RBAC y Matriz de Permisos en 3FN
+$todosRoles = $pdo->query("
+    SELECT r.id, r.nombre, r.es_personalizado, r.descripcion, 
+           COUNT(DISTINCT u.id) AS total_usuarios, 
+           COUNT(DISTINCT rp.permiso_id) AS total_permisos 
+    FROM roles r 
+    LEFT JOIN usuarios u ON u.rol_id = r.id 
+    LEFT JOIN rol_permisos rp ON rp.rol_id = r.id 
+    GROUP BY r.id, r.nombre, r.es_personalizado, r.descripcion 
+    ORDER BY r.id ASC
+")->fetchAll();
+
+$permisosCatalogo = $pdo->query("
+    SELECT p.id, p.codigo, p.nombre, p.descripcion, m.id AS modulo_id, m.nombre AS modulo_nombre 
+    FROM permisos p 
+    JOIN modulos_sistema m ON p.modulo_id = m.id 
+    ORDER BY m.id ASC, p.id ASC
+")->fetchAll();
+
+$rolPermisosRaw = $pdo->query("SELECT rol_id, permiso_id FROM rol_permisos")->fetchAll();
+$matrizRolPermisos = [];
+foreach ($rolPermisosRaw as $rp) {
+    $matrizRolPermisos[(int) $rp['rol_id']][(int) $rp['permiso_id']] = true;
+}
+
+$permisosPorModulo = [];
+foreach ($permisosCatalogo as $p) {
+    $permisosPorModulo[$p['modulo_nombre']][] = $p;
+}
+?>
 <div class="card bg-light border mb-3">
                         <div class="card-body p-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
                             <div>
