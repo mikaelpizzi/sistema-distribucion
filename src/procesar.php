@@ -62,40 +62,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Guardián RBAC: Validación basada en Matriz Dinámica de Permisos Atómicos
 $permisosPorAccion = [
-    'guardar_centro'                  => !empty($_POST['id']) ? 'CENTROS_EDITAR' : 'CENTROS_CREAR',
-    'cambiar_estado_centro'           => 'CENTROS_ESTADO',
-    'crear_tipo_centro'               => 'MAESTRAS_GESTIONAR',
-    'toggle_tipo_centro'              => 'MAESTRAS_GESTIONAR',
-    'crear_recurso'                   => 'MAESTRAS_GESTIONAR',
-    'toggle_recurso'                  => 'MAESTRAS_GESTIONAR',
-    'crear_rol'                       => 'MAESTRAS_GESTIONAR',
-    'actualizar_rol_permisos'         => 'MAESTRAS_GESTIONAR',
-    'eliminar_rol'                    => 'MAESTRAS_GESTIONAR',
-    'guardar_usuario'                 => 'USR_GESTIONAR',
-    'cambiar_estado_usuario'          => 'USR_GESTIONAR',
-    'descargar_respaldo'              => 'SISTEMA_RESPALDO',
-    'exportar_acta_pericial'          => 'AUDIT_EXPORTAR',
+    'guardar_centro' => !empty($_POST['id']) ? 'CENTROS_EDITAR' : 'CENTROS_CREAR',
+    'cambiar_estado_centro' => 'CENTROS_ESTADO',
+    'crear_tipo_centro' => 'MAESTRAS_GESTIONAR',
+    'toggle_tipo_centro' => 'MAESTRAS_GESTIONAR',
+    'crear_recurso' => 'MAESTRAS_GESTIONAR',
+    'toggle_recurso' => 'MAESTRAS_GESTIONAR',
+    'crear_rol' => 'MAESTRAS_GESTIONAR',
+    'actualizar_rol_permisos' => 'MAESTRAS_GESTIONAR',
+    'eliminar_rol' => 'MAESTRAS_GESTIONAR',
+    'guardar_usuario' => 'USR_GESTIONAR',
+    'cambiar_estado_usuario' => 'USR_GESTIONAR',
+    'descargar_respaldo' => 'SISTEMA_RESPALDO',
+    'exportar_acta_pericial' => 'AUDIT_EXPORTAR',
     'guardar_identidad_institucional' => 'CONFIG_SISTEMA',
-    'crear_medicamento'               => 'MED_CREAR',
-    'editar_medicamento'              => 'MED_EDITAR',
-    'cambiar_estado_medicamento'      => 'MED_EDITAR',
-    'crear_patologia'                 => 'MAESTRAS_GESTIONAR',
-    'cambiar_estado_patologia'        => 'MAESTRAS_GESTIONAR',
-    'crear_forma_farmaceutica'        => 'MAESTRAS_GESTIONAR',
-    'guardar_paciente'                => 'PACIENTES_GESTIONAR',
-    'guardar_recipe'                  => 'RECIPES_GESTIONAR',
-    'toggle_estado_recipe'            => 'RECIPES_GESTIONAR',
-    'procesar_despacho_fefo'          => 'DESP_PROCESAR',
+    'crear_medicamento' => 'MED_CREAR',
+    'editar_medicamento' => 'MED_EDITAR',
+    'cambiar_estado_medicamento' => 'MED_EDITAR',
+    'crear_patologia' => 'MAESTRAS_GESTIONAR',
+    'cambiar_estado_patologia' => 'MAESTRAS_GESTIONAR',
+    'crear_forma_farmaceutica' => 'MAESTRAS_GESTIONAR',
+    'guardar_paciente' => 'PACIENTES_GESTIONAR',
+    'guardar_recipe' => 'RECIPES_GESTIONAR',
+    'toggle_estado_recipe' => 'RECIPES_GESTIONAR',
+    'procesar_despacho_fefo' => 'DESP_PROCESAR',
 ];
 
 if (isset($permisosPorAccion[$accion])) {
     $permisoRequerido = $permisosPorAccion[$accion];
     if (!tienePermiso($permisoRequerido)) {
         registrarAuditoria($pdo, $usuarioSesionId, 'ACCESO_DENEGADO', 'seguridad', null, [
-            'evento'            => 'Intento no autorizado de ejecutar operación restringida',
+            'evento' => 'Intento no autorizado de ejecutar operación restringida',
             'accion_solicitada' => $accion,
             'permiso_requerido' => $permisoRequerido,
-            'rol_usuario'       => $usuario['rol_nombre'] ?? 'Sin rol'
+            'rol_usuario' => $usuario['rol_nombre'] ?? 'Sin rol'
         ]);
         $msg = "Acceso denegado: Su rol no posee el permiso atómico requerido [{$permisoRequerido}].";
         if (session_status() === PHP_SESSION_ACTIVE) {
@@ -138,8 +138,8 @@ try {
 
             if (!$pdo->inTransaction()) {
                 if (!$pdo->inTransaction()) {
-                $pdo->beginTransaction();
-            }
+                    $pdo->beginTransaction();
+                }
             }
 
             if ($id === null) {
@@ -215,7 +215,7 @@ try {
                 // Sincronización 1FN: telefonos_centro_salud
                 if ($telefono !== '') {
                     $stmtTipoTel = $pdo->query("SELECT id FROM tipos_contacto WHERE codigo IN ('TEL_FIJO', 'TEL_MOVIL') ORDER BY id ASC LIMIT 1");
-                    $tipoTelId = (int)($stmtTipoTel->fetchColumn() ?: 1);
+                    $tipoTelId = (int) ($stmtTipoTel->fetchColumn() ?: 1);
 
                     $stmtCheckTel = $pdo->prepare("SELECT id FROM telefonos_centro_salud WHERE centro_salud_id = :cid AND es_principal = 1 LIMIT 1");
                     $stmtCheckTel->execute([':cid' => $id]);
@@ -297,8 +297,8 @@ try {
 
             if (!$pdo->inTransaction()) {
                 if (!$pdo->inTransaction()) {
-                $pdo->beginTransaction();
-            }
+                    $pdo->beginTransaction();
+                }
             }
             $stmt = $pdo->prepare("SELECT codigo_sicm, nombre FROM centros_salud WHERE id = :id");
             $stmt->execute([':id' => $id]);
@@ -666,8 +666,8 @@ try {
 
             if (!$pdo->inTransaction()) {
                 if (!$pdo->inTransaction()) {
-                $pdo->beginTransaction();
-            }
+                    $pdo->beginTransaction();
+                }
             }
 
             if ($id === null) {
@@ -789,8 +789,8 @@ try {
 
             if (!$pdo->inTransaction()) {
                 if (!$pdo->inTransaction()) {
-                $pdo->beginTransaction();
-            }
+                    $pdo->beginTransaction();
+                }
             }
             $stmt = $pdo->prepare("SELECT nombre, email FROM usuarios WHERE id = :id");
             $stmt->execute([':id' => $id]);
@@ -1250,11 +1250,11 @@ try {
 
             $nombreSistema = trim($_POST['nombre_sistema'] ?? '');
             $siglasSistema = strtoupper(trim($_POST['siglas_sistema'] ?? ''));
-            $enteRector    = trim($_POST['ente_rector'] ?? '');
-            $municipio     = trim($_POST['municipio'] ?? '');
-            $diasFefo      = (int)($_POST['dias_alerta_fefo'] ?? 60);
-            $eliminarLogo  = !empty($_POST['eliminar_logo']);
-            $logotipoRuta  = trim($_POST['logotipo_ruta'] ?? '');
+            $enteRector = trim($_POST['ente_rector'] ?? '');
+            $municipio = trim($_POST['municipio'] ?? '');
+            $diasFefo = (int) ($_POST['dias_alerta_fefo'] ?? 60);
+            $eliminarLogo = !empty($_POST['eliminar_logo']);
+            $logotipoRuta = trim($_POST['logotipo_ruta'] ?? '');
 
             if (mb_strlen($nombreSistema, 'UTF-8') < 3 || mb_strlen($siglasSistema, 'UTF-8') < 2 || mb_strlen($enteRector, 'UTF-8') < 3) {
                 header('Location: index.php?tab=configuracion&error=' . urlencode('Los campos Nombre del Sistema, Siglas y Ente Rector son obligatorios.'));
@@ -1285,10 +1285,10 @@ try {
                 $finfo = new finfo(FILEINFO_MIME_TYPE);
                 $mime = $finfo->file($file['tmp_name']);
                 $permitidos = [
-                    'image/png'     => 'png',
-                    'image/jpeg'    => 'jpg',
+                    'image/png' => 'png',
+                    'image/jpeg' => 'jpg',
                     'image/svg+xml' => 'svg',
-                    'image/webp'    => 'webp'
+                    'image/webp' => 'webp'
                 ];
 
                 if (!isset($permitidos[$mime])) {
@@ -1315,8 +1315,8 @@ try {
 
             if (!$pdo->inTransaction()) {
                 if (!$pdo->inTransaction()) {
-                $pdo->beginTransaction();
-            }
+                    $pdo->beginTransaction();
+                }
             }
 
             $stmt = $pdo->prepare("
@@ -1330,24 +1330,24 @@ try {
                 WHERE id = 1
             ");
             $stmt->execute([
-                ':nombre'    => $nombreSistema,
-                ':siglas'    => $siglasSistema,
-                ':ente'      => $enteRector,
+                ':nombre' => $nombreSistema,
+                ':siglas' => $siglasSistema,
+                ':ente' => $enteRector,
                 ':municipio' => $municipio,
-                ':logo'      => $rutaFinalLogo,
-                ':dias'      => $diasFefo
+                ':logo' => $rutaFinalLogo,
+                ':dias' => $diasFefo
             ]);
 
             // Auditoría forense del cambio con delta detallado
             registrarAuditoria($pdo, $usuarioSesionId, 'ACTUALIZAR_IDENTIDAD_INSTITUCIONAL', 'configuracion_institucional', 1, [
                 'evento' => 'Actualización de Identidad Institucional y Parametrización FEFO',
                 'delta' => [
-                    'nombre_sistema'   => ['antes' => $actual['nombre_sistema'], 'despues' => $nombreSistema],
-                    'siglas_sistema'   => ['antes' => $actual['siglas_sistema'], 'despues' => $siglasSistema],
-                    'ente_rector'      => ['antes' => $actual['ente_rector'], 'despues' => $enteRector],
-                    'municipio'        => ['antes' => $actual['municipio'], 'despues' => $municipio],
+                    'nombre_sistema' => ['antes' => $actual['nombre_sistema'], 'despues' => $nombreSistema],
+                    'siglas_sistema' => ['antes' => $actual['siglas_sistema'], 'despues' => $siglasSistema],
+                    'ente_rector' => ['antes' => $actual['ente_rector'], 'despues' => $enteRector],
+                    'municipio' => ['antes' => $actual['municipio'], 'despues' => $municipio],
                     'dias_alerta_fefo' => ['antes' => $actual['dias_alerta_fefo'], 'despues' => $diasFefo],
-                    'logotipo_ruta'    => ['antes' => $actual['logotipo_ruta'], 'despues' => $rutaFinalLogo]
+                    'logotipo_ruta' => ['antes' => $actual['logotipo_ruta'], 'despues' => $rutaFinalLogo]
                 ]
             ]);
 
@@ -1382,8 +1382,8 @@ try {
 
             if (!$pdo->inTransaction()) {
                 if (!$pdo->inTransaction()) {
-                $pdo->beginTransaction();
-            }
+                    $pdo->beginTransaction();
+                }
             }
 
             $stmtIns = $pdo->prepare("
@@ -1465,8 +1465,8 @@ try {
 
             if (!$pdo->inTransaction()) {
                 if (!$pdo->inTransaction()) {
-                $pdo->beginTransaction();
-            }
+                    $pdo->beginTransaction();
+                }
             }
 
             // La actualización dispara automáticamente el trigger trg_medicamentos_audit_delta
@@ -1511,8 +1511,8 @@ try {
 
             if (!$pdo->inTransaction()) {
                 if (!$pdo->inTransaction()) {
-                $pdo->beginTransaction();
-            }
+                    $pdo->beginTransaction();
+                }
             }
 
             $stmt = $pdo->prepare("SELECT id, nombre_generico, concentracion, activo FROM medicamentos WHERE id = :id");
@@ -1744,33 +1744,33 @@ try {
             $contactosTipo = (array) ($_POST['contactos_tipo'] ?? []);
             $contactosValor = (array) ($_POST['contactos_valor'] ?? []);
             $contactosDetalle = (array) ($_POST['contactos_detalle'] ?? []);
-            $principalIdx = isset($_POST['contacto_principal_radio']) ? (int)$_POST['contacto_principal_radio'] : 0;
+            $principalIdx = isset($_POST['contacto_principal_radio']) ? (int) $_POST['contacto_principal_radio'] : 0;
 
             $contactosAInsertar = [];
             $huboPrincipal = false;
             $totalFilas = max(count($contactosTipo), count($contactosValor), count($contactosDetalle));
 
             for ($i = 0; $i < $totalFilas; $i++) {
-                $rawVal = isset($contactosValor[$i]) ? trim((string)$contactosValor[$i]) : '';
+                $rawVal = isset($contactosValor[$i]) ? trim((string) $contactosValor[$i]) : '';
                 if ($rawVal === '') {
                     continue; // Omitir filas vacías
                 }
 
-                $rawTipo = isset($contactosTipo[$i]) ? (int)$contactosTipo[$i] : $tipoDefecto;
+                $rawTipo = isset($contactosTipo[$i]) ? (int) $contactosTipo[$i] : $tipoDefecto;
                 if (!in_array($rawTipo, $setTiposValidos, true)) {
                     $rawTipo = $tipoDefecto;
                 }
 
-                $rawDet = isset($contactosDetalle[$i]) ? trim((string)$contactosDetalle[$i]) : '';
+                $rawDet = isset($contactosDetalle[$i]) ? trim((string) $contactosDetalle[$i]) : '';
                 $esPrincipal = ($i === $principalIdx) ? 1 : 0;
                 if ($esPrincipal === 1) {
                     $huboPrincipal = true;
                 }
 
                 $contactosAInsertar[] = [
-                    'tipo_id'      => $rawTipo,
-                    'valor'        => mb_substr($rawVal, 0, 120, 'UTF-8'),
-                    'detalle'      => $rawDet !== '' ? mb_substr($rawDet, 0, 100, 'UTF-8') : null,
+                    'tipo_id' => $rawTipo,
+                    'valor' => mb_substr($rawVal, 0, 120, 'UTF-8'),
+                    'detalle' => $rawDet !== '' ? mb_substr($rawDet, 0, 100, 'UTF-8') : null,
                     'es_principal' => $esPrincipal
                 ];
             }
@@ -1778,24 +1778,25 @@ try {
             // Manejo si se recibe arreglo estructurado $_POST['contactos'] (API o payload normalizado)
             if (isset($_POST['contactos']) && is_array($_POST['contactos'])) {
                 foreach ($_POST['contactos'] as $idx => $c) {
-                    if (!is_array($c)) continue;
-                    $rawVal = trim((string)($c['valor'] ?? ''));
+                    if (!is_array($c))
+                        continue;
+                    $rawVal = trim((string) ($c['valor'] ?? ''));
                     if ($rawVal === '') {
                         continue; // Omitir filas vacías sin error
                     }
-                    $rawTipo = isset($c['tipo_id']) ? (int)$c['tipo_id'] : (isset($c['tipo']) ? (int)$c['tipo'] : $tipoDefecto);
+                    $rawTipo = isset($c['tipo_id']) ? (int) $c['tipo_id'] : (isset($c['tipo']) ? (int) $c['tipo'] : $tipoDefecto);
                     if (!in_array($rawTipo, $setTiposValidos, true)) {
                         $rawTipo = $tipoDefecto;
                     }
-                    $rawDet = trim((string)($c['detalle'] ?? ($c['nombre_contacto_emergencia'] ?? '')));
+                    $rawDet = trim((string) ($c['detalle'] ?? ($c['nombre_contacto_emergencia'] ?? '')));
                     $esPrincipal = !empty($c['es_principal']) ? 1 : 0;
                     if ($esPrincipal === 1) {
                         $huboPrincipal = true;
                     }
                     $contactosAInsertar[] = [
-                        'tipo_id'      => $rawTipo,
-                        'valor'        => mb_substr($rawVal, 0, 120, 'UTF-8'),
-                        'detalle'      => $rawDet !== '' ? mb_substr($rawDet, 0, 100, 'UTF-8') : null,
+                        'tipo_id' => $rawTipo,
+                        'valor' => mb_substr($rawVal, 0, 120, 'UTF-8'),
+                        'detalle' => $rawDet !== '' ? mb_substr($rawDet, 0, 100, 'UTF-8') : null,
                         'es_principal' => $esPrincipal
                     ];
                 }
@@ -1805,18 +1806,18 @@ try {
             if (empty($contactosAInsertar) && (!empty($_POST['telefono_principal']) || !empty($_POST['contacto_emergencia_telefono']))) {
                 if (!empty($_POST['telefono_principal'])) {
                     $contactosAInsertar[] = [
-                        'tipo_id'      => (int)($_POST['tipo_contacto_principal_id'] ?? 2),
-                        'valor'        => mb_substr(trim($_POST['telefono_principal']), 0, 120, 'UTF-8'),
-                        'detalle'      => 'Paciente Directo',
+                        'tipo_id' => (int) ($_POST['tipo_contacto_principal_id'] ?? 2),
+                        'valor' => mb_substr(trim($_POST['telefono_principal']), 0, 120, 'UTF-8'),
+                        'detalle' => 'Paciente Directo',
                         'es_principal' => 1
                     ];
                     $huboPrincipal = true;
                 }
                 if (!empty($_POST['contacto_emergencia_telefono'])) {
                     $contactosAInsertar[] = [
-                        'tipo_id'      => (int)($_POST['tipo_contacto_emergencia_id'] ?? 5),
-                        'valor'        => mb_substr(trim($_POST['contacto_emergencia_telefono']), 0, 120, 'UTF-8'),
-                        'detalle'      => trim($_POST['contacto_emergencia_nombre'] ?? '') ?: 'Contacto de Emergencia',
+                        'tipo_id' => (int) ($_POST['tipo_contacto_emergencia_id'] ?? 5),
+                        'valor' => mb_substr(trim($_POST['contacto_emergencia_telefono']), 0, 120, 'UTF-8'),
+                        'detalle' => trim($_POST['contacto_emergencia_nombre'] ?? '') ?: 'Contacto de Emergencia',
                         'es_principal' => empty($contactosAInsertar) ? 1 : 0
                     ];
                 }
@@ -1837,11 +1838,11 @@ try {
                         VALUES (:tipo_doc, :cedula, :nombre, :fecha_nac, :direccion)";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
-                    ':tipo_doc'   => $tipoDocumentoId,
-                    ':cedula'     => $cedula,
-                    ':nombre'     => $nombreCompleto,
-                    ':fecha_nac'  => $fechaNacValida,
-                    ':direccion'  => $direccionResidencia !== '' ? $direccionResidencia : null
+                    ':tipo_doc' => $tipoDocumentoId,
+                    ':cedula' => $cedula,
+                    ':nombre' => $nombreCompleto,
+                    ':fecha_nac' => $fechaNacValida,
+                    ':direccion' => $direccionResidencia !== '' ? $direccionResidencia : null
                 ]);
                 $pacienteId = (int) $pdo->lastInsertId();
 
@@ -1851,23 +1852,23 @@ try {
                                                VALUES (:pid, :tid, :valor, :es_p, :detalle)");
                     foreach ($contactosAInsertar as $c) {
                         $stmtCont->execute([
-                            ':pid'     => $pacienteId,
-                            ':tid'     => $c['tipo_id'],
-                            ':valor'   => $c['valor'],
-                            ':es_p'    => $c['es_principal'],
+                            ':pid' => $pacienteId,
+                            ':tid' => $c['tipo_id'],
+                            ':valor' => $c['valor'],
+                            ':es_p' => $c['es_principal'],
                             ':detalle' => $c['detalle']
                         ]);
                     }
                 }
 
                 registrarAuditoria($pdo, $usuarioSesionId, 'CREAR_PACIENTE', 'pacientes', $pacienteId, [
-                    'evento'             => 'Registro de paciente en padrón municipal',
-                    'cedula'             => $cedula,
-                    'nombre_completo'    => $nombreCompleto,
-                    'tipo_documento_id'  => $tipoDocumentoId,
-                    'total_contactos'    => count($contactosAInsertar),
-                    'contactos'          => array_map(function($c) { 
-                        return "{$c['valor']} [" . ($c['es_principal'] ? 'Principal' : 'Secundario') . ($c['detalle'] ? " - {$c['detalle']}" : '') . "]"; 
+                    'evento' => 'Registro de paciente en padrón municipal',
+                    'cedula' => $cedula,
+                    'nombre_completo' => $nombreCompleto,
+                    'tipo_documento_id' => $tipoDocumentoId,
+                    'total_contactos' => count($contactosAInsertar),
+                    'contactos' => array_map(function ($c) {
+                        return "{$c['valor']} [" . ($c['es_principal'] ? 'Principal' : 'Secundario') . ($c['detalle'] ? " - {$c['detalle']}" : '') . "]";
                     }, $contactosAInsertar)
                 ]);
 
@@ -1898,12 +1899,12 @@ try {
                         WHERE id = :id";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
-                    ':tipo_doc'   => $tipoDocumentoId,
-                    ':cedula'     => $cedula,
-                    ':nombre'     => $nombreCompleto,
-                    ':fecha_nac'  => $fechaNacValida,
-                    ':direccion'  => $direccionResidencia !== '' ? $direccionResidencia : null,
-                    ':id'         => $id
+                    ':tipo_doc' => $tipoDocumentoId,
+                    ':cedula' => $cedula,
+                    ':nombre' => $nombreCompleto,
+                    ':fecha_nac' => $fechaNacValida,
+                    ':direccion' => $direccionResidencia !== '' ? $direccionResidencia : null,
+                    ':id' => $id
                 ]);
 
                 // Eliminar contactos previos del paciente e insertar la nueva colección (1FN Real con permiso DELETE)
@@ -1915,23 +1916,23 @@ try {
                                                VALUES (:pid, :tid, :valor, :es_p, :detalle)");
                     foreach ($contactosAInsertar as $c) {
                         $stmtCont->execute([
-                            ':pid'     => $id,
-                            ':tid'     => $c['tipo_id'],
-                            ':valor'   => $c['valor'],
-                            ':es_p'    => $c['es_principal'],
+                            ':pid' => $id,
+                            ':tid' => $c['tipo_id'],
+                            ':valor' => $c['valor'],
+                            ':es_p' => $c['es_principal'],
                             ':detalle' => $c['detalle']
                         ]);
                     }
                 }
 
                 registrarAuditoria($pdo, $usuarioSesionId, 'EDITAR_PACIENTE', 'pacientes', $id, [
-                    'evento'             => 'Actualización de expediente clínico del paciente',
-                    'cedula'             => $cedula,
-                    'nombre_completo'    => $nombreCompleto,
-                    'tipo_documento_id'  => $tipoDocumentoId,
-                    'total_contactos'    => count($contactosAInsertar),
-                    'contactos'          => array_map(function($c) { 
-                        return "{$c['valor']} [" . ($c['es_principal'] ? 'Principal' : 'Secundario') . ($c['detalle'] ? " - {$c['detalle']}" : '') . "]"; 
+                    'evento' => 'Actualización de expediente clínico del paciente',
+                    'cedula' => $cedula,
+                    'nombre_completo' => $nombreCompleto,
+                    'tipo_documento_id' => $tipoDocumentoId,
+                    'total_contactos' => count($contactosAInsertar),
+                    'contactos' => array_map(function ($c) {
+                        return "{$c['valor']} [" . ($c['es_principal'] ? 'Principal' : 'Secundario') . ($c['detalle'] ? " - {$c['detalle']}" : '') . "]";
                     }, $contactosAInsertar)
                 ]);
 
@@ -2057,28 +2058,28 @@ try {
                         VALUES (:paciente_id, :medicamento_id, :patologia_id, :dosis_mensual, :fecha_emision, :fecha_vencimiento, :medico, 1)";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
-                    ':paciente_id'      => $pacienteId,
-                    ':medicamento_id'   => $medicamentoId,
-                    ':patologia_id'     => $patologiaId,
-                    ':dosis_mensual'    => $dosisMensual,
-                    ':fecha_emision'    => $fechaEmision,
-                    ':fecha_vencimiento'=> $fechaVencimiento,
-                    ':medico'           => $medicoPrescriptor
+                    ':paciente_id' => $pacienteId,
+                    ':medicamento_id' => $medicamentoId,
+                    ':patologia_id' => $patologiaId,
+                    ':dosis_mensual' => $dosisMensual,
+                    ':fecha_emision' => $fechaEmision,
+                    ':fecha_vencimiento' => $fechaVencimiento,
+                    ':medico' => $medicoPrescriptor
                 ]);
                 $nuevoId = (int) $pdo->lastInsertId();
 
                 registrarAuditoria($pdo, $usuarioSesionId, 'CREAR_RECIPE', 'tratamientos_autorizados', $nuevoId, [
-                    'evento'             => 'Prescripción médica emitida y tratamiento autorizado registrado',
-                    'paciente_id'        => $pacienteId,
-                    'paciente'           => $paciente['nombre_completo'],
-                    'cedula'             => $paciente['cedula'],
-                    'medicamento_id'     => $medicamentoId,
-                    'medicamento'        => $med['nombre_generico'] . ' ' . $med['concentracion'],
-                    'patologia_id'       => $patologiaId,
-                    'patologia'          => "[{$pat['codigo_cie10']}] {$pat['nombre']}",
-                    'dosis_mensual'      => $dosisMensual,
-                    'fecha_emision'      => $fechaEmision,
-                    'fecha_vencimiento'  => $fechaVencimiento,
+                    'evento' => 'Prescripción médica emitida y tratamiento autorizado registrado',
+                    'paciente_id' => $pacienteId,
+                    'paciente' => $paciente['nombre_completo'],
+                    'cedula' => $paciente['cedula'],
+                    'medicamento_id' => $medicamentoId,
+                    'medicamento' => $med['nombre_generico'] . ' ' . $med['concentracion'],
+                    'patologia_id' => $patologiaId,
+                    'patologia' => "[{$pat['codigo_cie10']}] {$pat['nombre']}",
+                    'dosis_mensual' => $dosisMensual,
+                    'fecha_emision' => $fechaEmision,
+                    'fecha_vencimiento' => $fechaVencimiento,
                     'medico_prescriptor' => $medicoPrescriptor
                 ]);
 
@@ -2111,27 +2112,27 @@ try {
                         WHERE id = :id";
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute([
-                    ':paciente_id'      => $pacienteId,
-                    ':medicamento_id'   => $medicamentoId,
-                    ':patologia_id'     => $patologiaId,
-                    ':dosis_mensual'    => $dosisMensual,
-                    ':fecha_emision'    => $fechaEmision,
-                    ':fecha_vencimiento'=> $fechaVencimiento,
-                    ':medico'           => $medicoPrescriptor,
-                    ':id'               => $id
+                    ':paciente_id' => $pacienteId,
+                    ':medicamento_id' => $medicamentoId,
+                    ':patologia_id' => $patologiaId,
+                    ':dosis_mensual' => $dosisMensual,
+                    ':fecha_emision' => $fechaEmision,
+                    ':fecha_vencimiento' => $fechaVencimiento,
+                    ':medico' => $medicoPrescriptor,
+                    ':id' => $id
                 ]);
 
                 registrarAuditoria($pdo, $usuarioSesionId, 'EDITAR_RECIPE', 'tratamientos_autorizados', $id, [
-                    'evento'             => 'Actualización de prescripción médica y tratamiento autorizado',
-                    'paciente_id'        => $pacienteId,
-                    'paciente'           => $paciente['nombre_completo'],
-                    'medicamento_id'     => $medicamentoId,
-                    'medicamento'        => $med['nombre_generico'] . ' ' . $med['concentracion'],
-                    'patologia_id'       => $patologiaId,
-                    'patologia'          => "[{$pat['codigo_cie10']}] {$pat['nombre']}",
-                    'dosis_mensual'      => $dosisMensual,
-                    'fecha_emision'      => $fechaEmision,
-                    'fecha_vencimiento'  => $fechaVencimiento,
+                    'evento' => 'Actualización de prescripción médica y tratamiento autorizado',
+                    'paciente_id' => $pacienteId,
+                    'paciente' => $paciente['nombre_completo'],
+                    'medicamento_id' => $medicamentoId,
+                    'medicamento' => $med['nombre_generico'] . ' ' . $med['concentracion'],
+                    'patologia_id' => $patologiaId,
+                    'patologia' => "[{$pat['codigo_cie10']}] {$pat['nombre']}",
+                    'dosis_mensual' => $dosisMensual,
+                    'fecha_emision' => $fechaEmision,
+                    'fecha_vencimiento' => $fechaVencimiento,
                     'medico_prescriptor' => $medicoPrescriptor
                 ]);
 
@@ -2173,11 +2174,11 @@ try {
 
             $accionLog = ($nuevoEstado === 1) ? 'ACTIVAR_RECIPE' : 'DESACTIVAR_RECIPE';
             registrarAuditoria($pdo, $usuarioSesionId, $accionLog, 'tratamientos_autorizados', $id, [
-                'evento'          => ($nuevoEstado === 1) ? 'Reactivación de prescripción médica' : 'Suspensión/desactivación de prescripción médica',
-                'paciente_id'     => $rec['paciente_id'],
-                'medicamento_id'  => $rec['medicamento_id'],
+                'evento' => ($nuevoEstado === 1) ? 'Reactivación de prescripción médica' : 'Suspensión/desactivación de prescripción médica',
+                'paciente_id' => $rec['paciente_id'],
+                'medicamento_id' => $rec['medicamento_id'],
                 'estado_anterior' => (int) $rec['activo'],
-                'nuevo_estado'    => $nuevoEstado
+                'nuevo_estado' => $nuevoEstado
             ]);
 
             $pdo->commit();
@@ -2197,17 +2198,17 @@ try {
             }
 
             $tratamientoId = filter_input(INPUT_POST, 'tratamiento_id', FILTER_VALIDATE_INT);
-            $loteId        = filter_input(INPUT_POST, 'lote_id', FILTER_VALIDATE_INT);
-            $cantidad      = filter_input(INPUT_POST, 'cantidad', FILTER_VALIDATE_INT);
+            $loteId = filter_input(INPUT_POST, 'lote_id', FILTER_VALIDATE_INT);
+            $cantidad = filter_input(INPUT_POST, 'cantidad', FILTER_VALIDATE_INT);
             $centroIdInput = filter_input(INPUT_POST, 'centro_salud_id', FILTER_VALIDATE_INT);
-            $periodo       = trim((string)($_POST['periodo_mes_anio'] ?? date('Y-m')));
-            $observaciones = trim((string)($_POST['observaciones'] ?? ''));
-            $qRetorno      = trim((string)($_POST['q_paciente_retorno'] ?? ''));
+            $periodo = trim((string) ($_POST['periodo_mes_anio'] ?? date('Y-m')));
+            $observaciones = trim((string) ($_POST['observaciones'] ?? ''));
+            $qRetorno = trim((string) ($_POST['q_paciente_retorno'] ?? ''));
 
             $urlRetorno = 'index.php?tab=despachos' . ($qRetorno !== '' ? '&q_paciente=' . urlencode($qRetorno) : '');
 
             // Control de Jurisdicción Sanitaria
-            $centroSaludId = puedeSupervisarTodaLaRed() ? ($centroIdInput ?: (int)$usuario['centro_salud_id']) : (int)$usuario['centro_salud_id'];
+            $centroSaludId = puedeSupervisarTodaLaRed() ? ($centroIdInput ?: (int) $usuario['centro_salud_id']) : (int) $usuario['centro_salud_id'];
 
             if (!$tratamientoId || $tratamientoId <= 0) {
                 header("Location: {$urlRetorno}&error=" . urlencode('Tratamiento o récipe médico inválido.'));
@@ -2259,21 +2260,21 @@ try {
 
             $stmtSp->execute([
                 ':tratamiento_id' => $tratamientoId,
-                ':centro_id'      => $centroSaludId,
-                ':usuario_id'     => $usuarioSesionId,
-                ':lote_id'        => $loteId,
-                ':cantidad'       => $cantidad,
-                ':periodo'        => $periodo,
-                ':obs'            => $observaciones !== '' ? substr($observaciones, 0, 255) : null
+                ':centro_id' => $centroSaludId,
+                ':usuario_id' => $usuarioSesionId,
+                ':lote_id' => $loteId,
+                ':cantidad' => $cantidad,
+                ':periodo' => $periodo,
+                ':obs' => $observaciones !== '' ? substr($observaciones, 0, 255) : null
             ]);
             $stmtSp->closeCursor();
 
             // Rescate de parámetros OUT del Stored Procedure
             $resOut = $pdo->query("SELECT @despacho_id AS despacho_id, @codigo_resultado AS codigo, @mensaje_resultado AS mensaje")->fetch(PDO::FETCH_ASSOC);
 
-            $nuevoDespachoId = (int)($resOut['despacho_id'] ?? 0);
-            $codigoResultado = trim((string)($resOut['codigo'] ?? ''));
-            $mensajeProc     = trim((string)($resOut['mensaje'] ?? ''));
+            $nuevoDespachoId = (int) ($resOut['despacho_id'] ?? 0);
+            $codigoResultado = trim((string) ($resOut['codigo'] ?? ''));
+            $mensajeProc = trim((string) ($resOut['mensaje'] ?? ''));
 
             if ($codigoResultado === 'ERROR' || $nuevoDespachoId <= 0) {
                 $errorMsg = $mensajeProc !== '' ? $mensajeProc : 'No fue posible completar el despacho en el motor de base de datos.';
@@ -2295,7 +2296,8 @@ try {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
-    } catch (Throwable) {}
+    } catch (Throwable) {
+    }
 
     if (!empty($archivoSubidoRuta) && file_exists($archivoSubidoRuta)) {
         @unlink($archivoSubidoRuta);
@@ -2322,9 +2324,9 @@ try {
         $targetTab = 'despachos';
     }
 
-    $codigoSql  = (string)$e->getCode();
+    $codigoSql = (string) $e->getCode();
     $mensajeSql = $e->getMessage();
-    $driverCode = (int)($e->errorInfo[1] ?? 0);
+    $driverCode = (int) ($e->errorInfo[1] ?? 0);
 
     // Mapeo amigable de violaciones de integridad y reglas de base de datos
     if ($driverCode === 1062 || str_contains($mensajeSql, '1062 Duplicate entry')) {
@@ -2359,7 +2361,7 @@ try {
 
     $extraParams = '';
     if ($targetTab === 'despachos') {
-        $qPac = trim((string)($_POST['q_paciente_retorno'] ?? $_GET['q_paciente'] ?? ''));
+        $qPac = trim((string) ($_POST['q_paciente_retorno'] ?? $_GET['q_paciente'] ?? ''));
         if ($qPac !== '') {
             $extraParams = '&q_paciente=' . urlencode($qPac);
         }
@@ -2372,7 +2374,8 @@ try {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
-    } catch (Throwable) {}
+    } catch (Throwable) {
+    }
 
     if (!empty($archivoSubidoRuta) && file_exists($archivoSubidoRuta)) {
         @unlink($archivoSubidoRuta);
@@ -2380,7 +2383,7 @@ try {
 
     $extraParams = '';
     if (str_contains($accion, 'despacho')) {
-        $qPac = trim((string)($_POST['q_paciente_retorno'] ?? $_GET['q_paciente'] ?? ''));
+        $qPac = trim((string) ($_POST['q_paciente_retorno'] ?? $_GET['q_paciente'] ?? ''));
         if ($qPac !== '') {
             $extraParams = '&tab=despachos&q_paciente=' . urlencode($qPac);
         }
