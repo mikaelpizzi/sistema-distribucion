@@ -227,30 +227,84 @@ sistema-distribucion/
 │   ├── reset_quickstart.php          # Motor PHP para restablecimiento canónico de base de datos
 │   └── poblar_medicamentos.php       # Generador de carga masiva para pruebas de rendimiento
 ├── src/
+│   ├── actions/                      # Action Handlers transaccionales desacoplados (<100 lín c/u)
+│   │   ├── act_centros.php           # Operaciones sobre red de ambulatorios
+│   │   ├── act_medicamentos.php      # Altas y modificaciones de fármacos en vademécum
+│   │   ├── act_maestras.php          # Catálogos, tipos, recursos y matriz dinámica de roles RBAC
+│   │   ├── act_pacientes.php         # Empadronamiento de pacientes y contactos 1FN
+│   │   ├── act_recipes.php           # Prescripciones médicas autorizadas y vigencias
+│   │   ├── act_despachos.php         # Dispensación asistencial FEFO (Stored Procedure)
+│   │   ├── act_usuarios.php          # Gestión de operadores y asignación de perfiles
+│   │   ├── act_auditoria.php         # Streaming pericial de bitácoras en CSV O(1)
+│   │   └── act_configuracion.php     # Identidad institucional y backups calientes
 │   ├── config/
-│   │   └── database.php              # Conexión nativa PDO con control de excepciones y sin emulación
+│   │   ├── database.php              # Conexión nativa PDO con contexto forense WORM
+│   │   └── modules.php               # Feature-flags: activación/omisión de módulos para entregas
 │   ├── helpers/
-│   │   ├── auth.php                  # Autenticación, sesiones y control de acceso por roles (RBAC)
-│   │   └── auditoria.php             # Funciones de trazabilidad inmutable y resolución de deltas
+│   │   ├── auth.php                  # Guardián RBAC, verificación de permisos atómicos y sesiones
+│   │   ├── auditoria.php             # Funciones de trazabilidad forense y resolución de deltas
+│   │   └── configuracion.php         # Parámetros de identidad institucional y umbrales FEFO
 │   ├── public/
 │   │   ├── css/
-│   │   │   └── app.css               # Hoja de estilos de interfaz asistencial responsiva
+│   │   │   ├── app.css               # Estilos principales de la interfaz asistencial
+│   │   │   └── auth.css              # Estilos desacoplados para pantallas de autenticación y setup
 │   │   └── js/
-│   │       └── validaciones.js       # Validación preventiva y sanitización en cliente (Vanilla JS)
-│   ├── scripts/
-│   │   ├── reset_quickstart.php      # Proxy interno para restablecimiento desde contenedor
-│   │   └── poblar_medicamentos.php   # Proxy interno para generación de carga desde contenedor
-│   ├── index.php                     # Panel principal unificado (Ambulatorios, Catálogos, Operadores y Auditoría)
-│   ├── login.php                     # Control de acceso con formulario sobrio de autenticación
-│   ├── logout.php                    # Cierre de sesión seguro con registro en bitácora
-│   ├── setup.php                     # Asistente de primer arranque y configuración inicial del sistema
-│   └── procesar.php                  # Controlador transaccional centralizado para operaciones CRUD
+│   │       ├── validaciones.js       # Validación preventiva en formularios del cliente
+│   │       ├── contactos_repeater.js # Repetidor dinámico 1FN de vías de contacto
+│   │       ├── despachos_fefo.js     # Selección modal FEFO y cálculo dinámico de días/stock
+│   │       ├── permisos_matrix.js    # Utilidad de selección masiva para matriz de permisos
+│   │       └── auditoria_stream.js   # Cliente SSE para telemetría forense en tiempo real
+│   ├── views/
+│   │   ├── layout/                   # Layouts estructurales (header, footer, sidebar, topbar)
+│   │   └── tabs/                     # Vistas parciales modulares autosuficientes
+│   │       ├── auditoria/            # Subpestañas: subtab_eventos.php y subtab_deltas.php
+│   │       ├── medicamentos/         # Subpestañas: subtab_vademecum.php, subtab_formas.php, subtab_patologias.php
+│   │       ├── tab_centros.php
+│   │       ├── tab_pacientes.php
+│   │       ├── tab_recipes.php
+│   │       ├── tab_despachos.php
+│   │       ├── tab_maestras.php
+│   │       ├── tab_usuarios.php
+│   │       ├── tab_configuracion.php
+│   │       └── tab_404.php
+│   ├── index.php                     # Front Controller minimalista (65 líneas)
+│   ├── procesar.php                  # Action Router centralizado con captura de excepciones (84 líneas)
+│   ├── stream_logs.php               # API SSE (Server-Sent Events) para telemetría forense
+│   ├── login.php                     # Inicio de sesión institucional
+│   ├── logout.php                    # Cierre seguro de sesión con registro forense
+│   └── setup.php                     # Asistente de primer arranque y configuración inicial
 ├── .gitattributes                    # Normalización de saltos de línea (LF en scripts Unix)
 ├── .gitignore                        # Exclusión de temporales, credenciales y volcados pesados
 ├── reset_quickstart.bat              # Acceso rápido en Windows para reinicio de demostración
 ├── reset_quickstart.ps1              # Script PowerShell para reinicio de demostración
 └── README.md                         # Documentación técnica integral del proyecto
 ```
+
+### 3.1. Arquitectura Modular y Mecanismo de Entregas Parciales (Feature-Flags)
+
+Para soportar evaluaciones académicas progresivas, auditorías modulares o adaptaciones por fases de entrega, el sistema implementa un mecanismo centralizado de **feature-flags** en el archivo [`src/config/modules.php`](src/config/modules.php).
+
+A través del mapa asociativo devuelto por `obtenerModulosDisponibles()`, el docente o evaluador puede activar o desactivar dinámicamente cualquier módulo del sistema simplemente alternando su valor booleano (`true` / `false`):
+
+```php
+function obtenerModulosDisponibles(): array {
+    return [
+        'centros'       => true,  // Red de ambulatorios y recursos
+        'medicamentos'  => true,  // Vademécum farmacológico
+        'pacientes'     => true,  // Padrón de beneficiarios y contactos 1FN
+        'recipes'       => true,  // Prescripciones médicas
+        'despachos'     => true,  // Dispensación asistencial FEFO
+        'maestras'      => true,  // Catálogos y matriz RBAC
+        'usuarios'      => true,  // Nómina de operadores y seguridad
+        'auditoria'     => true,  // Consola forense WORM y telemetría SSE
+        'configuracion' => true,  // Identidad institucional y respaldos
+    ];
+}
+```
+
+**Beneficios en la evaluación y despliegue:**
+* **Aislamiento de Módulos:** Permite validar de forma autónoma componentes específicos (por ejemplo, evaluar únicamente la capa de Catálogos y Ambulatorios en una primera entrega, o aislar la Dispensación FEFO) sin que el resto del sistema interfiera.
+* **Seguridad en Front Controller y Action Handlers:** Tanto el enrutador de vistas (`src/index.php`) como el despachador de transacciones (`src/procesar.php`) verifican `esModuloActivo($modulo)` antes de renderizar pestañas o despachar acciones, retornando respuestas de rechazo controlado y vistas 404/Inactivo si se intenta acceder a un componente deshabilitado.
 
 ---
 
@@ -299,8 +353,9 @@ Si el sistema fue inicializado con los datos de prueba (o mediante `05_seeders.s
 
 | Perfil / Rol | Correo Institucional | Contraseña | Alcance y Jurisdicción (RBAC) |
 | :--- | :--- | :--- | :--- |
-| **Administrador Central** | `admin@salud.prueba.ve` | `admin123` | **Acceso Global:** Gestión de ambulatorios, catálogos 3FN, operadores de seguridad, auditoría inmutable y descarga de respaldos. |
-| **Farmaceuta Operador** | `farmacia.llano@salud.prueba.ve` | `farmacia123` | **Acceso Restringido:** Delimitado estrictamente a su ambulatorio de adscripción. Bloqueo total de catálogos, operadores, auditoría y respaldos. |
+| **Administrador Central** | `admin@salud.prueba.ve` | `admin123` | **Acceso Global Irrestricto (24/24 permisos):** Configuración de identidad, gestión de ambulatorios, vademécum, operadores, matriz de roles dinámicos, auditoría y respaldos calientes. |
+| **Farmaceuta Operador** | `farmacia.llano@salud.prueba.ve` | `farmacia123` | **Acceso Operativo Asistencial:** Circunscrito estrictamente al Ambulatorio El Llano. Padrón de pacientes, emisión de récipes y dispensación FEFO. Bloqueo total de módulos administrativos y auditoría. |
+| **Auditor Sanitario** | `auditor@salud.prueba.ve` | `auditor123` | **Supervisión Global en Modo Fiscalización:** Jurisdicción intercentros sobre toda la red. Consulta de padrón, vademécum y nómina. Acceso total a la consola forense WORM, deltas celda por celda y exportación pericial en CSV. Botones de mutación y dispensación inhabilitados. |
 
 ---
 
