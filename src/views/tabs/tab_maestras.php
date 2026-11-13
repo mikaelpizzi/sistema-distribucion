@@ -752,7 +752,7 @@ foreach ($permisosCatalogo as $p) {
                             <div class="card-sicm">
                                 <div class="card-header-sicm d-flex justify-content-between align-items-center">
                                     <div>
-                                        <span class="fw-bold">Atributos Farmacológicos Normalizados</span>
+                                        <span class="fw-bold">Atributos Farmacológicos</span>
                                         <span class="code-tag ms-2">atributos_farmacologicos</span>
                                     </div>
                                 </div>

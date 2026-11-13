@@ -37,7 +37,7 @@ declare(strict_types=1);
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label-sicm">Clasificación Nosológica (3FN) <span class="text-danger">*</span></label>
+                        <label class="form-label-sicm">Clasificación Nosológica <span class="text-danger">*</span></label>
                         <select name="clasificacion_id" class="form-select form-select-sm" required>
                             <option value="">-- Seleccionar Clasificación --</option>
                             <?php foreach ($clasificacionesPatologiaCatalogo as $cl): ?>
@@ -47,7 +47,7 @@ declare(strict_types=1);
                             <?php endforeach; ?>
                         </select>
                         <div class="form-text" style="font-size: 0.70rem;">
-                            Define el régimen de récipe médico y la vigencia asistencial en 3FN.
+                            Define el régimen de récipe médico y la vigencia asistencial.
                         </div>
                     </div>
 

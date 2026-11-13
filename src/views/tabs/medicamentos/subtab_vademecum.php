@@ -77,7 +77,7 @@ declare(strict_types=1);
 
                     <div class="p-2.5 bg-light border rounded">
                         <label class="form-label-sicm mb-1 fw-bold text-dark">
-                            <i class="bi bi-tags-fill text-primary me-1"></i> Atributos Farmacológicos Normalizados (3FN)
+                            <i class="bi bi-tags-fill text-primary me-1"></i> Atributos Farmacológicos
                         </label>
                         <div class="text-muted mb-2" style="font-size: 0.70rem;">
                             Condiciones de custodia técnica, cadena de frío y fiscalización clínica aplicables a este principio activo:
