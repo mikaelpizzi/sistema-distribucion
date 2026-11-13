@@ -1288,13 +1288,12 @@ foreach ($permisosCatalogo as $p) {
                         <!-- ========================================================== -->
                         <div class="col-12 mb-4 sec-catalogo" id="sec-medicos">
                             <div class="card-sicm">
-                                <div class="card-header-sicm d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                <div class="card-header-sicm d-flex justify-content-between align-items-center">
                                     <div class="d-flex align-items-center gap-2">
                                         <i class="bi bi-person-badge text-primary"></i>
                                         <span class="fw-bold">Padrón de Médicos Prescriptores Acreditados</span>
                                         <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle small"><?= count($todosMedicos) ?> médicos registrados</span>
                                     </div>
-                                    <span class="small text-muted font-monospace" style="font-size: 0.72rem;">Tabla: `medicos` | 3FN</span>
                                 </div>
                                 <div class="p-3 text-muted small border-bottom bg-white">
                                     Registro oficial de facultativos sanitarios acreditados ante el MPPS con competencia legal para emitir récipes y prescripciones médicas dentro de la red municipal de salud.

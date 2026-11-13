@@ -90,12 +90,12 @@ $seccionNombre = 'Configuración';
                                         <!-- Semáforo y Reglas Operativas FEFO -->
                                         <h6 class="fw-bold text-dark d-flex align-items-center gap-2 mb-3">
                                             <i class="bi bi-clock-history text-warning"></i> Semáforo y Políticas de
-                                            Almacenamiento FEFO
+                                            Almacenamiento
                                         </h6>
                                         <div class="row g-3 mb-4">
                                             <div class="col-md-6">
                                                 <label for="dias_alerta_fefo" class="form-label fw-semibold small">Días de
-                                                    Anticipación para Alerta FEFO <span class="text-danger">*</span></label>
+                                                    Anticipación para Alerta de Caducidad <span class="text-danger">*</span></label>
                                                 <div class="input-group input-group-sm">
                                                     <input type="number" class="form-control font-monospace"
                                                         id="dias_alerta_fefo" name="dias_alerta_fefo"
