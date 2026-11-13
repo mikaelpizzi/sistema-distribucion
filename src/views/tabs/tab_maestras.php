@@ -50,6 +50,16 @@ $clasificacionesPatologia = $pdo->query("
     ORDER BY cp.id ASC
 ")->fetchAll();
 
+// Catálogo 6: Padrón de Médicos Prescriptores Acreditados (3FN)
+$todosMedicos = $pdo->query("
+    SELECT m.id, m.nombres, m.apellidos, m.matricula_mpps, m.especialidad, m.telefono, m.activo, m.created_at,
+           COUNT(t.id) AS total_recipes
+    FROM medicos m
+    LEFT JOIN tratamientos_autorizados t ON t.medico_id = m.id
+    GROUP BY m.id, m.nombres, m.apellidos, m.matricula_mpps, m.especialidad, m.telefono, m.activo, m.created_at
+    ORDER BY m.activo DESC, m.apellidos ASC, m.nombres ASC
+")->fetchAll();
+
 
 // Gestión Dinámica de Roles RBAC y Matriz de Permisos en 3FN
 $todosRoles = $pdo->query("
@@ -160,6 +170,11 @@ foreach ($permisosCatalogo as $p) {
                                     <li class="nav-item">
                                         <a class="nav-link py-1 px-2.5 small fw-medium" href="#sec-patologias">
                                             <i class="bi bi-clipboard2-pulse me-1"></i>Clasificaciones de Patologías
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link py-1 px-2.5 small fw-medium" href="#sec-medicos">
+                                            <i class="bi bi-person-badge me-1"></i>Padrón de Médicos
                                         </a>
                                     </li>
                                 </ul>
@@ -1251,6 +1266,182 @@ foreach ($permisosCatalogo as $p) {
                                                                                 Tratamiento Crónico / Dotación Mensual Recurrente
                                                                             </label>
                                                                         </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-between">
+                                                                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                                                                    <button type="submit" class="btn btn-primary btn-sm px-3 fw-semibold">Guardar Cambios</button>
+                                                                </div>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ========================================================== -->
+                        <!-- PADRÓN DE MÉDICOS PRESCRIPTORES ACREDITADOS (3FN)          -->
+                        <!-- ========================================================== -->
+                        <div class="col-12 mb-4 sec-catalogo" id="sec-medicos">
+                            <div class="card-sicm">
+                                <div class="card-header-sicm d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <i class="bi bi-person-badge text-primary"></i>
+                                        <span class="fw-bold">Padrón de Médicos Prescriptores Acreditados</span>
+                                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle small"><?= count($todosMedicos) ?> médicos registrados</span>
+                                    </div>
+                                    <span class="small text-muted font-monospace" style="font-size: 0.72rem;">Tabla: `medicos` | 3FN</span>
+                                </div>
+                                <div class="p-3 text-muted small border-bottom bg-white">
+                                    Registro oficial de facultativos sanitarios acreditados ante el MPPS con competencia legal para emitir récipes y prescripciones médicas dentro de la red municipal de salud.
+                                </div>
+                                <div class="p-3 bg-light border-top border-bottom">
+                                    <form action="procesar.php" method="POST" class="row g-2 align-items-end">
+                                        <input type="hidden" name="csrf_token"
+                                            value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                        <input type="hidden" name="accion" value="crear_medico">
+                                        <div class="col-md-2">
+                                            <label class="form-label small fw-semibold mb-1">Nombres *</label>
+                                            <input type="text" name="nombres" class="form-control form-control-sm"
+                                                placeholder="Ej: Carlos" required maxlength="100">
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label small fw-semibold mb-1">Apellidos *</label>
+                                            <input type="text" name="apellidos" class="form-control form-control-sm"
+                                                placeholder="Ej: Mendoza Albornoz" required maxlength="100">
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label small fw-semibold mb-1">Matrícula MPPS *</label>
+                                            <input type="text" name="matricula_mpps"
+                                                class="form-control form-control-sm text-uppercase font-monospace"
+                                                placeholder="Ej: MPPS-78412" required maxlength="50">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label small fw-semibold mb-1">Especialidad Clínica *</label>
+                                            <input type="text" name="especialidad" class="form-control form-control-sm"
+                                                placeholder="Ej: Medicina Interna" required maxlength="100">
+                                        </div>
+                                        <div class="col-md-2">
+                                            <label class="form-label small fw-semibold mb-1">Teléfono</label>
+                                            <input type="text" name="telefono" class="form-control form-control-sm"
+                                                placeholder="Ej: 0414-7841201" maxlength="50">
+                                        </div>
+                                        <div class="col-md-1">
+                                            <button type="submit" class="btn btn-primary btn-sm w-100 fw-semibold text-nowrap">+ Agregar</button>
+                                        </div>
+                                    </form>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-sm table-sicm mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th style="width: 45px;">ID</th>
+                                                <th style="width: 120px;">Matrícula MPPS</th>
+                                                <th>Médico Tratante</th>
+                                                <th>Especialidad</th>
+                                                <th>Contacto</th>
+                                                <th style="width: 110px;" class="text-center">Récipes</th>
+                                                <th style="width: 80px;">Estado</th>
+                                                <th style="width: 145px;" class="text-end pe-3">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($todosMedicos as $m): ?>
+                                                <tr>
+                                                    <td class="text-muted fw-bold">#<?= (int) $m['id'] ?></td>
+                                                    <td><span class="code-tag font-monospace"><?= htmlspecialchars($m['matricula_mpps']) ?></span></td>
+                                                    <td class="fw-semibold text-dark">
+                                                        Dr(a). <?= htmlspecialchars($m['nombres'] . ' ' . $m['apellidos']) ?>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-light text-dark border">
+                                                            <?= htmlspecialchars($m['especialidad']) ?>
+                                                        </span>
+                                                    </td>
+                                                    <td class="small text-muted font-monospace">
+                                                        <?= htmlspecialchars($m['telefono'] ?? 'Sin teléfono') ?>
+                                                    </td>
+                                                    <td class="text-center">
+                                                        <?php if ((int) $m['total_recipes'] > 0): ?>
+                                                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace">
+                                                                <?= (int) $m['total_recipes'] ?> <?= (int) $m['total_recipes'] === 1 ? 'récipe' : 'récipes' ?>
+                                                            </span>
+                                                        <?php else: ?>
+                                                            <span class="text-muted small" style="font-size: 0.72rem;">0 récipes</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php if ((int) $m['activo'] === 1): ?>
+                                                            <span class="badge badge-status-active">Acreditado</span>
+                                                        <?php else: ?>
+                                                            <span class="badge badge-status-inactive">Inactivo</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td class="text-end pe-3">
+                                                        <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2 me-1"
+                                                            style="font-size: 0.72rem;" data-bs-toggle="modal"
+                                                            data-bs-target="#modalEditMedico<?= (int) $m['id'] ?>">
+                                                            <i class="bi bi-pencil me-1"></i>Editar
+                                                        </button>
+                                                        <form method="POST" action="procesar.php" class="d-inline"
+                                                            onsubmit="return confirm('¿Confirma conmutar el estado del médico prescriptor?');">
+                                                            <input type="hidden" name="csrf_token"
+                                                                value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                                            <input type="hidden" name="accion" value="toggle_medico">
+                                                            <input type="hidden" name="id" value="<?= (int) $m['id'] ?>">
+                                                            <input type="hidden" name="estado"
+                                                                value="<?= (int) $m['activo'] === 1 ? '0' : '1' ?>">
+                                                            <button type="submit"
+                                                                class="btn btn-outline-secondary btn-sm py-0 px-2"
+                                                                style="font-size: 0.72rem;">
+                                                                <?= (int) $m['activo'] === 1 ? 'Desactivar' : 'Activar' ?>
+                                                            </button>
+                                                        </form>
+                                                    </td>
+                                                </tr>
+
+                                                <!-- Modal Edición Médico -->
+                                                <div class="modal fade" id="modalEditMedico<?= (int) $m['id'] ?>" tabindex="-1" aria-hidden="true">
+                                                    <div class="modal-dialog modal-dialog-centered">
+                                                        <div class="modal-content border-0 shadow">
+                                                            <form action="procesar.php" method="POST">
+                                                                <input type="hidden" name="csrf_token"
+                                                                    value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                                                <input type="hidden" name="accion" value="editar_medico">
+                                                                <input type="hidden" name="id" value="<?= (int) $m['id'] ?>">
+                                                                <div class="modal-header bg-light py-2 px-3 border-bottom">
+                                                                    <h6 class="modal-title fw-bold">Editar Médico Prescriptor #<?= (int) $m['id'] ?></h6>
+                                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                                </div>
+                                                                <div class="modal-body p-3">
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label small fw-semibold mb-1">Nombres *</label>
+                                                                        <input type="text" name="nombres" class="form-control form-control-sm"
+                                                                            value="<?= htmlspecialchars($m['nombres']) ?>" required maxlength="100">
+                                                                    </div>
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label small fw-semibold mb-1">Apellidos *</label>
+                                                                        <input type="text" name="apellidos" class="form-control form-control-sm"
+                                                                            value="<?= htmlspecialchars($m['apellidos']) ?>" required maxlength="100">
+                                                                    </div>
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label small fw-semibold mb-1">Matrícula Sanitaria MPPS *</label>
+                                                                        <input type="text" name="matricula_mpps" class="form-control form-control-sm text-uppercase font-monospace"
+                                                                            value="<?= htmlspecialchars($m['matricula_mpps']) ?>" required maxlength="50">
+                                                                    </div>
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label small fw-semibold mb-1">Especialidad Clínica *</label>
+                                                                        <input type="text" name="especialidad" class="form-control form-control-sm"
+                                                                            value="<?= htmlspecialchars($m['especialidad']) ?>" required maxlength="100">
+                                                                    </div>
+                                                                    <div class="mb-2">
+                                                                        <label class="form-label small fw-semibold mb-1">Teléfono de Contacto</label>
+                                                                        <input type="text" name="telefono" class="form-control form-control-sm"
+                                                                            value="<?= htmlspecialchars($m['telefono'] ?? '') ?>" maxlength="50">
                                                                     </div>
                                                                 </div>
                                                                 <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-between">

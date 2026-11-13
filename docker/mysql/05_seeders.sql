@@ -47,11 +47,11 @@ INSERT INTO permisos (id, modulo_id, codigo, nombre, descripcion) VALUES
 (5,  2, 'MED_VER', 'Consultar catálogo de medicamentos', 'Visualización de vademécum municipal'),
 (6,  2, 'MED_CREAR', 'Registrar nuevo fármaco', 'Incorporación de nuevos medicamentos al vademécum'),
 (7,  2, 'MED_EDITAR', 'Editar características de fármacos', 'Modificar forma, concentración o cadena de frío'),
-(8,  3, 'INV_VER', 'Consultar existencias y lotes FEFO', 'Inspección de stock por ambulatorio y vencimientos'),
+(8,  3, 'INV_VER', 'Consultar existencias y lotes', 'Inspección de stock por ambulatorio y vencimientos'),
 (9,  3, 'INV_REGISTRAR_LOTE', 'Ingresar nuevo lote al inventario', 'Recepción formal de lotes farmacéuticos'),
 (10, 3, 'INV_AJUSTAR', 'Ajustar mermas de inventario', 'Reporte justificado de deterioros o averías'),
 (11, 4, 'DESP_VER', 'Consultar despachos realizados', 'Histórico de suministros entregados por periodo'),
-(12, 4, 'DESP_PROCESAR', 'Procesar dispensación FEFO', 'Ejecución de despachos mediante transacción atómica'),
+(12, 4, 'DESP_PROCESAR', 'Procesar dispensación', 'Ejecución de despachos mediante transacción atómica'),
 (13, 5, 'USR_VER', 'Consultar usuarios y perfiles', 'Visualización de nómina de operadores del sistema'),
 (14, 5, 'USR_GESTIONAR', 'Administrar usuarios y permisos', 'Creación, edición y asignación de roles RBAC'),
 (15, 6, 'AUDIT_VER', 'Consultar bitácoras forenses', 'Acceso a la auditoría general y auditoría delta celda por celda'),
@@ -237,16 +237,33 @@ INSERT INTO paciente_contactos (id, paciente_id, tipo_contacto_id, valor, es_pri
 ON DUPLICATE KEY UPDATE valor = VALUES(valor), es_principal = VALUES(es_principal);
 
 -- ============================================================================
+-- 5.9 PADRÓN DE MÉDICOS PRESCRIPTORES ACREDITADOS (3FN)
+-- ============================================================================
+INSERT INTO medicos (id, nombres, apellidos, matricula_mpps, especialidad, telefono, activo) VALUES
+(1, 'Carlos', 'Mendoza Albornoz', 'MPPS-78412', 'Medicina Interna', '0414-7841201', 1),
+(2, 'Elena', 'Rivas Briceño', 'MPPS-65239', 'Cardiología', '0424-6523902', 1),
+(3, 'Marcos', 'Paredes Uzcátegui', 'MPPS-91044', 'Medicina General', '0412-9104403', 1),
+(4, 'Sofía', 'Valero Márquez', 'MPPS-84310', 'Endocrinología', '0416-8431004', 1)
+ON DUPLICATE KEY UPDATE 
+    nombres = VALUES(nombres),
+    apellidos = VALUES(apellidos),
+    especialidad = VALUES(especialidad),
+    telefono = VALUES(telefono),
+    activo = VALUES(activo);
+
+-- ============================================================================
 -- 6. TRATAMIENTOS AUTORIZADOS (RÉCIPES VIGENTES)
 -- ============================================================================
-INSERT INTO tratamientos_autorizados (id, paciente_id, medicamento_id, patologia_id, dosis_mensual, fecha_emision_recipe, fecha_vencimiento_recipe, medico_prescriptor, activo) VALUES
+INSERT INTO tratamientos_autorizados (id, paciente_id, medicamento_id, patologia_id, medico_id, dosis_mensual, fecha_emision_recipe, fecha_vencimiento_recipe, medico_prescriptor, activo) VALUES
 -- Paciente 1 (Juan Morales): Hipertensión -> Losartán 50mg (30 comp/mes)
-(1, 1, 1, 1, 30, '2026-09-01', '2027-09-01', 'Dr. Carlos Mendoza (MPPS 45.120)', 1),
+(1, 1, 1, 1, 1, 30, '2026-09-01', '2027-09-01', 'Dr(a). Carlos Mendoza Albornoz — Matrícula MPPS: MPPS-78412 (Medicina Interna)', 1),
 -- Paciente 2 (María Peña): Diabetes Tipo 2 -> Metformina 850mg (60 comp/mes)
-(2, 2, 2, 2, 60, '2026-08-15', '2027-08-15', 'Dra. Elena Rivas (MPPS 52.880)', 1),
+(2, 2, 2, 2, 2, 60, '2026-08-15', '2027-08-15', 'Dr(a). Elena Rivas Briceño — Matrícula MPPS: MPPS-65239 (Cardiología)', 1),
 -- Paciente 3 (Pedro Albarrán): Diabetes Tipo 1 -> Insulina NPH (2 frascos/mes)
-(3, 3, 3, 3, 2, '2026-10-01', '2027-10-01', 'Dr. Roberto Briceño (MPPS 39.410)', 1)
+(3, 3, 3, 3, 4, 2, '2026-10-01', '2027-10-01', 'Dr(a). Sofía Valero Márquez — Matrícula MPPS: MPPS-84310 (Endocrinología)', 1)
 ON DUPLICATE KEY UPDATE 
+    medico_id = VALUES(medico_id),
+    medico_prescriptor = VALUES(medico_prescriptor),
     dosis_mensual = VALUES(dosis_mensual), 
     fecha_vencimiento_recipe = VALUES(fecha_vencimiento_recipe),
     activo = VALUES(activo);

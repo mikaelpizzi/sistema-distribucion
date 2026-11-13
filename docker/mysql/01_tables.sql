@@ -315,12 +315,25 @@ CREATE TABLE paciente_contactos (
     CONSTRAINT fk_pcont_tipo FOREIGN KEY (tipo_contacto_id) REFERENCES tipos_contacto(id)
 ) ENGINE=InnoDB;
 
--- 5.2 Tratamientos y Prescripciones Médicas Autorizadas
+-- 5.2 Padrón de Médicos Prescriptores Acreditados (3FN)
+CREATE TABLE medicos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    nombres VARCHAR(100) NOT NULL,
+    apellidos VARCHAR(100) NOT NULL,
+    matricula_mpps VARCHAR(50) NOT NULL UNIQUE,
+    especialidad VARCHAR(100) NOT NULL,
+    telefono VARCHAR(50) NULL,
+    activo TINYINT(1) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- 5.3 Tratamientos y Prescripciones Médicas Autorizadas
 CREATE TABLE tratamientos_autorizados (
     id INT AUTO_INCREMENT PRIMARY KEY,
     paciente_id INT NOT NULL,
     medicamento_id INT NOT NULL,
     patologia_id INT NOT NULL,
+    medico_id INT NULL,
     dosis_mensual INT NOT NULL CHECK (dosis_mensual > 0),
     fecha_emision_recipe DATE NOT NULL,
     fecha_vencimiento_recipe DATE NOT NULL,
@@ -330,6 +343,7 @@ CREATE TABLE tratamientos_autorizados (
     CONSTRAINT fk_tratamientos_paciente FOREIGN KEY (paciente_id) REFERENCES pacientes(id),
     CONSTRAINT fk_tratamientos_medicamento FOREIGN KEY (medicamento_id) REFERENCES medicamentos(id),
     CONSTRAINT fk_tratamientos_patologia FOREIGN KEY (patologia_id) REFERENCES patologias(id),
+    CONSTRAINT fk_tratamientos_medico FOREIGN KEY (medico_id) REFERENCES medicos(id),
     CONSTRAINT chk_recipe_rango_fechas CHECK (fecha_vencimiento_recipe >= fecha_emision_recipe)
 ) ENGINE=InnoDB;
 

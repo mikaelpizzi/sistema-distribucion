@@ -122,7 +122,7 @@ A diferencia de soluciones frágiles basadas en columnas `ENUM('admin', 'farmace
 | **Medicamentos** | `MED_VER` | Consultar vademécum municipal | Sí | Sí | Sí |
 | **Medicamentos** | `MED_CREAR` | Registrar nuevo fármaco | Sí | No | No |
 | **Medicamentos** | `MED_EDITAR` | Editar especificaciones farmacológicas | Sí | No | No |
-| **Inventario** | `INV_VER` | Consultar existencias y lotes FEFO | Sí | Sí | Sí |
+| **Inventario** | `INV_VER` | Consultar existencias y lotes | Sí | Sí | Sí |
 | **Inventario** | `INV_REGISTRAR_LOTE` | Recepción e ingreso formal de lotes | Sí | Sí | No |
 | **Inventario** | `INV_AJUSTAR` | Declaración de mermas y averías | Sí | No | No |
 | **Despachos** | `PACIENTES_VER` | Consultar padrón de beneficiarios | Sí | Sí | Sí |
@@ -130,7 +130,7 @@ A diferencia de soluciones frágiles basadas en columnas `ENUM('admin', 'farmace
 | **Despachos** | `RECIPES_VER` | Consultar prescripciones médicas | Sí | Sí | Sí |
 | **Despachos** | `RECIPES_GESTIONAR` | Emitir y conmutar vigencia de récipes | Sí | Sí | No |
 | **Despachos** | `DESP_VER` | Consultar despachos realizados | Sí | Sí | Sí |
-| **Despachos** | `DESP_PROCESAR` | Procesar dispensación FEFO atómica | Sí | Sí | No |
+| **Despachos** | `DESP_PROCESAR` | Procesar dispensación | Sí | Sí | No |
 | **Usuarios** | `USR_VER` | Consultar nómina de operadores | Sí | No | Sí |
 | **Usuarios** | `USR_GESTIONAR` | Crear, editar y asignar operadores | Sí | No | No |
 | **Usuarios** | `CONFIG_SISTEMA` | Configuración de identidad municipal | Sí | No | No |

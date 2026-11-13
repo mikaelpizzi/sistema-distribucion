@@ -229,7 +229,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const dosisInput  = document.getElementById('recipe_dosis_mensual');
             const emision     = document.getElementById('recipe_fecha_emision');
             const vencimiento = document.getElementById('recipe_fecha_vencimiento');
-            const medico      = document.getElementById('recipe_medico_prescriptor');
+            const medico      = document.getElementById('recipe_medico_id') || document.getElementById('recipe_medico_prescriptor');
 
             const erroresR = [];
 
@@ -279,8 +279,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 vencimiento?.classList.remove('is-invalid');
             }
 
-            if (!medico || medico.value.trim().length < 3) {
-                erroresR.push("Debe indicar el nombre del médico prescriptor y su matrícula sanitaria MPPS.");
+            if (!medico || !medico.value || (medico.tagName === 'SELECT' && parseInt(medico.value, 10) <= 0) || (medico.tagName === 'INPUT' && medico.value.trim().length < 3)) {
+                erroresR.push("Debe seleccionar un médico prescriptor acreditado en el padrón oficial.");
                 medico?.classList.add('is-invalid');
             } else {
                 medico?.classList.remove('is-invalid');

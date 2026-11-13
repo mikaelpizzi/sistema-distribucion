@@ -31,6 +31,7 @@ GRANT SELECT, INSERT, UPDATE ON control_medicamentos_red.tipos_documento TO 'app
 GRANT SELECT, INSERT, UPDATE ON control_medicamentos_red.pacientes TO 'app_salud_user'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON control_medicamentos_red.paciente_contactos TO 'app_salud_user'@'%';
 GRANT SELECT, INSERT, UPDATE ON control_medicamentos_red.telefonos_centro_salud TO 'app_salud_user'@'%';
+GRANT SELECT, INSERT, UPDATE ON control_medicamentos_red.medicos TO 'app_salud_user'@'%';
 GRANT SELECT, INSERT, UPDATE ON control_medicamentos_red.tratamientos_autorizados TO 'app_salud_user'@'%';
 GRANT SELECT, INSERT, UPDATE ON control_medicamentos_red.notificaciones_sistema TO 'app_salud_user'@'%';
 GRANT SELECT, INSERT, UPDATE ON control_medicamentos_red.tokens_seguridad TO 'app_salud_user'@'%';

@@ -17,6 +17,7 @@ switch ($accion) {
         $dosisMensual = (int) ($_POST['dosis_mensual'] ?? 0);
         $fechaEmision = trim((string) ($_POST['fecha_emision_recipe'] ?? ''));
         $fechaVencimiento = trim((string) ($_POST['fecha_vencimiento_recipe'] ?? ''));
+        $medicoId = (int) ($_POST['medico_id'] ?? 0);
         $medicoPrescriptor = trim((string) ($_POST['medico_prescriptor'] ?? ''));
 
         if ($pacienteId <= 0) {
@@ -54,10 +55,30 @@ switch ($accion) {
             exit;
         }
 
-        if (mb_strlen($medicoPrescriptor, 'UTF-8') < 3) {
-            header('Location: index.php?tab=recipes&error=' . urlencode('El médico prescriptor y matrícula MPPS deben contener al menos 3 caracteres.'));
+        if ($medicoId <= 0 && empty($medicoPrescriptor)) {
+            header('Location: index.php?tab=recipes&error=' . urlencode('Debe seleccionar un médico prescriptor acreditado en el padrón oficial.'));
             exit;
         }
+
+        // Validar que el médico seleccionado exista y esté activo en la base de datos (3FN estricta)
+        $medicoAcreditado = null;
+        if ($medicoId > 0) {
+            $stmtDoc = $pdo->prepare("SELECT id, nombres, apellidos, matricula_mpps, especialidad FROM medicos WHERE id = :id AND activo = 1");
+            $stmtDoc->execute([':id' => $medicoId]);
+            $medicoAcreditado = $stmtDoc->fetch(PDO::FETCH_ASSOC);
+        } elseif (!empty($medicoPrescriptor)) {
+            $stmtDoc = $pdo->prepare("SELECT id, nombres, apellidos, matricula_mpps, especialidad FROM medicos WHERE (matricula_mpps = :mpps OR CONCAT(nombres, ' ', apellidos) = :nom) AND activo = 1");
+            $stmtDoc->execute([':mpps' => $medicoPrescriptor, ':nom' => $medicoPrescriptor]);
+            $medicoAcreditado = $stmtDoc->fetch(PDO::FETCH_ASSOC);
+        }
+
+        if (!$medicoAcreditado) {
+            header('Location: index.php?tab=recipes&error=' . urlencode('El médico prescriptor seleccionado no se encuentra acreditado o no está activo en el padrón oficial.'));
+            exit;
+        }
+
+        $medicoId = (int) $medicoAcreditado['id'];
+        $medicoPrescriptor = "Dr(a). {$medicoAcreditado['nombres']} {$medicoAcreditado['apellidos']} — Matrícula MPPS: {$medicoAcreditado['matricula_mpps']} ({$medicoAcreditado['especialidad']})";
 
         if (!$pdo->inTransaction()) {
             $pdo->beginTransaction();
@@ -114,13 +135,14 @@ switch ($accion) {
 
             // CREATE
             $sql = "INSERT INTO tratamientos_autorizados 
-                    (paciente_id, medicamento_id, patologia_id, dosis_mensual, fecha_emision_recipe, fecha_vencimiento_recipe, medico_prescriptor, activo)
-                    VALUES (:paciente_id, :medicamento_id, :patologia_id, :dosis_mensual, :fecha_emision, :fecha_vencimiento, :medico, 1)";
+                    (paciente_id, medicamento_id, patologia_id, medico_id, dosis_mensual, fecha_emision_recipe, fecha_vencimiento_recipe, medico_prescriptor, activo)
+                    VALUES (:paciente_id, :medicamento_id, :patologia_id, :medico_id, :dosis_mensual, :fecha_emision, :fecha_vencimiento, :medico, 1)";
             $stmt = $pdo->prepare($sql);
             $stmt->execute([
                 ':paciente_id' => $pacienteId,
                 ':medicamento_id' => $medicamentoId,
                 ':patologia_id' => $patologiaId,
+                ':medico_id' => $medicoId,
                 ':dosis_mensual' => $dosisMensual,
                 ':fecha_emision' => $fechaEmision,
                 ':fecha_vencimiento' => $fechaVencimiento,
@@ -140,6 +162,7 @@ switch ($accion) {
                 'dosis_mensual' => $dosisMensual,
                 'fecha_emision' => $fechaEmision,
                 'fecha_vencimiento' => $fechaVencimiento,
+                'medico_id' => $medicoId,
                 'medico_prescriptor' => $medicoPrescriptor
             ]);
 
@@ -165,6 +188,7 @@ switch ($accion) {
                     SET paciente_id = :paciente_id,
                         medicamento_id = :medicamento_id,
                         patologia_id = :patologia_id,
+                        medico_id = :medico_id,
                         dosis_mensual = :dosis_mensual,
                         fecha_emision_recipe = :fecha_emision,
                         fecha_vencimiento_recipe = :fecha_vencimiento,
@@ -175,6 +199,7 @@ switch ($accion) {
                 ':paciente_id' => $pacienteId,
                 ':medicamento_id' => $medicamentoId,
                 ':patologia_id' => $patologiaId,
+                ':medico_id' => $medicoId,
                 ':dosis_mensual' => $dosisMensual,
                 ':fecha_emision' => $fechaEmision,
                 ':fecha_vencimiento' => $fechaVencimiento,
@@ -193,6 +218,7 @@ switch ($accion) {
                 'dosis_mensual' => $dosisMensual,
                 'fecha_emision' => $fechaEmision,
                 'fecha_vencimiento' => $fechaVencimiento,
+                'medico_id' => $medicoId,
                 'medico_prescriptor' => $medicoPrescriptor
             ]);
 

@@ -411,7 +411,7 @@ $ultimosDespachos = $stmtHist->fetchAll(PDO::FETCH_ASSOC);
                                             <i class="bi bi-chevron-right text-muted d-none d-lg-inline"></i>
                                             <div class="d-flex align-items-center gap-2">
                                                 <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill px-2 py-1">Paso 2</span>
-                                                <span class="fw-semibold text-dark">Validación automática de récipe y lote FEFO</span>
+                                                <span class="fw-semibold text-dark">Validación automática de récipe y lote</span>
                                             </div>
                                             <i class="bi bi-chevron-right text-muted d-none d-lg-inline"></i>
                                             <div class="d-flex align-items-center gap-2">
@@ -514,9 +514,9 @@ $ultimosDespachos = $stmtHist->fetchAll(PDO::FETCH_ASSOC);
                                         style="width: 52px; height: 52px;">
                                         <i class="bi bi-person-vcard fs-3"></i>
                                     </div>
-                                    <h6 class="fw-bold text-dark mb-1">Módulo de Dispensación Asistencial y Entrega FEFO</h6>
+                                    <h6 class="fw-bold text-dark mb-1">Módulo de Dispensación Asistencial</h6>
                                     <p class="text-muted small mx-auto mb-3" style="max-width: 650px;">
-                                        Inicie la atención localizando al paciente por cédula o nombre en el buscador superior. El sistema validará en tiempo real la vigencia del récipe médico, el bloqueo de doble retiro mensual y la asignación automática del lote con fecha de caducidad más próxima (First Expired, First Out).
+                                        Inicie la atención localizando al paciente por cédula o nombre en el buscador superior. El sistema validará en tiempo real la vigencia del récipe médico, el bloqueo de múltiples retiros mensuales y la asignación automática del lote con fecha de caducidad más próxima.
                                     </p>
                                     <div class="d-flex flex-wrap justify-content-center align-items-center gap-2 pt-2 border-top">
                                         <span class="small text-secondary fw-semibold">Consultas de prueba inmediata:</span>

@@ -961,6 +961,162 @@ switch ($accion) {
         header('Location: index.php?tab=maestras&msg=' . urlencode("Estado de clasificación '{$cpNombre}' actualizado.") . '#sec-patologias');
         exit;
 
+    case 'crear_medico':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header('Location: index.php?tab=maestras#sec-medicos');
+            exit;
+        }
+
+        $nombres = trim((string) ($_POST['nombres'] ?? ''));
+        $apellidos = trim((string) ($_POST['apellidos'] ?? ''));
+        $matriculaMpps = trim((string) ($_POST['matricula_mpps'] ?? ''));
+        $especialidad = trim((string) ($_POST['especialidad'] ?? ''));
+        $telefono = trim((string) ($_POST['telefono'] ?? ''));
+
+        if (mb_strlen($nombres) < 2 || mb_strlen($apellidos) < 2 || mb_strlen($matriculaMpps) < 3 || mb_strlen($especialidad) < 3) {
+            header('Location: index.php?tab=maestras&error=' . urlencode('Nombres, Apellidos, Matrícula MPPS y Especialidad son obligatorios.') . '#sec-medicos');
+            exit;
+        }
+
+        // Validar unicidad de matrícula sanitaria
+        $stmtCheck = $pdo->prepare("SELECT id FROM medicos WHERE matricula_mpps = :mpps");
+        $stmtCheck->execute([':mpps' => $matriculaMpps]);
+        if ($stmtCheck->fetch()) {
+            header('Location: index.php?tab=maestras&error=' . urlencode("La matrícula sanitaria '{$matriculaMpps}' ya se encuentra registrada en el padrón de médicos.") . '#sec-medicos');
+            exit;
+        }
+
+        if (!$pdo->inTransaction()) {
+            $pdo->beginTransaction();
+        }
+
+        $sql = "INSERT INTO medicos (nombres, apellidos, matricula_mpps, especialidad, telefono, activo)
+                VALUES (:nombres, :apellidos, :mpps, :esp, :tel, 1)";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([
+            ':nombres' => $nombres,
+            ':apellidos' => $apellidos,
+            ':mpps' => $matriculaMpps,
+            ':esp' => $especialidad,
+            ':tel' => $telefono !== '' ? $telefono : null
+        ]);
+        $nuevoId = (int) $pdo->lastInsertId();
+
+        registrarAuditoria($pdo, $usuarioSesionId, 'CREAR_MEDICO', 'medicos', $nuevoId, [
+            'evento' => 'Registro de médico prescriptor en padrón acreditado',
+            'nombres' => $nombres,
+            'apellidos' => $apellidos,
+            'matricula_mpps' => $matriculaMpps,
+            'especialidad' => $especialidad,
+            'telefono' => $telefono
+        ]);
+
+        $pdo->commit();
+        header('Location: index.php?tab=maestras&msg=' . urlencode("Médico prescriptor 'Dr(a). {$nombres} {$apellidos}' registrado exitosamente en el padrón.") . '#sec-medicos');
+        exit;
+
+    case 'editar_medico':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header('Location: index.php?tab=maestras#sec-medicos');
+            exit;
+        }
+
+        $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+        $nombres = trim((string) ($_POST['nombres'] ?? ''));
+        $apellidos = trim((string) ($_POST['apellidos'] ?? ''));
+        $matriculaMpps = trim((string) ($_POST['matricula_mpps'] ?? ''));
+        $especialidad = trim((string) ($_POST['especialidad'] ?? ''));
+        $telefono = trim((string) ($_POST['telefono'] ?? ''));
+
+        if (!$id || mb_strlen($nombres) < 2 || mb_strlen($apellidos) < 2 || mb_strlen($matriculaMpps) < 3 || mb_strlen($especialidad) < 3) {
+            header('Location: index.php?tab=maestras&error=' . urlencode('Datos incompletos para actualizar el médico prescriptor.') . '#sec-medicos');
+            exit;
+        }
+
+        $stmtPrev = $pdo->prepare("SELECT * FROM medicos WHERE id = :id");
+        $stmtPrev->execute([':id' => $id]);
+        $medPrev = $stmtPrev->fetch(PDO::FETCH_ASSOC);
+        if (!$medPrev) {
+            header('Location: index.php?tab=maestras&error=' . urlencode('El médico prescriptor no existe en el sistema.') . '#sec-medicos');
+            exit;
+        }
+
+        $stmtCheck = $pdo->prepare("SELECT id FROM medicos WHERE matricula_mpps = :mpps AND id != :id");
+        $stmtCheck->execute([':mpps' => $matriculaMpps, ':id' => $id]);
+        if ($stmtCheck->fetch()) {
+            header('Location: index.php?tab=maestras&error=' . urlencode("La matrícula sanitaria '{$matriculaMpps}' ya pertenece a otro profesional médico.") . '#sec-medicos');
+            exit;
+        }
+
+        if (!$pdo->inTransaction()) {
+            $pdo->beginTransaction();
+        }
+
+        $sql = "UPDATE medicos 
+                SET nombres = :nombres,
+                    apellidos = :apellidos,
+                    matricula_mpps = :mpps,
+                    especialidad = :esp,
+                    telefono = :tel
+                WHERE id = :id";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([
+            ':nombres' => $nombres,
+            ':apellidos' => $apellidos,
+            ':mpps' => $matriculaMpps,
+            ':esp' => $especialidad,
+            ':tel' => $telefono !== '' ? $telefono : null,
+            ':id' => $id
+        ]);
+
+        $nuevoTextoMedico = "Dr(a). {$nombres} {$apellidos} — Matrícula MPPS: {$matriculaMpps} ({$especialidad})";
+        $stmtSyncTa = $pdo->prepare("UPDATE tratamientos_autorizados SET medico_prescriptor = :txt WHERE medico_id = :mid");
+        $stmtSyncTa->execute([':txt' => $nuevoTextoMedico, ':mid' => $id]);
+
+        registrarAuditoria($pdo, $usuarioSesionId, 'EDITAR_MEDICO', 'medicos', $id, [
+            'evento' => 'Actualización de credenciales y datos de médico prescriptor',
+            'nombres' => $nombres,
+            'apellidos' => $apellidos,
+            'matricula_mpps' => $matriculaMpps,
+            'especialidad' => $especialidad,
+            'telefono' => $telefono
+        ]);
+
+        $pdo->commit();
+        header('Location: index.php?tab=maestras&msg=' . urlencode("Ficha médica de 'Dr(a). {$nombres} {$apellidos}' actualizada con éxito.") . '#sec-medicos');
+        exit;
+
+    case 'toggle_medico':
+        $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT) ?: filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+        $st = isset($_POST['estado']) ? (int) $_POST['estado'] : (isset($_GET['estado']) ? (int) $_GET['estado'] : null);
+
+        if (!$id || ($st !== 0 && $st !== 1)) {
+            header('Location: index.php?tab=maestras&error=' . urlencode('Parámetros inválidos.') . '#sec-medicos');
+            exit;
+        }
+
+        $stmtMed = $pdo->prepare("SELECT nombres, apellidos, matricula_mpps FROM medicos WHERE id = :id");
+        $stmtMed->execute([':id' => $id]);
+        $medInfo = $stmtMed->fetch(PDO::FETCH_ASSOC);
+        $docNom = $medInfo ? "Dr(a). {$medInfo['nombres']} {$medInfo['apellidos']}" : "Médico #{$id}";
+
+        if (!$pdo->inTransaction()) {
+            $pdo->beginTransaction();
+        }
+
+        $pdo->prepare("UPDATE medicos SET activo = :st WHERE id = :id")->execute([':st' => $st, ':id' => $id]);
+
+        registrarAuditoria($pdo, $usuarioSesionId, 'CONMUTAR_ESTADO_MEDICO', 'medicos', $id, [
+            'evento' => 'Conmutación de acreditación y vigencia de médico prescriptor',
+            'medico' => $docNom,
+            'matricula_mpps' => $medInfo['matricula_mpps'] ?? '',
+            'nuevo_estado' => $st
+        ]);
+
+        $pdo->commit();
+        header('Location: index.php?tab=maestras&msg=' . urlencode("Vigencia facultativa de '{$docNom}' actualizada.") . '#sec-medicos');
+        exit;
+
     default:
         header('Location: index.php?tab=maestras');
         exit;

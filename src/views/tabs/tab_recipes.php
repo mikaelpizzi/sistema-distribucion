@@ -29,6 +29,13 @@ $catalogoPatologias = $pdo->query("
     ORDER BY nombre ASC
 ")->fetchAll(PDO::FETCH_ASSOC);
 
+$catalogoMedicos = $pdo->query("
+    SELECT id, nombres, apellidos, matricula_mpps, especialidad, telefono, activo
+    FROM medicos
+    WHERE activo = 1
+    ORDER BY apellidos ASC, nombres ASC
+")->fetchAll(PDO::FETCH_ASSOC);
+
 // 2. Métricas del Cuadro de Mando de Récipes (KPIs Institucionales)
 $kpiTotalRecipes = (int) ($pdo->query("SELECT COUNT(*) FROM tratamientos_autorizados")->fetchColumn() ?: 0);
 $kpiRecipesVigentes = (int) ($pdo->query("SELECT COUNT(*) FROM tratamientos_autorizados WHERE activo = 1 AND fecha_vencimiento_recipe >= CURRENT_DATE")->fetchColumn() ?: 0);
@@ -44,11 +51,14 @@ $condRecipes = [];
 $paramsRecipes = [];
 
 if ($busquedaRecipe !== '') {
-    $condRecipes[] = "(p.cedula LIKE :q1 OR p.nombre_completo LIKE :q2 OR m.nombre_generico LIKE :q3 OR t.medico_prescriptor LIKE :q4)";
+    $condRecipes[] = "(p.cedula LIKE :q1 OR p.nombre_completo LIKE :q2 OR m.nombre_generico LIKE :q3 OR t.medico_prescriptor LIKE :q4 OR med.nombres LIKE :q5 OR med.apellidos LIKE :q6 OR med.matricula_mpps LIKE :q7)";
     $paramsRecipes[':q1'] = '%' . $busquedaRecipe . '%';
     $paramsRecipes[':q2'] = '%' . $busquedaRecipe . '%';
     $paramsRecipes[':q3'] = '%' . $busquedaRecipe . '%';
     $paramsRecipes[':q4'] = '%' . $busquedaRecipe . '%';
+    $paramsRecipes[':q5'] = '%' . $busquedaRecipe . '%';
+    $paramsRecipes[':q6'] = '%' . $busquedaRecipe . '%';
+    $paramsRecipes[':q7'] = '%' . $busquedaRecipe . '%';
 }
 
 if ($filtroEstadoRecipe === 'vigentes') {
@@ -78,6 +88,7 @@ $stmtCountRec = $pdo->prepare("
     JOIN medicamentos m ON t.medicamento_id = m.id
     LEFT JOIN formas_farmaceuticas ff ON m.forma_farmaceutica_id = ff.id
     JOIN patologias pat ON t.patologia_id = pat.id
+    LEFT JOIN medicos med ON t.medico_id = med.id
     {$whereRecipesSql}
 ");
 $stmtCountRec->execute($paramsRecipes);
@@ -94,7 +105,7 @@ $offsetRecipes = ($paginaActual - 1) * $limitePorPagina;
 
 // 5. Consulta Principal de Récipes
 $sqlRecipes = "
-    SELECT t.id, t.paciente_id, t.medicamento_id, t.patologia_id, t.dosis_mensual,
+    SELECT t.id, t.paciente_id, t.medicamento_id, t.patologia_id, t.medico_id, t.dosis_mensual,
            t.fecha_emision_recipe, t.fecha_vencimiento_recipe, t.medico_prescriptor,
            t.activo, t.created_at,
            (t.fecha_vencimiento_recipe < CURRENT_DATE) AS esta_vencido,
@@ -102,13 +113,16 @@ $sqlRecipes = "
            td.codigo AS tipo_doc_codigo,
            m.nombre_generico AS medicamento_nombre, m.concentracion AS medicamento_concentracion,
            ff.nombre AS forma_nombre,
-           pat.codigo_cie10 AS patologia_cie10, pat.nombre AS patologia_nombre
+           pat.codigo_cie10 AS patologia_cie10, pat.nombre AS patologia_nombre,
+           med.nombres AS medico_nombres, med.apellidos AS medico_apellidos,
+           med.matricula_mpps AS medico_matricula, med.especialidad AS medico_especialidad
     FROM tratamientos_autorizados t
     JOIN pacientes p ON t.paciente_id = p.id
     LEFT JOIN tipos_documento td ON p.tipo_documento_id = td.id
     JOIN medicamentos m ON t.medicamento_id = m.id
     LEFT JOIN formas_farmaceuticas ff ON m.forma_farmaceutica_id = ff.id
     JOIN patologias pat ON t.patologia_id = pat.id
+    LEFT JOIN medicos med ON t.medico_id = med.id
     {$whereRecipesSql}
     ORDER BY t.id DESC
     LIMIT :limite OFFSET :offset
@@ -306,18 +320,39 @@ if (!empty($_GET['editar_id']) || !empty($_GET['editar'])) {
                                             </div>
 
                                             <div class="mb-2">
-                                                <label class="form-label small fw-semibold text-secondary mb-1">Médico
-                                                    Prescriptor y Matrícula MPPS *</label>
+                                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                                    <label class="form-label small fw-semibold text-secondary mb-0">
+                                                        Médico Prescriptor Acreditado (Padrón MPPS) *
+                                                    </label>
+                                                    <a href="index.php?tab=maestras#sec-medicos" target="_blank" class="small text-decoration-none" style="font-size: 0.70rem;">
+                                                        <i class="bi bi-person-plus me-1"></i>Gestionar Padrón
+                                                    </a>
+                                                </div>
                                                 <div class="input-group input-group-sm">
                                                     <span class="input-group-text bg-white text-muted"><i
                                                             class="bi bi-person-badge"></i></span>
-                                                    <input type="text" name="medico_prescriptor" id="recipe_medico_prescriptor"
-                                                        class="form-control" maxlength="120" required
-                                                        placeholder="Ej: Dra. Elena Rivas - MPPS 52.880"
-                                                        value="<?= $recipeEdicion ? htmlspecialchars($recipeEdicion['medico_prescriptor'] ?? '') : '' ?>">
+                                                    <select name="medico_id" id="recipe_medico_id" class="form-select" required>
+                                                        <option value="">-- Seleccione médico tratante acreditado --</option>
+                                                        <?php foreach ($catalogoMedicos as $medDoc): ?>
+                                                            <?php
+                                                            $selectedMedDoc = false;
+                                                            if ($recipeEdicion) {
+                                                                if (!empty($recipeEdicion['medico_id']) && (int)$recipeEdicion['medico_id'] === (int)$medDoc['id']) {
+                                                                    $selectedMedDoc = true;
+                                                                } elseif (empty($recipeEdicion['medico_id']) && !empty($recipeEdicion['medico_prescriptor'])) {
+                                                                    if (stripos($recipeEdicion['medico_prescriptor'], $medDoc['matricula_mpps']) !== false || stripos($recipeEdicion['medico_prescriptor'], $medDoc['apellidos']) !== false) {
+                                                                        $selectedMedDoc = true;
+                                                                    }
+                                                                }
+                                                            }
+                                                            ?>
+                                                            <option value="<?= (int) $medDoc['id'] ?>" <?= $selectedMedDoc ? 'selected' : '' ?>>
+                                                                Dr(a). <?= htmlspecialchars($medDoc['nombres'] . ' ' . $medDoc['apellidos']) ?> — Matrícula MPPS: <?= htmlspecialchars($medDoc['matricula_mpps']) ?> (<?= htmlspecialchars($medDoc['especialidad']) ?>)
+                                                            </option>
+                                                        <?php endforeach; ?>
+                                                    </select>
                                                 </div>
-                                                <div class="form-text" style="font-size: 0.68rem;">Nombre completo del
-                                                    facultativo tratante y su credencial sanitaria oficial.</div>
+                                                <div class="form-text" style="font-size: 0.68rem;">Facultativo tratante acreditado con credencial sanitaria oficial en el padrón institucional.</div>
                                             </div>
                                         </div>
                                         <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-between">
@@ -520,9 +555,13 @@ if (!empty($_GET['editar_id']) || !empty($_GET['editar'])) {
                                                                 </div>
                                                             </td>
                                                             <td>
+                                                                <?php
+                                                                $docText = !empty($r['medico_nombres'])
+                                                                    ? "Dr(a). {$r['medico_nombres']} {$r['medico_apellidos']} — Matrícula: {$r['medico_matricula']} ({$r['medico_especialidad']})"
+                                                                    : ($r['medico_prescriptor'] ?? 'No especificado');
+                                                                ?>
                                                                 <div class="small fw-semibold text-dark" style="font-size: 0.78rem;">
-                                                                    <i
-                                                                        class="bi bi-person-badge me-1 text-primary"></i><?= htmlspecialchars($r['medico_prescriptor'] ?? 'No especificado') ?>
+                                                                    <i class="bi bi-person-badge me-1 text-primary"></i><?= htmlspecialchars($docText) ?>
                                                                 </div>
                                                             </td>
                                                             <td class="text-center">
