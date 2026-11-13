@@ -6,16 +6,17 @@ declare(strict_types=1);
 switch ($accion) {
     case 'crear_tipo_centro':
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Location: index.php?tab=maestras');
+            header('Location: index.php?tab=maestras#sec-tipos-centro');
             exit;
         }
 
         $codigo = strtoupper(trim($_POST['codigo'] ?? ''));
+        $codigo = preg_replace('/[^A-Z0-9_]/', '', $codigo);
         $nombre = trim($_POST['nombre'] ?? '');
         $desc = trim($_POST['descripcion'] ?? '');
 
         if (mb_strlen($codigo, 'UTF-8') < 2 || mb_strlen($nombre, 'UTF-8') < 3) {
-            header('Location: index.php?tab=maestras&error=' . urlencode('Código y Denominación son obligatorios.'));
+            header('Location: index.php?tab=maestras&error=' . urlencode('Código (mínimo 2 caracteres) y Denominación son obligatorios.') . '#sec-tipos-centro');
             exit;
         }
 
@@ -29,7 +30,57 @@ switch ($accion) {
             'nombre' => $nombre
         ]);
 
-        header('Location: index.php?tab=maestras&msg=' . urlencode("Clasificación '{$nombre}' registrada en catálogo maestro."));
+        header('Location: index.php?tab=maestras&msg=' . urlencode("Clasificación '{$nombre}' registrada en catálogo maestro.") . '#sec-tipos-centro');
+        exit;
+
+    case 'editar_tipo_centro':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header('Location: index.php?tab=maestras#sec-tipos-centro');
+            exit;
+        }
+
+        $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+        $codigo = strtoupper(trim($_POST['codigo'] ?? ''));
+        $codigo = preg_replace('/[^A-Z0-9_]/', '', $codigo);
+        $nombre = trim($_POST['nombre'] ?? '');
+        $desc = trim($_POST['descripcion'] ?? '');
+
+        if (!$id || mb_strlen($codigo, 'UTF-8') < 2 || mb_strlen($nombre, 'UTF-8') < 3) {
+            header('Location: index.php?tab=maestras&error=' . urlencode('Código (mínimo 2) y Denominación (mínimo 3) son obligatorios.') . '#sec-tipos-centro');
+            exit;
+        }
+
+        $stmtCheck = $pdo->prepare("SELECT id FROM tipos_centro_salud WHERE codigo = :c AND id != :id");
+        $stmtCheck->execute([':c' => $codigo, ':id' => $id]);
+        if ($stmtCheck->fetch()) {
+            header('Location: index.php?tab=maestras&error=' . urlencode("El código '{$codigo}' ya está en uso por otro tipo de centro.") . '#sec-tipos-centro');
+            exit;
+        }
+
+        $stmtPrev = $pdo->prepare("SELECT codigo, nombre, descripcion FROM tipos_centro_salud WHERE id = :id");
+        $stmtPrev->execute([':id' => $id]);
+        $prevData = $stmtPrev->fetch(PDO::FETCH_ASSOC);
+
+        if (!$pdo->inTransaction()) {
+            $pdo->beginTransaction();
+        }
+
+        $stmtUpd = $pdo->prepare("UPDATE tipos_centro_salud SET codigo = :c, nombre = :n, descripcion = :d WHERE id = :id");
+        $stmtUpd->execute([
+            ':c' => $codigo,
+            ':n' => $nombre,
+            ':d' => $desc !== '' ? $desc : null,
+            ':id' => $id
+        ]);
+
+        registrarAuditoria($pdo, $usuarioSesionId, 'EDITAR_TIPO_CENTRO', 'tipos_centro_salud', $id, [
+            'evento' => 'Modificación de especificaciones de tipo de centro asistencial',
+            'anterior' => $prevData,
+            'nuevo' => ['codigo' => $codigo, 'nombre' => $nombre, 'descripcion' => $desc]
+        ]);
+
+        $pdo->commit();
+        header('Location: index.php?tab=maestras&msg=' . urlencode("Tipo de centro '{$nombre}' actualizado con éxito.") . '#sec-tipos-centro');
         exit;
 
     case 'toggle_tipo_centro':
@@ -37,7 +88,7 @@ switch ($accion) {
         $st = isset($_POST['estado']) ? (int) $_POST['estado'] : (isset($_GET['estado']) ? (int) $_GET['estado'] : null);
 
         if (!$id || ($st !== 0 && $st !== 1)) {
-            header('Location: index.php?tab=maestras&error=' . urlencode('Parámetros inválidos.'));
+            header('Location: index.php?tab=maestras&error=' . urlencode('Parámetros inválidos.') . '#sec-tipos-centro');
             exit;
         }
 
@@ -55,21 +106,22 @@ switch ($accion) {
             'nuevo_estado' => $st
         ]);
 
-        header('Location: index.php?tab=maestras&msg=' . urlencode("Vigencia de clasificación '{$tipoNombre}' actualizada."));
+        header('Location: index.php?tab=maestras&msg=' . urlencode("Vigencia de clasificación '{$tipoNombre}' actualizada.") . '#sec-tipos-centro');
         exit;
 
     case 'crear_recurso':
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Location: index.php?tab=maestras');
+            header('Location: index.php?tab=maestras#sec-equipamiento');
             exit;
         }
 
         $codigo = strtoupper(trim($_POST['codigo'] ?? ''));
+        $codigo = preg_replace('/[^A-Z0-9_]/', '', $codigo);
         $nombre = trim($_POST['nombre'] ?? '');
         $desc = trim($_POST['descripcion'] ?? '');
 
         if (mb_strlen($codigo, 'UTF-8') < 2 || mb_strlen($nombre, 'UTF-8') < 3) {
-            header('Location: index.php?tab=maestras&error=' . urlencode('Código y Nombre del recurso son obligatorios.'));
+            header('Location: index.php?tab=maestras&error=' . urlencode('Código y Nombre del recurso son obligatorios.') . '#sec-equipamiento');
             exit;
         }
 
@@ -83,7 +135,57 @@ switch ($accion) {
             'nombre' => $nombre
         ]);
 
-        header('Location: index.php?tab=maestras&msg=' . urlencode("Equipamiento '{$nombre}' añadido al catálogo."));
+        header('Location: index.php?tab=maestras&msg=' . urlencode("Equipamiento '{$nombre}' añadido al catálogo.") . '#sec-equipamiento');
+        exit;
+
+    case 'editar_recurso':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header('Location: index.php?tab=maestras#sec-equipamiento');
+            exit;
+        }
+
+        $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+        $codigo = strtoupper(trim($_POST['codigo'] ?? ''));
+        $codigo = preg_replace('/[^A-Z0-9_]/', '', $codigo);
+        $nombre = trim($_POST['nombre'] ?? '');
+        $desc = trim($_POST['descripcion'] ?? '');
+
+        if (!$id || mb_strlen($codigo, 'UTF-8') < 2 || mb_strlen($nombre, 'UTF-8') < 3) {
+            header('Location: index.php?tab=maestras&error=' . urlencode('Código y Nombre del recurso son obligatorios.') . '#sec-equipamiento');
+            exit;
+        }
+
+        $stmtCheck = $pdo->prepare("SELECT id FROM recursos_operativos WHERE codigo = :c AND id != :id");
+        $stmtCheck->execute([':c' => $codigo, ':id' => $id]);
+        if ($stmtCheck->fetch()) {
+            header('Location: index.php?tab=maestras&error=' . urlencode("El código '{$codigo}' ya está en uso por otro equipamiento/recurso.") . '#sec-equipamiento');
+            exit;
+        }
+
+        $stmtPrev = $pdo->prepare("SELECT codigo, nombre, descripcion FROM recursos_operativos WHERE id = :id");
+        $stmtPrev->execute([':id' => $id]);
+        $prevData = $stmtPrev->fetch(PDO::FETCH_ASSOC);
+
+        if (!$pdo->inTransaction()) {
+            $pdo->beginTransaction();
+        }
+
+        $stmtUpd = $pdo->prepare("UPDATE recursos_operativos SET codigo = :c, nombre = :n, descripcion = :d WHERE id = :id");
+        $stmtUpd->execute([
+            ':c' => $codigo,
+            ':n' => $nombre,
+            ':d' => $desc !== '' ? $desc : null,
+            ':id' => $id
+        ]);
+
+        registrarAuditoria($pdo, $usuarioSesionId, 'EDITAR_RECURSO', 'recursos_operativos', $id, [
+            'evento' => 'Modificación de capacidad/equipamiento en catálogo operativo',
+            'anterior' => $prevData,
+            'nuevo' => ['codigo' => $codigo, 'nombre' => $nombre, 'descripcion' => $desc]
+        ]);
+
+        $pdo->commit();
+        header('Location: index.php?tab=maestras&msg=' . urlencode("Equipamiento '{$nombre}' actualizado con éxito.") . '#sec-equipamiento');
         exit;
 
     case 'toggle_recurso':
@@ -91,7 +193,7 @@ switch ($accion) {
         $st = isset($_POST['estado']) ? (int) $_POST['estado'] : (isset($_GET['estado']) ? (int) $_GET['estado'] : null);
 
         if (!$id || ($st !== 0 && $st !== 1)) {
-            header('Location: index.php?tab=maestras&error=' . urlencode('Parámetros inválidos.'));
+            header('Location: index.php?tab=maestras&error=' . urlencode('Parámetros inválidos.') . '#sec-equipamiento');
             exit;
         }
 
@@ -109,7 +211,7 @@ switch ($accion) {
             'nuevo_estado' => $st
         ]);
 
-        header('Location: index.php?tab=maestras&msg=' . urlencode('Disponibilidad de equipamiento actualizada.'));
+        header('Location: index.php?tab=maestras&msg=' . urlencode('Disponibilidad de equipamiento actualizada.') . '#sec-equipamiento');
         exit;
 
     case 'crear_rol':
@@ -475,28 +577,29 @@ switch ($accion) {
         ]);
 
         $pdo->commit();
-        header('Location: index.php?tab=maestras&msg=' . urlencode("Tipo de documento '{$codigo} - {$nombre}' creado exitosamente."));
+        header('Location: index.php?tab=maestras&msg=' . urlencode("Tipo de documento '{$codigo} - {$nombre}' creado exitosamente.") . '#sec-documentos');
         exit;
 
     case 'editar_tipo_documento':
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Location: index.php?tab=maestras');
+            header('Location: index.php?tab=maestras#sec-documentos');
             exit;
         }
 
         $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
         $codigo = strtoupper(trim($_POST['codigo'] ?? ''));
+        $codigo = preg_replace('/[^A-Z0-9_]/', '', $codigo);
         $nombre = trim($_POST['nombre'] ?? '');
 
         if (!$id || mb_strlen($codigo, 'UTF-8') < 1 || mb_strlen($codigo, 'UTF-8') > 10 || mb_strlen($nombre, 'UTF-8') < 2) {
-            header('Location: index.php?tab=maestras&error=' . urlencode('Parámetros inválidos para edición de tipo de documento.'));
+            header('Location: index.php?tab=maestras&error=' . urlencode('Parámetros inválidos para edición de tipo de documento.') . '#sec-documentos');
             exit;
         }
 
         $stmtCheck = $pdo->prepare("SELECT id FROM tipos_documento WHERE codigo = :c AND id != :id");
         $stmtCheck->execute([':c' => $codigo, ':id' => $id]);
         if ($stmtCheck->fetch()) {
-            header('Location: index.php?tab=maestras&error=' . urlencode("El código de documento '{$codigo}' ya está en uso por otro registro."));
+            header('Location: index.php?tab=maestras&error=' . urlencode("El código de documento '{$codigo}' ya está en uso por otro registro.") . '#sec-documentos');
             exit;
         }
 
@@ -518,7 +621,7 @@ switch ($accion) {
         ]);
 
         $pdo->commit();
-        header('Location: index.php?tab=maestras&msg=' . urlencode("Tipo de documento '{$codigo}' actualizado con éxito."));
+        header('Location: index.php?tab=maestras&msg=' . urlencode("Tipo de documento '{$codigo}' actualizado con éxito.") . '#sec-documentos');
         exit;
 
     case 'toggle_tipo_documento':
@@ -526,7 +629,7 @@ switch ($accion) {
         $st = isset($_POST['estado']) ? (int) $_POST['estado'] : (isset($_GET['estado']) ? (int) $_GET['estado'] : null);
 
         if (!$id || ($st !== 0 && $st !== 1)) {
-            header('Location: index.php?tab=maestras&error=' . urlencode('Parámetros inválidos para conmutar estado.'));
+            header('Location: index.php?tab=maestras&error=' . urlencode('Parámetros inválidos para conmutar estado.') . '#sec-documentos');
             exit;
         }
 
@@ -550,7 +653,7 @@ switch ($accion) {
         ]);
 
         $pdo->commit();
-        header('Location: index.php?tab=maestras&msg=' . urlencode("Estado de documento '{$docCodigo}' actualizado."));
+        header('Location: index.php?tab=maestras&msg=' . urlencode("Estado de documento '{$docCodigo}' actualizado.") . '#sec-documentos');
         exit;
 
     // =========================================================================
@@ -558,7 +661,7 @@ switch ($accion) {
     // =========================================================================
     case 'crear_atributo_farmacologico':
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Location: index.php?tab=maestras');
+            header('Location: index.php?tab=maestras#sec-atributos');
             exit;
         }
 
@@ -566,18 +669,23 @@ switch ($accion) {
         $codigo = preg_replace('/[^A-Z0-9_]/', '', $codigo);
         $nombre = trim($_POST['nombre'] ?? '');
         $descripcion = trim($_POST['descripcion'] ?? '');
-        $icono = trim($_POST['icono'] ?? 'bi-tag');
+        $icono = trim($_POST['icono'] ?? 'bi-capsule');
         $colorBadge = trim($_POST['color_badge'] ?? 'primary');
 
+        $coloresValidos = ['primary', 'info', 'success', 'warning', 'danger', 'purple', 'indigo', 'orange', 'dark', 'secondary'];
+        if (!in_array($colorBadge, $coloresValidos, true)) {
+            $colorBadge = 'primary';
+        }
+
         if (mb_strlen($codigo, 'UTF-8') < 2 || mb_strlen($nombre, 'UTF-8') < 2) {
-            header('Location: index.php?tab=maestras&error=' . urlencode('Código (mínimo 2 caracteres) y Denominación son obligatorios.'));
+            header('Location: index.php?tab=maestras&error=' . urlencode('Código (mínimo 2 caracteres) y Denominación son obligatorios.') . '#sec-atributos');
             exit;
         }
 
         $stmtCheck = $pdo->prepare("SELECT id FROM atributos_farmacologicos WHERE codigo = :c");
         $stmtCheck->execute([':c' => $codigo]);
         if ($stmtCheck->fetch()) {
-            header('Location: index.php?tab=maestras&error=' . urlencode("El atributo '{$codigo}' ya se encuentra registrado."));
+            header('Location: index.php?tab=maestras&error=' . urlencode("El atributo '{$codigo}' ya se encuentra registrado.") . '#sec-atributos');
             exit;
         }
 
@@ -593,8 +701,8 @@ switch ($accion) {
             ':c' => $codigo,
             ':n' => $nombre,
             ':d' => $descripcion !== '' ? $descripcion : null,
-            ':ico' => $icono !== '' ? $icono : 'bi-tag',
-            ':color' => $colorBadge !== '' ? $colorBadge : 'primary'
+            ':ico' => $icono !== '' ? $icono : 'bi-capsule',
+            ':color' => $colorBadge
         ]);
         $nuevoId = (int) $pdo->lastInsertId();
 
@@ -606,7 +714,76 @@ switch ($accion) {
         ]);
 
         $pdo->commit();
-        header('Location: index.php?tab=maestras&msg=' . urlencode("Atributo farmacológico '{$nombre}' incorporado exitosamente."));
+        header('Location: index.php?tab=maestras&msg=' . urlencode("Atributo farmacológico '{$nombre}' incorporado exitosamente.") . '#sec-atributos');
+        exit;
+
+    case 'editar_atributo_farmacologico':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header('Location: index.php?tab=maestras#sec-atributos');
+            exit;
+        }
+
+        $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+        $codigo = strtoupper(trim($_POST['codigo'] ?? ''));
+        $codigo = preg_replace('/[^A-Z0-9_]/', '', $codigo);
+        $nombre = trim($_POST['nombre'] ?? '');
+        $descripcion = trim($_POST['descripcion'] ?? '');
+        $icono = trim($_POST['icono'] ?? 'bi-capsule');
+        $colorBadge = trim($_POST['color_badge'] ?? 'primary');
+
+        $coloresValidos = ['primary', 'info', 'success', 'warning', 'danger', 'purple', 'indigo', 'orange', 'dark', 'secondary'];
+        if (!in_array($colorBadge, $coloresValidos, true)) {
+            $colorBadge = 'primary';
+        }
+
+        if (!$id || mb_strlen($codigo, 'UTF-8') < 2 || mb_strlen($nombre, 'UTF-8') < 2) {
+            header('Location: index.php?tab=maestras&error=' . urlencode('Código (mínimo 2 caracteres) y Denominación son obligatorios.') . '#sec-atributos');
+            exit;
+        }
+
+        $stmtCheck = $pdo->prepare("SELECT id FROM atributos_farmacologicos WHERE codigo = :c AND id != :id");
+        $stmtCheck->execute([':c' => $codigo, ':id' => $id]);
+        if ($stmtCheck->fetch()) {
+            header('Location: index.php?tab=maestras&error=' . urlencode("El código '{$codigo}' ya está en uso por otro atributo farmacológico.") . '#sec-atributos');
+            exit;
+        }
+
+        $stmtPrev = $pdo->prepare("SELECT codigo, nombre, descripcion, icono, color_badge FROM atributos_farmacologicos WHERE id = :id");
+        $stmtPrev->execute([':id' => $id]);
+        $prevData = $stmtPrev->fetch(PDO::FETCH_ASSOC);
+
+        if (!$pdo->inTransaction()) {
+            $pdo->beginTransaction();
+        }
+
+        $stmtUpd = $pdo->prepare("
+            UPDATE atributos_farmacologicos
+            SET codigo = :c, nombre = :n, descripcion = :d, icono = :ico, color_badge = :color
+            WHERE id = :id
+        ");
+        $stmtUpd->execute([
+            ':c' => $codigo,
+            ':n' => $nombre,
+            ':d' => $descripcion !== '' ? $descripcion : null,
+            ':ico' => $icono !== '' ? $icono : 'bi-capsule',
+            ':color' => $colorBadge,
+            ':id' => $id
+        ]);
+
+        registrarAuditoria($pdo, $usuarioSesionId, 'EDITAR_ATRIBUTO_FARMACOLOGICO', 'atributos_farmacologicos', $id, [
+            'evento' => 'Modificación de atributo farmacológico en catálogo 3FN',
+            'anterior' => $prevData,
+            'nuevo' => [
+                'codigo' => $codigo,
+                'nombre' => $nombre,
+                'descripcion' => $descripcion,
+                'icono' => $icono,
+                'color_badge' => $colorBadge
+            ]
+        ]);
+
+        $pdo->commit();
+        header('Location: index.php?tab=maestras&msg=' . urlencode("Atributo farmacológico '{$nombre}' actualizado con éxito.") . '#sec-atributos');
         exit;
 
     case 'toggle_atributo_farmacologico':
@@ -614,7 +791,7 @@ switch ($accion) {
         $st = isset($_POST['estado']) ? (int) $_POST['estado'] : (isset($_GET['estado']) ? (int) $_GET['estado'] : null);
 
         if (!$id || ($st !== 0 && $st !== 1)) {
-            header('Location: index.php?tab=maestras&error=' . urlencode('Parámetros inválidos.'));
+            header('Location: index.php?tab=maestras&error=' . urlencode('Parámetros inválidos.') . '#sec-atributos');
             exit;
         }
 
@@ -636,7 +813,7 @@ switch ($accion) {
         ]);
 
         $pdo->commit();
-        header('Location: index.php?tab=maestras&msg=' . urlencode("Estado de atributo '{$atrNombre}' actualizado."));
+        header('Location: index.php?tab=maestras&msg=' . urlencode("Estado de atributo '{$atrNombre}' actualizado.") . '#sec-atributos');
         exit;
 
     // =========================================================================
@@ -644,7 +821,7 @@ switch ($accion) {
     // =========================================================================
     case 'crear_clasificacion_patologia':
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header('Location: index.php?tab=maestras');
+            header('Location: index.php?tab=maestras#sec-patologias');
             exit;
         }
 
@@ -655,14 +832,14 @@ switch ($accion) {
         $esRecurrente = !empty($_POST['es_recurrente_mensual']) ? 1 : 0;
 
         if (mb_strlen($codigo, 'UTF-8') < 2 || mb_strlen($nombre, 'UTF-8') < 2) {
-            header('Location: index.php?tab=maestras&error=' . urlencode('Código (mínimo 2 caracteres) y Denominación son obligatorios.'));
+            header('Location: index.php?tab=maestras&error=' . urlencode('Código (mínimo 2 caracteres) y Denominación son obligatorios.') . '#sec-patologias');
             exit;
         }
 
         $stmtCheck = $pdo->prepare("SELECT id FROM clasificaciones_patologia WHERE codigo = :c");
         $stmtCheck->execute([':c' => $codigo]);
         if ($stmtCheck->fetch()) {
-            header('Location: index.php?tab=maestras&error=' . urlencode("La clasificación '{$codigo}' ya se encuentra registrada."));
+            header('Location: index.php?tab=maestras&error=' . urlencode("La clasificación '{$codigo}' ya se encuentra registrada.") . '#sec-patologias');
             exit;
         }
 
@@ -690,7 +867,68 @@ switch ($accion) {
         ]);
 
         $pdo->commit();
-        header('Location: index.php?tab=maestras&msg=' . urlencode("Clasificación '{$nombre}' incorporada exitosamente."));
+        header('Location: index.php?tab=maestras&msg=' . urlencode("Clasificación '{$nombre}' incorporada exitosamente.") . '#sec-patologias');
+        exit;
+
+    case 'editar_clasificacion_patologia':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header('Location: index.php?tab=maestras#sec-patologias');
+            exit;
+        }
+
+        $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+        $codigo = strtoupper(trim($_POST['codigo'] ?? ''));
+        $codigo = preg_replace('/[^A-Z0-9_]/', '', $codigo);
+        $nombre = trim($_POST['nombre'] ?? '');
+        $descripcion = trim($_POST['descripcion'] ?? '');
+        $esRecurrente = !empty($_POST['es_recurrente_mensual']) ? 1 : 0;
+
+        if (!$id || mb_strlen($codigo, 'UTF-8') < 2 || mb_strlen($nombre, 'UTF-8') < 2) {
+            header('Location: index.php?tab=maestras&error=' . urlencode('Código (mínimo 2 caracteres) y Denominación son obligatorios.') . '#sec-patologias');
+            exit;
+        }
+
+        $stmtCheck = $pdo->prepare("SELECT id FROM clasificaciones_patologia WHERE codigo = :c AND id != :id");
+        $stmtCheck->execute([':c' => $codigo, ':id' => $id]);
+        if ($stmtCheck->fetch()) {
+            header('Location: index.php?tab=maestras&error=' . urlencode("La clasificación '{$codigo}' ya está en uso por otro registro.") . '#sec-patologias');
+            exit;
+        }
+
+        $stmtPrev = $pdo->prepare("SELECT codigo, nombre, descripcion, es_recurrente_mensual FROM clasificaciones_patologia WHERE id = :id");
+        $stmtPrev->execute([':id' => $id]);
+        $prevData = $stmtPrev->fetch(PDO::FETCH_ASSOC);
+
+        if (!$pdo->inTransaction()) {
+            $pdo->beginTransaction();
+        }
+
+        $stmtUpd = $pdo->prepare("
+            UPDATE clasificaciones_patologia
+            SET codigo = :c, nombre = :n, descripcion = :d, es_recurrente_mensual = :rec
+            WHERE id = :id
+        ");
+        $stmtUpd->execute([
+            ':c' => $codigo,
+            ':n' => $nombre,
+            ':d' => $descripcion !== '' ? $descripcion : null,
+            ':rec' => $esRecurrente,
+            ':id' => $id
+        ]);
+
+        registrarAuditoria($pdo, $usuarioSesionId, 'EDITAR_CLASIFICACION_PATOLOGIA', 'clasificaciones_patologia', $id, [
+            'evento' => 'Modificación de clasificación nosológica de patología',
+            'anterior' => $prevData,
+            'nuevo' => [
+                'codigo' => $codigo,
+                'nombre' => $nombre,
+                'descripcion' => $descripcion,
+                'es_recurrente_mensual' => $esRecurrente
+            ]
+        ]);
+
+        $pdo->commit();
+        header('Location: index.php?tab=maestras&msg=' . urlencode("Clasificación '{$nombre}' actualizada con éxito.") . '#sec-patologias');
         exit;
 
     case 'toggle_clasificacion_patologia':
@@ -698,7 +936,7 @@ switch ($accion) {
         $st = isset($_POST['estado']) ? (int) $_POST['estado'] : (isset($_GET['estado']) ? (int) $_GET['estado'] : null);
 
         if (!$id || ($st !== 0 && $st !== 1)) {
-            header('Location: index.php?tab=maestras&error=' . urlencode('Parámetros inválidos.'));
+            header('Location: index.php?tab=maestras&error=' . urlencode('Parámetros inválidos.') . '#sec-patologias');
             exit;
         }
 
@@ -720,7 +958,7 @@ switch ($accion) {
         ]);
 
         $pdo->commit();
-        header('Location: index.php?tab=maestras&msg=' . urlencode("Estado de clasificación '{$cpNombre}' actualizado."));
+        header('Location: index.php?tab=maestras&msg=' . urlencode("Estado de clasificación '{$cpNombre}' actualizado.") . '#sec-patologias');
         exit;
 
     default:

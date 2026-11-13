@@ -154,7 +154,7 @@ foreach ($permisosCatalogo as $p) {
                                     </li>
                                     <li class="nav-item">
                                         <a class="nav-link py-1 px-2.5 small fw-medium" href="#sec-atributos">
-                                            <i class="bi bi-tags me-1"></i>Atributos Farmacológicos
+                                            <i class="bi bi-capsule me-1"></i>Atributos Farmacológicos
                                         </a>
                                     </li>
                                     <li class="nav-item">
@@ -530,7 +530,7 @@ foreach ($permisosCatalogo as $p) {
                                                 <th>Tipo de Ambulatorio</th>
                                                 <th style="width: 110px;">Centros Vinculados</th>
                                                 <th style="width: 80px;">Estado</th>
-                                                <th style="width: 85px;" class="text-end pe-3">Acción</th>
+                                                <th style="width: 145px;" class="text-end pe-3">Acciones</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -559,6 +559,11 @@ foreach ($permisosCatalogo as $p) {
                                                         <?php endif; ?>
                                                     </td>
                                                     <td class="text-end pe-3">
+                                                        <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2 me-1"
+                                                            style="font-size: 0.72rem;" data-bs-toggle="modal"
+                                                            data-bs-target="#modalEditTipoCentro<?= (int) $t['id'] ?>">
+                                                            <i class="bi bi-pencil me-1"></i>Editar
+                                                        </button>
                                                         <form method="POST" action="procesar.php" class="d-inline"
                                                             onsubmit="return confirm('¿Confirma cambiar el estado de este tipo de centro?');">
                                                             <input type="hidden" name="csrf_token"
@@ -575,6 +580,45 @@ foreach ($permisosCatalogo as $p) {
                                                         </form>
                                                     </td>
                                                 </tr>
+
+                                                <!-- Modal Edición Tipo de Centro -->
+                                                <div class="modal fade" id="modalEditTipoCentro<?= (int) $t['id'] ?>" tabindex="-1" aria-hidden="true">
+                                                    <div class="modal-dialog modal-dialog-centered">
+                                                        <div class="modal-content border-0 shadow">
+                                                            <form action="procesar.php" method="POST">
+                                                                <input type="hidden" name="csrf_token"
+                                                                    value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                                                <input type="hidden" name="accion" value="editar_tipo_centro">
+                                                                <input type="hidden" name="id" value="<?= (int) $t['id'] ?>">
+                                                                <div class="modal-header bg-light py-2 px-3 border-bottom">
+                                                                    <h6 class="modal-title fw-bold">Editar Tipo de Centro #<?= (int) $t['id'] ?></h6>
+                                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                                </div>
+                                                                <div class="modal-body p-3">
+                                                                    <div class="mb-3">
+                                                                         <label class="form-label small fw-semibold mb-1">Código Único *</label>
+                                                                         <input type="text" name="codigo" class="form-control form-control-sm text-uppercase font-monospace"
+                                                                             value="<?= htmlspecialchars($t['codigo']) ?>" required maxlength="30">
+                                                                    </div>
+                                                                    <div class="mb-3">
+                                                                         <label class="form-label small fw-semibold mb-1">Denominación del Tipo *</label>
+                                                                         <input type="text" name="nombre" class="form-control form-control-sm"
+                                                                             value="<?= htmlspecialchars($t['nombre']) ?>" required maxlength="80">
+                                                                    </div>
+                                                                    <div class="mb-2">
+                                                                         <label class="form-label small fw-semibold mb-1">Descripción / Cobertura Asistencial</label>
+                                                                         <textarea name="descripcion" class="form-control form-control-sm" rows="3"
+                                                                             maxlength="255"><?= htmlspecialchars($t['descripcion'] ?? '') ?></textarea>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-between">
+                                                                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                                                                    <button type="submit" class="btn btn-primary btn-sm px-3 fw-semibold">Guardar Cambios</button>
+                                                                </div>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             <?php endforeach; ?>
                                         </tbody>
                                     </table>
@@ -627,7 +671,7 @@ foreach ($permisosCatalogo as $p) {
                                                 <th>Equipamiento</th>
                                                 <th style="width: 110px;">Centros Vinculados</th>
                                                 <th style="width: 80px;">Estado</th>
-                                                <th style="width: 85px;" class="text-end pe-3">Acción</th>
+                                                <th style="width: 145px;" class="text-end pe-3">Acciones</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -656,6 +700,11 @@ foreach ($permisosCatalogo as $p) {
                                                         <?php endif; ?>
                                                     </td>
                                                     <td class="text-end pe-3">
+                                                        <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2 me-1"
+                                                            style="font-size: 0.72rem;" data-bs-toggle="modal"
+                                                            data-bs-target="#modalEditRecurso<?= (int) $r['id'] ?>">
+                                                            <i class="bi bi-pencil me-1"></i>Editar
+                                                        </button>
                                                         <form method="POST" action="procesar.php" class="d-inline"
                                                             onsubmit="return confirm('¿Confirma cambiar el estado de este equipamiento/recurso?');">
                                                             <input type="hidden" name="csrf_token"
@@ -672,6 +721,45 @@ foreach ($permisosCatalogo as $p) {
                                                         </form>
                                                     </td>
                                                 </tr>
+
+                                                <!-- Modal Edición Equipamiento/Recurso -->
+                                                <div class="modal fade" id="modalEditRecurso<?= (int) $r['id'] ?>" tabindex="-1" aria-hidden="true">
+                                                    <div class="modal-dialog modal-dialog-centered">
+                                                        <div class="modal-content border-0 shadow">
+                                                            <form action="procesar.php" method="POST">
+                                                                <input type="hidden" name="csrf_token"
+                                                                    value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                                                <input type="hidden" name="accion" value="editar_recurso">
+                                                                <input type="hidden" name="id" value="<?= (int) $r['id'] ?>">
+                                                                <div class="modal-header bg-light py-2 px-3 border-bottom">
+                                                                    <h6 class="modal-title fw-bold">Editar Equipamiento / Capacidad #<?= (int) $r['id'] ?></h6>
+                                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                                </div>
+                                                                <div class="modal-body p-3">
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label small fw-semibold mb-1">Código Único *</label>
+                                                                        <input type="text" name="codigo" class="form-control form-control-sm text-uppercase font-monospace"
+                                                                            value="<?= htmlspecialchars($r['codigo']) ?>" required maxlength="30">
+                                                                    </div>
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label small fw-semibold mb-1">Nombre del Recurso / Capacidad *</label>
+                                                                        <input type="text" name="nombre" class="form-control form-control-sm"
+                                                                            value="<?= htmlspecialchars($r['nombre']) ?>" required maxlength="80">
+                                                                    </div>
+                                                                    <div class="mb-2">
+                                                                        <label class="form-label small fw-semibold mb-1">Descripción Operativa / Requerimientos</label>
+                                                                        <textarea name="descripcion" class="form-control form-control-sm" rows="3"
+                                                                            maxlength="255"><?= htmlspecialchars($r['descripcion'] ?? '') ?></textarea>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-between">
+                                                                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                                                                    <button type="submit" class="btn btn-primary btn-sm px-3 fw-semibold">Guardar Cambios</button>
+                                                                </div>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             <?php endforeach; ?>
                                         </tbody>
                                     </table>
@@ -845,11 +933,14 @@ foreach ($permisosCatalogo as $p) {
                                             <label class="form-label small fw-semibold mb-1">Color / Distintivo</label>
                                             <select name="color_badge" class="form-select form-select-sm">
                                                 <option value="primary">Azul (Institucional)</option>
-                                                <option value="info">Celeste (Cadena de Frío)</option>
-                                                <option value="warning">Ámbar (Precaución)</option>
-                                                <option value="danger">Rojo (Control Estricto)</option>
-                                                <option value="dark">Oscuro (Reserva)</option>
-                                                <option value="secondary">Gris (Genérico)</option>
+                                                <option value="info">Celeste (Cadena de Frío / Inocuidad)</option>
+                                                <option value="success">Verde (Terapéutico / Natural)</option>
+                                                <option value="warning">Ámbar (Precaución / Advertencia)</option>
+                                                <option value="danger">Rojo (Control Estricto / Alerta)</option>
+                                                <option value="purple">Morado (Especializado / Onco-Biológico)</option>
+                                                <option value="orange">Naranja (Alta Vigilancia)</option>
+                                                <option value="dark">Oscuro (Reserva / Restringido)</option>
+                                                <option value="secondary">Gris (Neutral / Genérico)</option>
                                             </select>
                                         </div>
                                         <div class="col-md-2">
@@ -874,7 +965,7 @@ foreach ($permisosCatalogo as $p) {
                                                 <th style="width: 140px;">Distintivo Visual</th>
                                                 <th style="width: 130px;">Fármacos Vinculados</th>
                                                 <th style="width: 80px;">Estado</th>
-                                                <th style="width: 85px;" class="text-end pe-3">Acción</th>
+                                                <th style="width: 145px;" class="text-end pe-3">Acciones</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -911,6 +1002,11 @@ foreach ($permisosCatalogo as $p) {
                                                         <?php endif; ?>
                                                     </td>
                                                     <td class="text-end pe-3">
+                                                        <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2 me-1"
+                                                            style="font-size: 0.72rem;" data-bs-toggle="modal"
+                                                            data-bs-target="#modalEditAtr<?= (int) $af['id'] ?>">
+                                                            <i class="bi bi-pencil me-1"></i>Editar
+                                                        </button>
                                                         <form method="POST" action="procesar.php" class="d-inline"
                                                             onsubmit="return confirm('¿Confirma cambiar el estado de este atributo farmacológico?');">
                                                             <input type="hidden" name="csrf_token"
@@ -927,6 +1023,67 @@ foreach ($permisosCatalogo as $p) {
                                                         </form>
                                                     </td>
                                                 </tr>
+
+                                                <!-- Modal Edición Atributo Farmacológico -->
+                                                <div class="modal fade" id="modalEditAtr<?= (int) $af['id'] ?>" tabindex="-1" aria-hidden="true">
+                                                    <div class="modal-dialog modal-dialog-centered">
+                                                        <div class="modal-content border-0 shadow">
+                                                            <form action="procesar.php" method="POST">
+                                                                <input type="hidden" name="csrf_token"
+                                                                    value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                                                <input type="hidden" name="accion" value="editar_atributo_farmacologico">
+                                                                <input type="hidden" name="id" value="<?= (int) $af['id'] ?>">
+                                                                <div class="modal-header bg-light py-2 px-3 border-bottom">
+                                                                    <h6 class="modal-title fw-bold">Editar Atributo Farmacológico #<?= (int) $af['id'] ?></h6>
+                                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                                </div>
+                                                                <div class="modal-body p-3">
+                                                                    <div class="row g-2 mb-3">
+                                                                        <div class="col-md-6">
+                                                                            <label class="form-label small fw-semibold mb-1">Código Único *</label>
+                                                                            <input type="text" name="codigo" class="form-control form-control-sm text-uppercase font-monospace"
+                                                                                value="<?= htmlspecialchars($af['codigo']) ?>" required maxlength="30">
+                                                                        </div>
+                                                                        <div class="col-md-6">
+                                                                            <label class="form-label small fw-semibold mb-1">Distintivo Visual / Color *</label>
+                                                                            <select name="color_badge" class="form-select form-select-sm">
+                                                                                <option value="primary" <?= $af['color_badge'] === 'primary' ? 'selected' : '' ?>>Azul (Institucional)</option>
+                                                                                <option value="info" <?= $af['color_badge'] === 'info' ? 'selected' : '' ?>>Celeste (Cadena de Frío / Inocuidad)</option>
+                                                                                <option value="success" <?= $af['color_badge'] === 'success' ? 'selected' : '' ?>>Verde (Terapéutico / Natural)</option>
+                                                                                <option value="warning" <?= $af['color_badge'] === 'warning' ? 'selected' : '' ?>>Ámbar (Precaución / Advertencia)</option>
+                                                                                <option value="danger" <?= $af['color_badge'] === 'danger' ? 'selected' : '' ?>>Rojo (Control Estricto / Alerta)</option>
+                                                                                <option value="purple" <?= $af['color_badge'] === 'purple' ? 'selected' : '' ?>>Morado (Especializado / Onco-Biológico)</option>
+                                                                                <option value="orange" <?= $af['color_badge'] === 'orange' ? 'selected' : '' ?>>Naranja (Alta Vigilancia)</option>
+                                                                                <option value="dark" <?= $af['color_badge'] === 'dark' ? 'selected' : '' ?>>Oscuro (Reserva / Restringido)</option>
+                                                                                <option value="secondary" <?= $af['color_badge'] === 'secondary' ? 'selected' : '' ?>>Gris (Neutral / Genérico)</option>
+                                                                            </select>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label small fw-semibold mb-1">Denominación del Atributo *</label>
+                                                                        <input type="text" name="nombre" class="form-control form-control-sm"
+                                                                            value="<?= htmlspecialchars($af['nombre']) ?>" required maxlength="80">
+                                                                    </div>
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label small fw-semibold mb-1">Descripción / Norma Técnica</label>
+                                                                        <textarea name="descripcion" class="form-control form-control-sm" rows="3"
+                                                                            maxlength="255"><?= htmlspecialchars($af['descripcion'] ?? '') ?></textarea>
+                                                                    </div>
+                                                                    <div class="mb-2">
+                                                                        <label class="form-label small fw-semibold mb-1">Icono Bootstrap</label>
+                                                                        <input type="text" name="icono" class="form-control form-control-sm font-monospace"
+                                                                            value="<?= htmlspecialchars($af['icono'] ?? 'bi-capsule') ?>" maxlength="40"
+                                                                            placeholder="Ej: bi-capsule, bi-snow2, bi-sun, bi-shield-exclamation">
+                                                                    </div>
+                                                                </div>
+                                                                <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-between">
+                                                                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                                                                    <button type="submit" class="btn btn-primary btn-sm px-3 fw-semibold">Guardar Cambios</button>
+                                                                </div>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             <?php endforeach; ?>
                                         </tbody>
                                     </table>
@@ -992,7 +1149,7 @@ foreach ($permisosCatalogo as $p) {
                                                 <th style="width: 130px;">Dotación Continua</th>
                                                 <th style="width: 130px;">Patologías Asociadas</th>
                                                 <th style="width: 80px;">Estado</th>
-                                                <th style="width: 85px;" class="text-end pe-3">Acción</th>
+                                                <th style="width: 145px;" class="text-end pe-3">Acciones</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -1035,6 +1192,11 @@ foreach ($permisosCatalogo as $p) {
                                                         <?php endif; ?>
                                                     </td>
                                                     <td class="text-end pe-3">
+                                                        <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2 me-1"
+                                                            style="font-size: 0.72rem;" data-bs-toggle="modal"
+                                                            data-bs-target="#modalEditClasifPat<?= (int) $cp['id'] ?>">
+                                                            <i class="bi bi-pencil me-1"></i>Editar
+                                                        </button>
                                                         <form method="POST" action="procesar.php" class="d-inline"
                                                             onsubmit="return confirm('¿Confirma cambiar el estado de esta clasificación?');">
                                                             <input type="hidden" name="csrf_token"
@@ -1051,6 +1213,54 @@ foreach ($permisosCatalogo as $p) {
                                                         </form>
                                                     </td>
                                                 </tr>
+
+                                                <!-- Modal Edición Clasificación de Patología -->
+                                                <div class="modal fade" id="modalEditClasifPat<?= (int) $cp['id'] ?>" tabindex="-1" aria-hidden="true">
+                                                    <div class="modal-dialog modal-dialog-centered">
+                                                        <div class="modal-content border-0 shadow">
+                                                            <form action="procesar.php" method="POST">
+                                                                <input type="hidden" name="csrf_token"
+                                                                    value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                                                <input type="hidden" name="accion" value="editar_clasificacion_patologia">
+                                                                <input type="hidden" name="id" value="<?= (int) $cp['id'] ?>">
+                                                                <div class="modal-header bg-light py-2 px-3 border-bottom">
+                                                                    <h6 class="modal-title fw-bold">Editar Clasificación Nosológica #<?= (int) $cp['id'] ?></h6>
+                                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                                </div>
+                                                                <div class="modal-body p-3">
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label small fw-semibold mb-1">Código Único *</label>
+                                                                        <input type="text" name="codigo" class="form-control form-control-sm text-uppercase font-monospace"
+                                                                            value="<?= htmlspecialchars($cp['codigo']) ?>" required maxlength="30">
+                                                                    </div>
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label small fw-semibold mb-1">Denominación Nosológica *</label>
+                                                                        <input type="text" name="nombre" class="form-control form-control-sm"
+                                                                            value="<?= htmlspecialchars($cp['nombre']) ?>" required maxlength="80">
+                                                                    </div>
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label small fw-semibold mb-1">Descripción Clínica</label>
+                                                                        <textarea name="descripcion" class="form-control form-control-sm" rows="3"
+                                                                            maxlength="255"><?= htmlspecialchars($cp['descripcion'] ?? '') ?></textarea>
+                                                                    </div>
+                                                                    <div class="mb-2">
+                                                                        <div class="form-check form-switch">
+                                                                            <input class="form-check-input" type="checkbox" name="es_recurrente_mensual" value="1"
+                                                                                id="edit_rec_<?= (int) $cp['id'] ?>" <?= (int) $cp['es_recurrente_mensual'] === 1 ? 'checked' : '' ?>>
+                                                                            <label class="form-check-label small fw-semibold" for="edit_rec_<?= (int) $cp['id'] ?>">
+                                                                                Tratamiento Crónico / Dotación Mensual Recurrente
+                                                                            </label>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-between">
+                                                                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                                                                    <button type="submit" class="btn btn-primary btn-sm px-3 fw-semibold">Guardar Cambios</button>
+                                                                </div>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             <?php endforeach; ?>
                                         </tbody>
                                     </table>

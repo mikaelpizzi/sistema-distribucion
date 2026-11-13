@@ -21,7 +21,11 @@ $archivoSubidoRuta = null;
 $rutas = [
     'guardar_centro' => 'act_centros.php', 'cambiar_estado_centro' => 'act_centros.php',
     'crear_medicamento' => 'act_medicamentos.php', 'editar_medicamento' => 'act_medicamentos.php', 'guardar_medicamento' => 'act_medicamentos.php', 'cambiar_estado_medicamento' => 'act_medicamentos.php',
-    'crear_tipo_centro' => 'act_maestras.php', 'toggle_tipo_centro' => 'act_maestras.php', 'crear_recurso' => 'act_maestras.php', 'toggle_recurso' => 'act_maestras.php',
+    'crear_tipo_centro' => 'act_maestras.php', 'editar_tipo_centro' => 'act_maestras.php', 'toggle_tipo_centro' => 'act_maestras.php',
+    'crear_recurso' => 'act_maestras.php', 'editar_recurso' => 'act_maestras.php', 'toggle_recurso' => 'act_maestras.php',
+    'crear_tipo_documento' => 'act_maestras.php', 'editar_tipo_documento' => 'act_maestras.php', 'toggle_tipo_documento' => 'act_maestras.php',
+    'crear_atributo_farmacologico' => 'act_maestras.php', 'editar_atributo_farmacologico' => 'act_maestras.php', 'toggle_atributo_farmacologico' => 'act_maestras.php',
+    'crear_clasificacion_patologia' => 'act_maestras.php', 'editar_clasificacion_patologia' => 'act_maestras.php', 'toggle_clasificacion_patologia' => 'act_maestras.php',
     'crear_forma_farmaceutica' => 'act_maestras.php', 'guardar_forma' => 'act_maestras.php', 'crear_patologia' => 'act_maestras.php', 'guardar_patologia' => 'act_maestras.php',
     'cambiar_estado_patologia' => 'act_maestras.php', 'crear_rol' => 'act_maestras.php', 'actualizar_rol_permisos' => 'act_maestras.php', 'eliminar_rol' => 'act_maestras.php',
     'guardar_paciente' => 'act_pacientes.php', 'cambiar_estado_paciente' => 'act_pacientes.php',
@@ -40,7 +44,7 @@ $permisos = [
 ];
 
 $tabDestino = match (true) {
-    str_contains($accion, 'tipo') || str_contains($accion, 'recurso') || str_contains($accion, 'rol') => 'maestras',
+    str_contains($accion, 'tipo') || str_contains($accion, 'recurso') || str_contains($accion, 'rol') || str_contains($accion, 'atributo') || str_contains($accion, 'clasificacion') || str_contains($accion, 'documento') => 'maestras',
     str_contains($accion, 'usuario') => 'usuarios', str_contains($accion, 'paciente') => 'pacientes',
     str_contains($accion, 'recipe') => 'recipes', str_contains($accion, 'configuracion') || str_contains($accion, 'identidad') => 'configuracion',
     str_contains($accion, 'patologia') => 'medicamentos&subtab=patologias', str_contains($accion, 'forma') => 'medicamentos&subtab=formas',

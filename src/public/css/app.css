@@ -565,4 +565,93 @@ body.error-layout {
     font-weight: 700;
 }
 
+/* ============================================================================
+   PALETA EXTENDIDA DE BADGES Y ATRIBUTOS FARMACOLÓGICOS (3FN)
+   ============================================================================ */
+/* Morado / Púrpura Especializado (purple) */
+.bg-purple-subtle {
+    background-color: #f3e8ff !important;
+}
+.text-purple {
+    color: #6f42c1 !important;
+}
+.border-purple-subtle {
+    border-color: #d8b4fe !important;
+}
+.badge-purple {
+    background-color: #f3e8ff !important;
+    color: #6f42c1 !important;
+    border: 1px solid #d8b4fe !important;
+}
+
+/* Naranja Alta Vigilancia (orange) */
+.bg-orange-subtle {
+    background-color: #ffedd5 !important;
+}
+.text-orange {
+    color: #ea580c !important;
+}
+.border-orange-subtle {
+    border-color: #fed7aa !important;
+}
+.badge-orange {
+    background-color: #ffedd5 !important;
+    color: #ea580c !important;
+    border: 1px solid #fed7aa !important;
+}
+
+/* Índigo / Azul Profundo (indigo) */
+.bg-indigo-subtle {
+    background-color: #e0e7ff !important;
+}
+.text-indigo {
+    color: #4338ca !important;
+}
+.border-indigo-subtle {
+    border-color: #c7d2fe !important;
+}
+.badge-indigo {
+    background-color: #e0e7ff !important;
+    color: #4338ca !important;
+    border: 1px solid #c7d2fe !important;
+}
+
+/* Estilos de compatibilidad badge-<color> */
+.badge-primary {
+    background-color: #cfe2ff !important;
+    color: #084298 !important;
+    border: 1px solid #b6d4fe !important;
+}
+.badge-info {
+    background-color: #cff4fc !important;
+    color: #055160 !important;
+    border: 1px solid #b6effb !important;
+}
+.badge-success {
+    background-color: #d1e7dd !important;
+    color: #0f5132 !important;
+    border: 1px solid #badbcc !important;
+}
+.badge-warning {
+    background-color: #fff3cd !important;
+    color: #664d03 !important;
+    border: 1px solid #ffecb5 !important;
+}
+.badge-danger {
+    background-color: #f8d7da !important;
+    color: #842029 !important;
+    border: 1px solid #f5c2c7 !important;
+}
+.badge-dark {
+    background-color: #ced4da !important;
+    color: #212529 !important;
+    border: 1px solid #adb5bd !important;
+}
+.badge-secondary {
+    background-color: #e2e3e5 !important;
+    color: #41464b !important;
+    border: 1px solid #d3d6d8 !important;
+}
+
+
 

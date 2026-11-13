@@ -76,9 +76,13 @@ declare(strict_types=1);
                     </div>
 
                     <div class="p-2.5 bg-light border rounded">
-                        <label class="form-label-sicm mb-1 fw-bold text-dark">
-                            <i class="bi bi-tags-fill text-primary me-1"></i> Atributos Farmacológicos
-                        </label>
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="form-label-sicm mb-0 fw-bold text-dark">
+                                <i class="bi bi-capsule text-primary me-1"></i> Atributos Farmacológicos
+                            </label>
+                            <a href="index.php?tab=maestras#sec-atributos" class="small text-decoration-none"
+                                style="font-size: 0.70rem;">Configurar Catálogo</a>
+                        </div>
                         <div class="text-muted mb-2" style="font-size: 0.70rem;">
                             Condiciones de custodia técnica, cadena de frío y fiscalización clínica aplicables a este principio activo:
                         </div>
@@ -88,20 +92,22 @@ declare(strict_types=1);
                                 $isAtrChecked = in_array((int) $atr['id'], array_map('intval', $atributosEdicionIds), true);
                                 ?>
                                 <div class="col-md-6">
-                                    <div class="form-check p-2 bg-white border rounded h-100">
-                                        <input class="form-check-input" type="checkbox" name="atributos[]"
-                                            value="<?= (int) $atr['id'] ?>" id="atr_med_<?= (int) $atr['id'] ?>"
-                                            <?= $isAtrChecked ? 'checked' : '' ?>>
-                                        <label class="form-check-label small" for="atr_med_<?= (int) $atr['id'] ?>">
-                                            <span class="badge bg-<?= htmlspecialchars($atr['color_badge']) ?>-subtle text-<?= htmlspecialchars($atr['color_badge']) ?> border border-<?= htmlspecialchars($atr['color_badge']) ?>-subtle">
-                                                <i class="bi <?= htmlspecialchars($atr['icono']) ?> me-1"></i><?= htmlspecialchars($atr['nombre']) ?>
-                                            </span>
-                                            <?php if (!empty($atr['descripcion'])): ?>
-                                                <div class="text-muted mt-1" style="font-size: 0.68rem; line-height: 1.2;">
-                                                    <?= htmlspecialchars($atr['descripcion']) ?>
-                                                </div>
-                                            <?php endif; ?>
-                                        </label>
+                                    <div class="p-2 bg-white border rounded h-100">
+                                        <div class="form-check mb-0">
+                                            <input class="form-check-input" type="checkbox" name="atributos[]"
+                                                value="<?= (int) $atr['id'] ?>" id="atr_med_<?= (int) $atr['id'] ?>"
+                                                <?= $isAtrChecked ? 'checked' : '' ?>>
+                                            <label class="form-check-label small" for="atr_med_<?= (int) $atr['id'] ?>">
+                                                <span class="badge bg-<?= htmlspecialchars($atr['color_badge']) ?>-subtle text-<?= htmlspecialchars($atr['color_badge']) ?> border border-<?= htmlspecialchars($atr['color_badge']) ?>-subtle">
+                                                    <i class="bi <?= htmlspecialchars($atr['icono']) ?> me-1"></i><?= htmlspecialchars($atr['nombre']) ?>
+                                                </span>
+                                                <?php if (!empty($atr['descripcion'])): ?>
+                                                    <div class="text-muted mt-1" style="font-size: 0.68rem; line-height: 1.2;">
+                                                        <?= htmlspecialchars($atr['descripcion']) ?>
+                                                    </div>
+                                                <?php endif; ?>
+                                            </label>
+                                        </div>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
