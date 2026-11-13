@@ -17,121 +17,220 @@ if (contarUsuariosRegistrados($pdo) > 0) {
 
 $error = null;
 
-// 2. Procesar Inicialización (Validación Estricta en Backend)
+// 2. Procesar Inicialización (Acción Rápida de Demostración o Formulario Manual)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Sanitización y prevención de abuso de inputs
-    $nombre     = trim(filter_var($_POST['nombre'] ?? '', FILTER_UNSAFE_RAW, FILTER_FLAG_STRIP_LOW));
-    $email      = strtolower(trim(filter_var($_POST['email'] ?? '', FILTER_UNSAFE_RAW, FILTER_FLAG_STRIP_LOW)));
-    $password   = (string)($_POST['password'] ?? '');
-    $confirm    = (string)($_POST['confirm_password'] ?? '');
-    $cargarDemo = isset($_POST['cargar_demo']);
+    $accion = $_POST['accion'] ?? 'manual';
 
-    // Longitudes máximas para evitar buffer overflow y DoS de hashing en Bcrypt
-    $nombreLen = mb_strlen($nombre, 'UTF-8');
-    $emailLen  = mb_strlen($email, 'UTF-8');
-    $passLen   = strlen($password);
-
-    // Batería de validaciones en Backend
-    if ($nombreLen < 4 || $nombreLen > 80) {
-        $error = 'El nombre completo debe tener entre 4 y 80 caracteres.';
-    } elseif (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s\.\-]{4,80}$/u', $nombre)) {
-        $error = 'El nombre solo puede contener letras, espacios, acentos y puntos.';
-    } elseif ($emailLen < 5 || $emailLen > 120 || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error = 'Debe ingresar un correo institucional válido (ej. operador@salud.prueba.ve).';
-    } elseif ($passLen < 8) {
-        $error = 'La contraseña debe contener al menos 8 caracteres.';
-    } elseif ($passLen > 72) {
-        $error = 'La contraseña no puede exceder 72 caracteres por límites de seguridad criptográfica.';
-    } elseif (!preg_match('/[A-Z]/', $password)) {
-        $error = 'La contraseña debe contener al menos una letra mayúscula (A-Z).';
-    } elseif (!preg_match('/[a-z]/', $password)) {
-        $error = 'La contraseña debe contener al menos una letra minúscula (a-z).';
-    } elseif (!preg_match('/[0-9]/', $password)) {
-        $error = 'La contraseña debe contener al menos un número (0-9).';
-    } elseif (!preg_match('/[!@#$%^&*()_+\-=\[\]{};\':"\\|,.<>\/?]/', $password)) {
-        $error = 'La contraseña debe contener al menos un símbolo especial (!@#$%...).';
-    } elseif ($password !== $confirm) {
-        $error = 'La confirmación de la contraseña no coincide con la original.';
-    } else {
-        // Ejecución Transaccional Atómica con Auditoría Forense
+    if ($accion === 'quick_demo') {
+        // Inicialización Rápida en 1 Clic con credenciales canónicas de prueba
         $pdo->beginTransaction();
         try {
-            $hash = password_hash($password, PASSWORD_DEFAULT);
-
-            $stmt = $pdo->prepare("
-                INSERT INTO usuarios (nombre, email, password_hash, rol_id, centro_salud_id, activo)
-                VALUES (:nombre, :email, :pass, 1, NULL, 1)
-            ");
-            $stmt->execute([
-                ':nombre' => $nombre,
-                ':email'  => $email,
-                ':pass'   => $hash
-            ]);
-            $nuevoAdminId = (int)$pdo->lastInsertId();
-
-            if ($cargarDemo) {
-                // 1. Aprovisionar Ambulatorios Iniciales en Mérida si aún no existen
-                $stmtCentros = $pdo->query("SELECT COUNT(*) FROM centros_salud");
-                if ((int)$stmtCentros->fetchColumn() === 0) {
-                    $pdo->exec("
-                        INSERT INTO centros_salud (id, codigo_sicm, nombre, tipo_centro_id, medico_director, horario_atencion, direccion, telefono_principal, activo) VALUES
-                        (1, 'AMB-MER-001', 'Ambulatorio Urbano III El Llano', 3, 'Dr. Carlos Mendoza (MPPS 45.120)', '24 Horas / Emergencia Continua', 'Av. 3 Independencia, Sector El Llano, Mérida', '0274-2521100', 1),
-                        (2, 'AMB-MER-002', 'Ambulatorio Urbano II Santa Rosa', 2, 'Dra. Elena Rivas (MPPS 52.880)', 'Lunes a Viernes 7:00 AM - 7:00 PM', 'Sector La Hechicera / Santa Rosa, Mérida', '0274-2443210', 1),
-                        (3, 'AMB-MER-003', 'Ambulatorio Urbano III Belén', 3, 'Dr. Roberto Briceño (MPPS 39.410)', '24 Horas / Guardias Rotativas', 'Calle 16 entre Av. 7 y 8, Sector Belén, Mérida', '0274-2510988', 1)
-                        ON DUPLICATE KEY UPDATE nombre = VALUES(nombre);
-                    ");
-
-                    $pdo->exec("
-                        INSERT INTO centro_recursos (centro_salud_id, recurso_id, operativo, detalle_capacidad) VALUES
-                        (1, 1, 1, 'Refrigerador médico Haier Biomedical 350L'),
-                        (1, 2, 1, 'Generador Cummins 30 kVA Diésel con ATS'),
-                        (1, 3, 1, 'Unidad de Rescate Soporte Avanzado Toyota'),
-                        (2, 1, 1, 'Refrigerador vertical 180L con monitoreo digital'),
-                        (2, 5, 1, 'Dispensación ambulatoria continua'),
-                        (3, 1, 1, 'Nevera horizontal grado farmacéutico 300L'),
-                        (3, 2, 1, 'Generador auxiliar 25 kVA'),
-                        (3, 4, 1, 'Autoclave digital a vapor 50L')
-                        ON DUPLICATE KEY UPDATE operativo = VALUES(operativo);
-                    ");
-                }
-
-                // 2. Operador Farmaceuta de Demostración para validación de perfiles RBAC
-                $hashFarm = password_hash('farmacia123', PASSWORD_DEFAULT);
-                $stmtFarm = $pdo->prepare("
-                    INSERT INTO usuarios (nombre, email, password_hash, rol_id, centro_salud_id, activo)
-                    VALUES (:nombre, :email, :pass, 2, 1, 1)
-                    ON DUPLICATE KEY UPDATE nombre = VALUES(nombre)
+            // 1. Aprovisionar Ambulatorios Iniciales en Mérida si aún no existen
+            $stmtCentros = $pdo->query("SELECT COUNT(*) FROM centros_salud");
+            if ((int)$stmtCentros->fetchColumn() === 0) {
+                $pdo->exec("
+                    INSERT INTO centros_salud (id, codigo_sicm, nombre, tipo_centro_id, medico_director, horario_atencion, direccion, telefono_principal, activo) VALUES
+                    (1, 'AMB-MER-001', 'Ambulatorio Urbano III El Llano', 3, 'Dr. Carlos Mendoza (MPPS 45.120)', '24 Horas / Emergencia Continua', 'Av. 3 Independencia, Sector El Llano, Mérida', '0274-2521100', 1),
+                    (2, 'AMB-MER-002', 'Ambulatorio Urbano II Santa Rosa', 2, 'Dra. Elena Rivas (MPPS 52.880)', 'Lunes a Viernes 7:00 AM - 7:00 PM', 'Sector La Hechicera / Santa Rosa, Mérida', '0274-2443210', 1),
+                    (3, 'AMB-MER-003', 'Ambulatorio Urbano III Belén', 3, 'Dr. Roberto Briceño (MPPS 39.410)', '24 Horas / Guardias Rotativas', 'Calle 16 entre Av. 7 y 8, Sector Belén, Mérida', '0274-2510988', 1)
+                    ON DUPLICATE KEY UPDATE nombre = VALUES(nombre);
                 ");
-                $stmtFarm->execute([
-                    ':nombre' => 'Lcda. Elena Farmaceuta',
-                    ':email'  => 'farmacia.llano@salud.prueba.ve',
-                    ':pass'   => $hashFarm
-                ]);
+
+                $pdo->exec("
+                    INSERT INTO centro_recursos (centro_salud_id, recurso_id, operativo, detalle_capacidad) VALUES
+                    (1, 1, 1, 'Refrigerador médico Haier Biomedical 350L'),
+                    (1, 2, 1, 'Generador Cummins 30 kVA Diésel con ATS'),
+                    (1, 3, 1, 'Unidad de Rescate Soporte Avanzado Toyota'),
+                    (2, 1, 1, 'Refrigerador vertical 180L con monitoreo digital'),
+                    (2, 5, 1, 'Atención farmacéutica ambulatoria continua'),
+                    (3, 1, 1, 'Nevera horizontal grado farmacéutico 300L'),
+                    (3, 2, 1, 'Generador auxiliar 25 kVA'),
+                    (3, 4, 1, 'Autoclave digital a vapor 50L')
+                    ON DUPLICATE KEY UPDATE operativo = VALUES(operativo);
+                ");
             }
 
+            // 2. Aprovisionar 3 Cuentas Canónicas con contraseña unificada 'prueba123'
+            $passHashComun = password_hash('prueba123', PASSWORD_DEFAULT);
+
+            // Determinar rol para supervisión / director médico (rol_auditor o rol secundario)
+            $stmtRolSup = $pdo->query("SELECT id FROM roles WHERE nombre IN ('rol_auditor', 'rol_supervisor') ORDER BY id ASC LIMIT 1");
+            $rolSupervisorId = (int)($stmtRolSup->fetchColumn() ?: 3);
+
+            $stmtRolFarm = $pdo->query("SELECT id FROM roles WHERE nombre = 'rol_farmaceuta' LIMIT 1");
+            $rolFarmaciaId = (int)($stmtRolFarm->fetchColumn() ?: 2);
+
+            // 2.1 Administrador Central (rol_admin = 1)
+            $stmtAdmin = $pdo->prepare("
+                INSERT INTO usuarios (id, nombre, email, password_hash, rol_id, centro_salud_id, activo)
+                VALUES (1, 'Administrador Central', 'admin@salud.prueba.ve', :pass, 1, NULL, 1)
+                ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), password_hash = VALUES(password_hash), rol_id = VALUES(rol_id), activo = 1
+            ");
+            $stmtAdmin->execute([':pass' => $passHashComun]);
+            $nuevoAdminId = 1;
+
+            // 2.2 Director Médico / Supervisor Municipal
+            $stmtDirector = $pdo->prepare("
+                INSERT INTO usuarios (id, nombre, email, password_hash, rol_id, centro_salud_id, activo)
+                VALUES (2, 'Dr. Carlos Mendoza', 'director@salud.prueba.ve', :pass, :rol, NULL, 1)
+                ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), password_hash = VALUES(password_hash), rol_id = VALUES(rol_id), activo = 1
+            ");
+            $stmtDirector->execute([
+                ':pass' => $passHashComun,
+                ':rol'  => $rolSupervisorId
+            ]);
+
+            // 2.3 Farmaceuta Asistencial (Ambulatorio El Llano, centro_id = 1)
+            $stmtFarm = $pdo->prepare("
+                INSERT INTO usuarios (id, nombre, email, password_hash, rol_id, centro_salud_id, activo)
+                VALUES (3, 'Lcda. Elena Farmaceuta', 'farmacia.llano@salud.prueba.ve', :pass, :rol, 1, 1)
+                ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), password_hash = VALUES(password_hash), rol_id = VALUES(rol_id), centro_salud_id = 1, activo = 1
+            ");
+            $stmtFarm->execute([
+                ':pass' => $passHashComun,
+                ':rol'  => $rolFarmaciaId
+            ]);
+
+            // 3. Auditoría Forense
             registrarAuditoria($pdo, $nuevoAdminId, 'INICIALIZAR_SISTEMA', 'usuarios', $nuevoAdminId, [
-                'evento'       => 'Creación del Administrador Central mediante Asistente de Primer Arranque',
-                'nombre'       => $nombre,
-                'email'        => $email,
-                'rol_id'       => 1,
-                'rol_nombre'   => 'rol_admin',
-                'datos_prueba' => $cargarDemo ? 'Red asistencial y operador farmacéutico auxiliar cargados' : 'Instalación limpia'
+                'evento'       => 'Inicialización Rápida en 1 Clic con Red Asistencial y Cuentas de Prueba',
+                'admin_email'  => 'admin@salud.prueba.ve',
+                'cuentas'      => ['admin@salud.prueba.ve', 'director@salud.prueba.ve', 'farmacia.llano@salud.prueba.ve'],
+                'modo'         => 'Demostración Asistencial'
             ]);
 
             $pdo->commit();
 
-            // Autenticar automáticamente al nuevo Administrador
-            autenticarUsuario($pdo, $email, $password);
+            // 4. Autenticar automáticamente al Administrador Central e ingresar directo
+            autenticarUsuario($pdo, 'admin@salud.prueba.ve', 'prueba123');
 
-            $msgExtra = $cargarDemo ? " Red de ambulatorios y farmaceuta sectorial aprovisionados." : "";
-            header('Location: index.php?msg=' . urlencode("Bienvenido. El sistema ha sido inicializado exitosamente con la cuenta de {$nombre}.{$msgExtra}"));
+            header('Location: index.php?msg=' . urlencode('Bienvenido. El sistema ha sido inicializado con datos de demostración y 3 cuentas de prueba.'));
             exit;
 
         } catch (Throwable $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
-            $error = 'Error de base de datos durante la inicialización: ' . $e->getMessage();
+            $error = 'Error durante la inicialización rápida de demostración: ' . $e->getMessage();
+        }
+
+    } else {
+        // Inicialización Manual Tradicional
+        // Sanitización y prevención de abuso de inputs
+        $nombre     = trim(filter_var($_POST['nombre'] ?? '', FILTER_UNSAFE_RAW, FILTER_FLAG_STRIP_LOW));
+        $email      = strtolower(trim(filter_var($_POST['email'] ?? '', FILTER_UNSAFE_RAW, FILTER_FLAG_STRIP_LOW)));
+        $password   = (string)($_POST['password'] ?? '');
+        $confirm    = (string)($_POST['confirm_password'] ?? '');
+        $cargarDemo = isset($_POST['cargar_demo']);
+
+        // Longitudes máximas para evitar buffer overflow y DoS de hashing en Bcrypt
+        $nombreLen = mb_strlen($nombre, 'UTF-8');
+        $emailLen  = mb_strlen($email, 'UTF-8');
+        $passLen   = strlen($password);
+
+        // Batería de validaciones en Backend
+        if ($nombreLen < 4 || $nombreLen > 80) {
+            $error = 'El nombre completo debe tener entre 4 y 80 caracteres.';
+        } elseif (!preg_match('/^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s\.\-]{4,80}$/u', $nombre)) {
+            $error = 'El nombre solo puede contener letras, espacios, acentos y puntos.';
+        } elseif ($emailLen < 5 || $emailLen > 120 || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $error = 'Debe ingresar un correo institucional válido (ej. operador@salud.prueba.ve).';
+        } elseif ($passLen < 8) {
+            $error = 'La contraseña debe contener al menos 8 caracteres.';
+        } elseif ($passLen > 72) {
+            $error = 'La contraseña no puede exceder 72 caracteres por límites de seguridad criptográfica.';
+        } elseif (!preg_match('/[A-Z]/', $password)) {
+            $error = 'La contraseña debe contener al menos una letra mayúscula (A-Z).';
+        } elseif (!preg_match('/[a-z]/', $password)) {
+            $error = 'La contraseña debe contener al menos una letra minúscula (a-z).';
+        } elseif (!preg_match('/[0-9]/', $password)) {
+            $error = 'La contraseña debe contener al menos un número (0-9).';
+            $error = 'La contraseña debe contener al menos una letra minúscula (a-z).';
+        } elseif (!preg_match('/[!@#$%^&*()_+\-=\[\]{};\':"\\|,.<>\/?]/', $password)) {
+            $error = 'La contraseña debe contener al menos un símbolo especial (!@#$%...).';
+        } elseif ($password !== $confirm) {
+            $error = 'La confirmación de la contraseña no coincide con la original.';
+        } else {
+            // Ejecución Transaccional Atómica con Auditoría Forense
+            $pdo->beginTransaction();
+            try {
+                $hash = password_hash($password, PASSWORD_DEFAULT);
+
+                $stmt = $pdo->prepare("
+                    INSERT INTO usuarios (nombre, email, password_hash, rol_id, centro_salud_id, activo)
+                    VALUES (:nombre, :email, :pass, 1, NULL, 1)
+                ");
+                $stmt->execute([
+                    ':nombre' => $nombre,
+                    ':email'  => $email,
+                    ':pass'   => $hash
+                ]);
+                $nuevoAdminId = (int)$pdo->lastInsertId();
+
+                if ($cargarDemo) {
+                    // 1. Aprovisionar Ambulatorios Iniciales en Mérida si aún no existen
+                    $stmtCentros = $pdo->query("SELECT COUNT(*) FROM centros_salud");
+                    if ((int)$stmtCentros->fetchColumn() === 0) {
+                        $pdo->exec("
+                            INSERT INTO centros_salud (id, codigo_sicm, nombre, tipo_centro_id, medico_director, horario_atencion, direccion, telefono_principal, activo) VALUES
+                            (1, 'AMB-MER-001', 'Ambulatorio Urbano III El Llano', 3, 'Dr. Carlos Mendoza (MPPS 45.120)', '24 Horas / Emergencia Continua', 'Av. 3 Independencia, Sector El Llano, Mérida', '0274-2521100', 1),
+                            (2, 'AMB-MER-002', 'Ambulatorio Urbano II Santa Rosa', 2, 'Dra. Elena Rivas (MPPS 52.880)', 'Lunes a Viernes 7:00 AM - 7:00 PM', 'Sector La Hechicera / Santa Rosa, Mérida', '0274-2443210', 1),
+                            (3, 'AMB-MER-003', 'Ambulatorio Urbano III Belén', 3, 'Dr. Roberto Briceño (MPPS 39.410)', '24 Horas / Guardias Rotativas', 'Calle 16 entre Av. 7 y 8, Sector Belén, Mérida', '0274-2510988', 1)
+                            ON DUPLICATE KEY UPDATE nombre = VALUES(nombre);
+                        ");
+
+                        $pdo->exec("
+                            INSERT INTO centro_recursos (centro_salud_id, recurso_id, operativo, detalle_capacidad) VALUES
+                            (1, 1, 1, 'Refrigerador médico Haier Biomedical 350L'),
+                            (1, 2, 1, 'Generador Cummins 30 kVA Diésel con ATS'),
+                            (1, 3, 1, 'Unidad de Rescate Soporte Avanzado Toyota'),
+                            (2, 1, 1, 'Refrigerador vertical 180L con monitoreo digital'),
+                            (2, 5, 1, 'Atención farmacéutica ambulatoria continua'),
+                            (3, 1, 1, 'Nevera horizontal grado farmacéutico 300L'),
+                            (3, 2, 1, 'Generador auxiliar 25 kVA'),
+                            (3, 4, 1, 'Autoclave digital a vapor 50L')
+                            ON DUPLICATE KEY UPDATE operativo = VALUES(operativo);
+                        ");
+                    }
+
+                    // 2. Operador Farmaceuta de Demostración para validación de perfiles
+                    $hashFarm = password_hash('prueba123', PASSWORD_DEFAULT);
+                    $stmtFarm = $pdo->prepare("
+                        INSERT INTO usuarios (nombre, email, password_hash, rol_id, centro_salud_id, activo)
+                        VALUES (:nombre, :email, :pass, 2, 1, 1)
+                        ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), password_hash = VALUES(password_hash)
+                    ");
+                    $stmtFarm->execute([
+                        ':nombre' => 'Lcda. Elena Farmaceuta',
+                        ':email'  => 'farmacia.llano@salud.prueba.ve',
+                        ':pass'   => $hashFarm
+                    ]);
+                }
+
+                registrarAuditoria($pdo, $nuevoAdminId, 'INICIALIZAR_SISTEMA', 'usuarios', $nuevoAdminId, [
+                    'evento'       => 'Creación del Administrador Central mediante Asistente de Primer Arranque',
+                    'nombre'       => $nombre,
+                    'email'        => $email,
+                    'rol_id'       => 1,
+                    'rol_nombre'   => 'rol_admin',
+                    'datos_prueba' => $cargarDemo ? 'Red asistencial y operador farmacéutico auxiliar cargados' : 'Instalación limpia'
+                ]);
+
+                $pdo->commit();
+
+                // Autenticar automáticamente al nuevo Administrador
+                autenticarUsuario($pdo, $email, $password);
+
+                $msgExtra = $cargarDemo ? " Red de ambulatorios y farmaceuta sectorial aprovisionados." : "";
+                header('Location: index.php?msg=' . urlencode("Bienvenido. El sistema ha sido inicializado exitosamente con la cuenta de {$nombre}.{$msgExtra}"));
+                exit;
+
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                $error = 'Error de base de datos durante la inicialización: ' . $e->getMessage();
+            }
         }
     }
 }
@@ -159,8 +258,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
         <?php endif; ?>
 
-        <!-- 2. Formulario con Validación Reactiva -->
+        <!-- 2. Bloque de Inicialización Rápida de Demostración -->
+        <div class="card bg-dark border-primary mb-4 shadow-sm" style="background-color: #1e293b !important; border-color: #3b82f6 !important;">
+            <div class="card-body p-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="badge bg-primary text-white px-2 py-1" style="font-size: 0.75rem;">1 Clic</span>
+                    <h2 class="h6 mb-0 text-white fw-bold">Inicialización Rápida de Demostración</h2>
+                </div>
+                <p class="text-secondary small mb-2" style="color: #cbd5e1 !important; font-size: 0.78rem; line-height: 1.4;">
+                    Haga clic para inicializar el sistema con 3 ambulatorios y 3 cuentas preparadas para pruebas:
+                </p>
+                <div class="p-2 rounded mb-3 font-monospace" style="background-color: #0f172a; border: 1px solid #334155; font-size: 0.75rem;">
+                    <div class="text-light mb-1"><span class="text-info fw-semibold">admin@salud.prueba.ve</span> <span class="text-secondary">(Administrador Central)</span></div>
+                    <div class="text-light mb-1"><span class="text-info fw-semibold">director@salud.prueba.ve</span> <span class="text-secondary">(Director Médico)</span></div>
+                    <div class="text-light mb-2"><span class="text-info fw-semibold">farmacia.llano@salud.prueba.ve</span> <span class="text-secondary">(Farmacia Ambulatorio El Llano)</span></div>
+                    <div class="pt-1 border-top border-secondary text-warning" style="border-color: #334155 !important;">
+                        Contraseña común: <span class="badge bg-warning text-dark font-monospace fw-bold">prueba123</span>
+                    </div>
+                </div>
+                <form action="setup.php" method="POST" class="m-0">
+                    <input type="hidden" name="accion" value="quick_demo">
+                    <button type="submit" class="btn btn-primary w-100 fw-semibold shadow-sm py-2" style="font-size: 0.85rem;">
+                        Cargar Datos de Demostración (1 Clic)
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Divisor Alternativo -->
+        <div class="position-relative my-4 text-center">
+            <hr style="border-color: #334155;">
+            <span class="position-absolute top-50 start-50 translate-middle px-3 text-secondary small" style="background-color: #0f172a; color: #94a3b8 !important;">
+                o cree una cuenta manual
+            </span>
+        </div>
+
+        <!-- 3. Formulario Manual con Validación Reactiva -->
         <form id="form-setup" action="setup.php" method="POST" novalidate autocomplete="off">
+            <input type="hidden" name="accion" value="manual">
             
             <!-- Nombre Completo -->
             <div class="mb-3">
@@ -230,19 +365,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
                 <div class="feedback-msg" id="confirm-feedback">
                     Las contraseñas no coinciden.
-                </div>
-            </div>
-
-            <!-- Opción de Carga de Datos de Demostración (Quick Start) -->
-            <div class="mb-4 p-3 rounded" style="background-color: #1e293b; border: 1px solid #334155;">
-                <div class="form-check m-0">
-                    <input class="form-check-input" type="checkbox" name="cargar_demo" id="cargar_demo" checked>
-                    <label class="form-check-label text-start" for="cargar_demo">
-                        <span class="d-block fw-semibold" style="color: #f8fafc; font-size: 0.825rem;">Cargar datos de prueba de la red asistencial</span>
-                        <span class="d-block mt-1" style="color: #cbd5e1; font-size: 0.74rem; line-height: 1.4;">
-                            Puebla 3 ambulatorios iniciales en Mérida y la cuenta de farmaceuta (<span class="font-monospace" style="color: #38bdf8; font-weight: 600;">farmacia.llano@salud.prueba.ve</span> / <span class="font-monospace" style="color: #38bdf8; font-weight: 600;">farmacia123</span>) para verificar el control de acceso (RBAC).
-                        </span>
-                    </label>
                 </div>
             </div>
 
