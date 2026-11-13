@@ -55,7 +55,42 @@ $stmtMed = $pdo->prepare($sqlMed);
 $stmtMed->execute($paramsMed);
 $medicamentos = $stmtMed->fetchAll(PDO::FETCH_ASSOC);
 
-// 4. Catálogo CIE-10 de Patologías
+// Carga de Atributos Farmacológicos Normalizados (3FN - N:M)
+$todosAtributosFarmacologicos = $pdo->query("
+    SELECT id, codigo, nombre, descripcion, icono, color_badge
+    FROM atributos_farmacologicos
+    WHERE activo = 1
+    ORDER BY id ASC
+")->fetchAll(PDO::FETCH_ASSOC);
+
+$medIds = array_column($medicamentos, 'id');
+$atributosPorMedicamento = [];
+if (!empty($medIds)) {
+    $inClause = implode(',', array_map('intval', $medIds));
+    $stmtAtr = $pdo->query("
+        SELECT ma.medicamento_id, af.id, af.codigo, af.nombre, af.icono, af.color_badge
+        FROM medicamento_atributos ma
+        JOIN atributos_farmacologicos af ON ma.atributo_id = af.id
+        WHERE ma.medicamento_id IN ({$inClause}) AND af.activo = 1
+        ORDER BY af.id ASC
+    ");
+    while ($row = $stmtAtr->fetch(PDO::FETCH_ASSOC)) {
+        $atributosPorMedicamento[(int) $row['medicamento_id']][] = $row;
+    }
+}
+foreach ($medicamentos as &$m) {
+    $m['atributos'] = $atributosPorMedicamento[(int) $m['id']] ?? [];
+}
+unset($m);
+
+// 4. Catálogo CIE-10 de Patologías y Clasificaciones 3FN
+$clasificacionesPatologiaCatalogo = $pdo->query("
+    SELECT id, codigo, nombre, descripcion, es_recurrente_mensual
+    FROM clasificaciones_patologia
+    WHERE activo = 1
+    ORDER BY id ASC
+")->fetchAll(PDO::FETCH_ASSOC);
+
 $filtroEstadoPat = $_GET['estado_pat'] ?? 'todos';
 $busquedaPat = trim($_GET['q_pat'] ?? '');
 $condPat = [];
@@ -75,13 +110,20 @@ if ($busquedaPat !== '') {
 }
 
 $wherePat = !empty($condPat) ? 'WHERE ' . implode(' AND ', $condPat) : '';
-$sqlPat = "SELECT p.* FROM patologias p {$wherePat} ORDER BY p.codigo_cie10 ASC";
+$sqlPat = "
+    SELECT p.*, cp.codigo AS clasificacion_codigo, cp.nombre AS clasificacion_nombre, cp.es_recurrente_mensual
+    FROM patologias p
+    LEFT JOIN clasificaciones_patologia cp ON p.clasificacion_id = cp.id
+    {$wherePat}
+    ORDER BY p.codigo_cie10 ASC
+";
 $stmtPat = $pdo->prepare($sqlPat);
 $stmtPat->execute($paramsPat);
 $patologias = $stmtPat->fetchAll(PDO::FETCH_ASSOC);
 
 // Edición si aplica
 $medicamentoEdicion = null;
+$atributosEdicionIds = [];
 $editarMId = filter_input(INPUT_GET, 'editar_m', FILTER_VALIDATE_INT)
     ?: filter_input(INPUT_GET, 'editar_med', FILTER_VALIDATE_INT)
     ?: filter_input(INPUT_GET, 'editar', FILTER_VALIDATE_INT);
@@ -89,6 +131,11 @@ if ($editarMId) {
     $stmtMEd = $pdo->prepare("SELECT * FROM medicamentos WHERE id = :id");
     $stmtMEd->execute([':id' => $editarMId]);
     $medicamentoEdicion = $stmtMEd->fetch(PDO::FETCH_ASSOC);
+    if ($medicamentoEdicion) {
+        $stmtAtrEd = $pdo->prepare("SELECT atributo_id FROM medicamento_atributos WHERE medicamento_id = :id");
+        $stmtAtrEd->execute([':id' => $medicamentoEdicion['id']]);
+        $atributosEdicionIds = $stmtAtrEd->fetchAll(PDO::FETCH_COLUMN);
+    }
 }
 ?>
 <!-- Cuadro de Mando de Vademécum (3 Tarjetas KPIs Institucionales) -->

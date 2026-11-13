@@ -27,8 +27,26 @@ switch ($accion) {
         $nombre = trim($_POST['nombre_generico'] ?? '');
         $concentracion = trim($_POST['concentracion'] ?? '');
         $formaFarmaceuticaId = (int) ($_POST['forma_farmaceutica_id'] ?? 0);
-        $requiereFrio = !empty($_POST['requiere_cadena_frio']) ? 1 : 0;
         $stockMinimo = max(1, (int) ($_POST['stock_minimo_sugerido'] ?? 20));
+
+        $atributosInput = $_POST['atributos'] ?? [];
+        if (!is_array($atributosInput)) {
+            $atributosInput = [];
+        }
+        $atributoIds = array_filter(array_map('intval', $atributosInput));
+
+        // Determinar soporte de cadena de frío automáticamente a partir de los atributos
+        $requiereFrio = 0;
+        if (!empty($atributoIds)) {
+            $inAtr = implode(',', $atributoIds);
+            $stmtFrioAtr = $pdo->query("SELECT COUNT(*) FROM atributos_farmacologicos WHERE id IN ({$inAtr}) AND codigo = 'CADENA_FRIO'");
+            if (((int) $stmtFrioAtr->fetchColumn()) > 0) {
+                $requiereFrio = 1;
+            }
+        }
+        if (!empty($_POST['requiere_cadena_frio'])) {
+            $requiereFrio = 1;
+        }
 
         if (mb_strlen($nombre, 'UTF-8') < 2 || mb_strlen($concentracion, 'UTF-8') < 1 || $formaFarmaceuticaId <= 0) {
             header('Location: index.php?tab=medicamentos&subtab=vademecum&error=' . urlencode('Verifique los campos requeridos: Nombre Genérico, Concentración y Forma Farmacéutica.'));
@@ -60,12 +78,22 @@ switch ($accion) {
         ]);
         $nuevoId = (int) $pdo->lastInsertId();
 
+        // Sincronizar atributos farmacológicos N:M
+        $pdo->prepare("DELETE FROM medicamento_atributos WHERE medicamento_id = :mid")->execute([':mid' => $nuevoId]);
+        if (!empty($atributoIds)) {
+            $stmtInsAtr = $pdo->prepare("INSERT IGNORE INTO medicamento_atributos (medicamento_id, atributo_id) VALUES (:mid, :aid)");
+            foreach ($atributoIds as $aid) {
+                $stmtInsAtr->execute([':mid' => $nuevoId, ':aid' => $aid]);
+            }
+        }
+
         registrarAuditoria($pdo, $usuarioSesionId, 'CREAR_MEDICAMENTO', 'medicamentos', $nuevoId, [
             'evento' => 'Alta de fármaco en Vademécum Institucional',
             'nombre_generico' => $nombre,
             'concentracion' => $concentracion,
             'forma_farmaceutica' => $formaInfo['nombre'],
             'requiere_cadena_frio' => $requiereFrio,
+            'atributos_ids' => $atributoIds,
             'stock_minimo_sugerido' => $stockMinimo
         ]);
 
@@ -84,8 +112,25 @@ switch ($accion) {
         $nombre = trim($_POST['nombre_generico'] ?? '');
         $concentracion = trim($_POST['concentracion'] ?? '');
         $formaFarmaceuticaId = (int) ($_POST['forma_farmaceutica_id'] ?? 0);
-        $requiereFrio = !empty($_POST['requiere_cadena_frio']) ? 1 : 0;
         $stockMinimo = max(1, (int) ($_POST['stock_minimo_sugerido'] ?? 20));
+
+        $atributosInput = $_POST['atributos'] ?? [];
+        if (!is_array($atributosInput)) {
+            $atributosInput = [];
+        }
+        $atributoIds = array_filter(array_map('intval', $atributosInput));
+
+        $requiereFrio = 0;
+        if (!empty($atributoIds)) {
+            $inAtr = implode(',', $atributoIds);
+            $stmtFrioAtr = $pdo->query("SELECT COUNT(*) FROM atributos_farmacologicos WHERE id IN ({$inAtr}) AND codigo = 'CADENA_FRIO'");
+            if (((int) $stmtFrioAtr->fetchColumn()) > 0) {
+                $requiereFrio = 1;
+            }
+        }
+        if (!empty($_POST['requiere_cadena_frio'])) {
+            $requiereFrio = 1;
+        }
 
         if (!$id || mb_strlen($nombre, 'UTF-8') < 2 || mb_strlen($concentracion, 'UTF-8') < 1 || $formaFarmaceuticaId <= 0) {
             header('Location: index.php?tab=medicamentos&subtab=vademecum&error=' . urlencode('Verifique los campos requeridos: ID, Nombre Genérico, Concentración y Forma Farmacéutica.'));
@@ -148,10 +193,20 @@ switch ($accion) {
             ':id' => $id
         ]);
 
+        // Sincronizar atributos farmacológicos N:M
+        $pdo->prepare("DELETE FROM medicamento_atributos WHERE medicamento_id = :mid")->execute([':mid' => $id]);
+        if (!empty($atributoIds)) {
+            $stmtInsAtr = $pdo->prepare("INSERT IGNORE INTO medicamento_atributos (medicamento_id, atributo_id) VALUES (:mid, :aid)");
+            foreach ($atributoIds as $aid) {
+                $stmtInsAtr->execute([':mid' => $id, ':aid' => $aid]);
+            }
+        }
+
         registrarAuditoria($pdo, $usuarioSesionId, 'EDITAR_MEDICAMENTO', 'medicamentos', $id, [
             'evento' => 'Actualización de especificaciones de fármaco en Vademécum',
             'nombre_generico' => $nombre,
-            'delta' => !empty($delta) ? $delta : 'Sin modificaciones detectadas'
+            'delta' => !empty($delta) ? $delta : 'Sin modificaciones detectadas',
+            'atributos_ids' => $atributoIds
         ]);
 
         $pdo->commit();

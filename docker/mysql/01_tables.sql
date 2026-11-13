@@ -68,8 +68,10 @@ CREATE TABLE rol_permisos (
 -- 1.5 Tipos de Documento de Identidad Oficiales
 CREATE TABLE tipos_documento (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    codigo CHAR(1) NOT NULL UNIQUE COMMENT 'V, E, P',
-    nombre VARCHAR(40) NOT NULL
+    codigo VARCHAR(10) NOT NULL UNIQUE COMMENT 'V, E, P, DNI, RUT',
+    nombre VARCHAR(40) NOT NULL,
+    activo TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
 -- 1.6 Catálogo de Tipos de Vías de Contacto (1FN Normalización)
@@ -107,15 +109,28 @@ CREATE TABLE recursos_operativos (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
--- 1.10 Catálogo Clínico Parametrizable: Patologías y Diagnósticos (3FN)
+-- 1.10 Catálogo de Clasificaciones de Patología (3FN)
+CREATE TABLE clasificaciones_patologia (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    codigo VARCHAR(30) NOT NULL UNIQUE COMMENT 'CRONICA, AGUDA, EPIDEMIOLOGICA',
+    nombre VARCHAR(80) NOT NULL,
+    descripcion VARCHAR(255) NULL,
+    es_recurrente_mensual TINYINT(1) NOT NULL DEFAULT 1,
+    activo TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- 1.11 Catálogo Clínico Parametrizable: Patologías y Diagnósticos (3FN)
 CREATE TABLE patologias (
     id INT AUTO_INCREMENT PRIMARY KEY,
     codigo_cie10 VARCHAR(10) NULL UNIQUE COMMENT 'Código internacional CIE-10 (ej: I10, E11)',
     nombre VARCHAR(120) NOT NULL UNIQUE COMMENT 'Ej: Hipertensión Arterial Primaria, Diabetes Mellitus Tipo 2',
+    clasificacion_id INT NULL,
     cronica TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1 = Enfermedad crónica no transmisible, 0 = Aguda',
     descripcion VARCHAR(255) NULL,
     activo TINYINT(1) NOT NULL DEFAULT 1,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_patologias_clasificacion FOREIGN KEY (clasificacion_id) REFERENCES clasificaciones_patologia(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- ============================================================================
@@ -231,6 +246,27 @@ CREATE TABLE medicamentos (
     CONSTRAINT fk_medicamentos_forma FOREIGN KEY (forma_farmaceutica_id) REFERENCES formas_farmaceuticas(id)
 ) ENGINE=InnoDB;
 
+-- 4.1 Atributos Farmacológicos Normalizados (3FN - N:M)
+CREATE TABLE atributos_farmacologicos (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    codigo VARCHAR(30) NOT NULL UNIQUE,
+    nombre VARCHAR(80) NOT NULL,
+    descripcion VARCHAR(255) NULL,
+    icono VARCHAR(40) NOT NULL DEFAULT 'bi-tag',
+    color_badge VARCHAR(30) NOT NULL DEFAULT 'primary',
+    activo TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- 4.2 Tabla Intermedia Muchos a Muchos: Medicamentos <-> Atributos Farmacológicos
+CREATE TABLE medicamento_atributos (
+    medicamento_id INT NOT NULL,
+    atributo_id INT NOT NULL,
+    PRIMARY KEY (medicamento_id, atributo_id),
+    CONSTRAINT fk_med_atr_medicamento FOREIGN KEY (medicamento_id) REFERENCES medicamentos(id) ON DELETE CASCADE,
+    CONSTRAINT fk_med_atr_atributo FOREIGN KEY (atributo_id) REFERENCES atributos_farmacologicos(id) ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
 -- POLÍTICA APLICADA: Un lote NUNCA se borra físicamente para trazabilidad sanitaria
 CREATE TABLE lotes_inventario (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -238,6 +274,7 @@ CREATE TABLE lotes_inventario (
     medicamento_id INT NOT NULL,
     numero_lote VARCHAR(30) NOT NULL,
     fecha_vencimiento DATE NOT NULL,
+    laboratorio_proveedor VARCHAR(100) NULL COMMENT 'Laboratorio fabricante o proveedor sanitario',
     cantidad_actual INT NOT NULL CHECK (cantidad_actual >= 0),
     usuario_id INT NOT NULL COMMENT 'Trazabilidad: Operador que registró el lote',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

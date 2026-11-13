@@ -125,14 +125,21 @@ INSERT INTO recursos_operativos (id, codigo, nombre, descripcion, activo) VALUES
 (5, 'FARMACIA_24H', 'Farmacia Nocturna / 24 Horas', 'Ventanilla de despacho continuo durante turnos nocturnos y festivos', 1)
 ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), descripcion = VALUES(descripcion), activo = VALUES(activo);
 
--- 1.10 Catálogo Clínico Parametrizable: Patologías Crónicas (3FN)
-INSERT INTO patologias (id, codigo_cie10, nombre, cronica, descripcion, activo) VALUES
-(1, 'I10', 'Hipertensión Arterial Primaria', 1, 'Presión arterial sistólica >= 140 mmHg y/o diastólica >= 90 mmHg de etiología primaria', 1),
-(2, 'E11', 'Diabetes Mellitus Tipo 2', 1, 'Alteración metabólica de hiperglucemia crónica no dependiente primariamente de insulina', 1),
-(3, 'E10', 'Diabetes Mellitus Tipo 1', 1, 'Destrucción autoinmune de células beta pancreáticas con requerimiento estricto de insulina', 1),
-(4, 'J45', 'Asma Bronquial Crónica', 1, 'Inflamación crónica de vías respiratorias con episodios recurrentes de broncoespasmo', 1),
-(5, 'E03', 'Hipotiroidismo Primario', 1, 'Déficit en la producción de hormonas tiroideas por afectación glandular', 1)
-ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), codigo_cie10 = VALUES(codigo_cie10);
+-- 1.10 Catálogo de Clasificaciones de Patología (3FN)
+INSERT INTO clasificaciones_patologia (id, codigo, nombre, descripcion, es_recurrente_mensual, activo) VALUES
+(1, 'CRONICA', 'Enfermedad Crónica No Transmisible', 'Patología de curso prolongado elegible para dotación mensual continua de récipe', 1, 1),
+(2, 'AGUDA', 'Patología Aguda / Estacional', 'Afección transitoria o estacional con tratamiento prescrito acotado', 0, 1),
+(3, 'EPIDEMIOLOGICA', 'Monitoreo Epidemiológico Especial', 'Patología bajo vigilancia sanitaria municipal y cerco epidemiológico', 0, 1)
+ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), descripcion = VALUES(descripcion), es_recurrente_mensual = VALUES(es_recurrente_mensual), activo = VALUES(activo);
+
+-- 1.11 Catálogo Clínico Parametrizable: Patologías Crónicas (3FN)
+INSERT INTO patologias (id, codigo_cie10, nombre, clasificacion_id, cronica, descripcion, activo) VALUES
+(1, 'I10', 'Hipertensión Arterial Primaria', 1, 1, 'Presión arterial sistólica >= 140 mmHg y/o diastólica >= 90 mmHg de etiología primaria', 1),
+(2, 'E11', 'Diabetes Mellitus Tipo 2', 1, 1, 'Alteración metabólica de hiperglucemia crónica no dependiente primariamente de insulina', 1),
+(3, 'E10', 'Diabetes Mellitus Tipo 1', 1, 1, 'Destrucción autoinmune de células beta pancreáticas con requerimiento estricto de insulina', 1),
+(4, 'J45', 'Asma Bronquial Crónica', 1, 1, 'Inflamación crónica de vías respiratorias con episodios recurrentes de broncoespasmo', 1),
+(5, 'E03', 'Hipotiroidismo Primario', 1, 1, 'Déficit en la producción de hormonas tiroideas por afectación glandular', 1)
+ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), codigo_cie10 = VALUES(codigo_cie10), clasificacion_id = VALUES(clasificacion_id);
 
 -- ============================================================================
 -- 2. CENTROS DE SALUD DE LA RED MUNICIPAL
@@ -197,6 +204,20 @@ ON DUPLICATE KEY UPDATE
     concentracion = VALUES(concentracion), 
     requiere_cadena_frio = VALUES(requiere_cadena_frio),
     stock_minimo_sugerido = VALUES(stock_minimo_sugerido);
+
+-- 4.1 Atributos Farmacológicos Normalizados (3FN - N:M)
+INSERT INTO atributos_farmacologicos (id, codigo, nombre, descripcion, icono, color_badge, activo) VALUES
+(1, 'CADENA_FRIO', 'Requiere Cadena de Frío', 'Refrigeración obligatoria continua entre 2°C y 8°C', 'bi-snow2', 'info', 1),
+(2, 'FOTOSENSIBLE', 'Fotosensible / Proteger de Luz', 'Sensible a radiación lumínica solar o ambiental directa', 'bi-sun', 'warning', 1),
+(3, 'PSICOTROPICO', 'Sujeto a Fiscalización', 'Fármaco controlado bajo estricta normativa de estupefacientes', 'bi-shield-exclamation', 'danger', 1),
+(4, 'ANTIBIOTICO', 'Reserva Antimicrobiana', 'Uso vigilado para prevención de resistencia bacteriana', 'bi-capsule', 'dark', 1),
+(5, 'TERMOLABIL', 'Sensible a Temperatura Ambiente', 'Requiere almacenaje en áreas climatizadas bajo 25°C', 'bi-thermometer-half', 'secondary', 1)
+ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), descripcion = VALUES(descripcion), icono = VALUES(icono), color_badge = VALUES(color_badge), activo = VALUES(activo);
+
+-- 4.2 Relación Fármacos con Atributos (N:M)
+INSERT INTO medicamento_atributos (medicamento_id, atributo_id) VALUES
+(3, 1) -- Insulina NPH Humana requiere Cadena de Frío
+ON DUPLICATE KEY UPDATE atributo_id = VALUES(atributo_id);
 
 -- ============================================================================
 -- 5. PACIENTES Y NORMALIZACIÓN 1FN DE CONTACTOS

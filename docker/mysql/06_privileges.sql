@@ -20,11 +20,14 @@ GRANT SELECT, INSERT, UPDATE ON control_medicamentos_red.configuracion_instituci
 GRANT SELECT, INSERT, UPDATE, DELETE ON control_medicamentos_red.roles TO 'app_salud_user'@'%';
 GRANT SELECT, INSERT, UPDATE ON control_medicamentos_red.centros_salud TO 'app_salud_user'@'%';
 GRANT SELECT, INSERT, UPDATE ON control_medicamentos_red.medicamentos TO 'app_salud_user'@'%';
+GRANT SELECT, INSERT, UPDATE ON control_medicamentos_red.atributos_farmacologicos TO 'app_salud_user'@'%';
 GRANT SELECT, INSERT, UPDATE ON control_medicamentos_red.patologias TO 'app_salud_user'@'%';
+GRANT SELECT, INSERT, UPDATE ON control_medicamentos_red.clasificaciones_patologia TO 'app_salud_user'@'%';
 GRANT SELECT, INSERT, UPDATE ON control_medicamentos_red.formas_farmaceuticas TO 'app_salud_user'@'%';
 GRANT SELECT, INSERT, UPDATE ON control_medicamentos_red.tipos_centro_salud TO 'app_salud_user'@'%';
 GRANT SELECT, INSERT, UPDATE ON control_medicamentos_red.recursos_operativos TO 'app_salud_user'@'%';
 GRANT SELECT, INSERT, UPDATE ON control_medicamentos_red.lotes_inventario TO 'app_salud_user'@'%';
+GRANT SELECT, INSERT, UPDATE ON control_medicamentos_red.tipos_documento TO 'app_salud_user'@'%';
 GRANT SELECT, INSERT, UPDATE ON control_medicamentos_red.pacientes TO 'app_salud_user'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON control_medicamentos_red.paciente_contactos TO 'app_salud_user'@'%';
 GRANT SELECT, INSERT, UPDATE ON control_medicamentos_red.telefonos_centro_salud TO 'app_salud_user'@'%';
@@ -48,6 +51,7 @@ GRANT SELECT ON control_medicamentos_red.tipos_contacto TO 'app_salud_user'@'%';
 -- Tablas Intermedias que requieren asignación y desasignación
 GRANT SELECT, INSERT, DELETE ON control_medicamentos_red.rol_permisos TO 'app_salud_user'@'%';
 GRANT SELECT, INSERT, UPDATE, DELETE ON control_medicamentos_red.centro_recursos TO 'app_salud_user'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE ON control_medicamentos_red.medicamento_atributos TO 'app_salud_user'@'%';
 
 -- Vistas del Sistema (Solo Lectura)
 GRANT SELECT ON control_medicamentos_red.vw_centros_salud TO 'app_salud_user'@'%';

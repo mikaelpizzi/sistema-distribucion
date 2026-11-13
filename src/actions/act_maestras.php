@@ -315,8 +315,17 @@ switch ($accion) {
         }
 
         $nombre = trim($_POST['nombre'] ?? '');
-        $cronica = !empty($_POST['cronica']) ? 1 : 0;
+        $clasificacionId = filter_input(INPUT_POST, 'clasificacion_id', FILTER_VALIDATE_INT) ?: null;
         $descripcion = trim($_POST['descripcion'] ?? '');
+
+        if ($clasificacionId) {
+            $stmtClas = $pdo->prepare("SELECT es_recurrente_mensual FROM clasificaciones_patologia WHERE id = :id");
+            $stmtClas->execute([':id' => $clasificacionId]);
+            $rowClas = $stmtClas->fetch(PDO::FETCH_ASSOC);
+            $cronica = $rowClas ? (int) $rowClas['es_recurrente_mensual'] : (!empty($_POST['cronica']) ? 1 : 0);
+        } else {
+            $cronica = !empty($_POST['cronica']) ? 1 : 0;
+        }
 
         if (mb_strlen($nombre, 'UTF-8') < 3) {
             header('Location: index.php?tab=medicamentos&subtab=patologias&error=' . urlencode('El diagnóstico/nombre de la patología es obligatorio (mínimo 3 caracteres).'));
@@ -328,12 +337,13 @@ switch ($accion) {
         }
 
         $stmtIns = $pdo->prepare("
-            INSERT INTO patologias (codigo_cie10, nombre, cronica, descripcion, activo)
-            VALUES (:codigo, :nombre, :cronica, :descripcion, 1)
+            INSERT INTO patologias (codigo_cie10, nombre, clasificacion_id, cronica, descripcion, activo)
+            VALUES (:codigo, :nombre, :clas_id, :cronica, :descripcion, 1)
         ");
         $stmtIns->execute([
             ':codigo' => $codigo,
             ':nombre' => $nombre,
+            ':clas_id' => $clasificacionId,
             ':cronica' => $cronica,
             ':descripcion' => $descripcion !== '' ? $descripcion : null
         ]);
@@ -343,6 +353,7 @@ switch ($accion) {
             'evento' => 'Registro de patología diagnóstica en catálogo CIE-10',
             'codigo_cie10' => $codigo,
             'nombre' => $nombre,
+            'clasificacion_id' => $clasificacionId,
             'cronica' => $cronica,
             'descripcion' => $descripcion !== '' ? $descripcion : null
         ]);
@@ -422,6 +433,294 @@ switch ($accion) {
 
         $pdo->commit();
         header('Location: index.php?tab=medicamentos&subtab=formas&msg=' . urlencode("Forma farmacéutica '{$nombre}' incorporada exitosamente."));
+        exit;
+
+    // =========================================================================
+    // 3. TIPOS DE DOCUMENTO DE IDENTIDAD (CATÁLOGO MAESTRO)
+    // =========================================================================
+    case 'crear_tipo_documento':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header('Location: index.php?tab=maestras');
+            exit;
+        }
+
+        $codigo = strtoupper(trim($_POST['codigo'] ?? ''));
+        $nombre = trim($_POST['nombre'] ?? '');
+
+        if (mb_strlen($codigo, 'UTF-8') < 1 || mb_strlen($codigo, 'UTF-8') > 10 || mb_strlen($nombre, 'UTF-8') < 2) {
+            header('Location: index.php?tab=maestras&error=' . urlencode('Código (1-10 caracteres) y Nombre (mínimo 2 caracteres) son obligatorios.'));
+            exit;
+        }
+
+        // Validar duplicidad
+        $stmtCheck = $pdo->prepare("SELECT id FROM tipos_documento WHERE codigo = :c");
+        $stmtCheck->execute([':c' => $codigo]);
+        if ($stmtCheck->fetch()) {
+            header('Location: index.php?tab=maestras&error=' . urlencode("El código de documento '{$codigo}' ya se encuentra registrado."));
+            exit;
+        }
+
+        if (!$pdo->inTransaction()) {
+            $pdo->beginTransaction();
+        }
+
+        $stmtIns = $pdo->prepare("INSERT INTO tipos_documento (codigo, nombre, activo) VALUES (:c, :n, 1)");
+        $stmtIns->execute([':c' => $codigo, ':n' => $nombre]);
+        $nuevoId = (int) $pdo->lastInsertId();
+
+        registrarAuditoria($pdo, $usuarioSesionId, 'CREAR_TIPO_DOCUMENTO', 'tipos_documento', $nuevoId, [
+            'evento' => 'Alta de nuevo tipo de documento de identidad oficial',
+            'codigo' => $codigo,
+            'nombre' => $nombre
+        ]);
+
+        $pdo->commit();
+        header('Location: index.php?tab=maestras&msg=' . urlencode("Tipo de documento '{$codigo} - {$nombre}' creado exitosamente."));
+        exit;
+
+    case 'editar_tipo_documento':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header('Location: index.php?tab=maestras');
+            exit;
+        }
+
+        $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
+        $codigo = strtoupper(trim($_POST['codigo'] ?? ''));
+        $nombre = trim($_POST['nombre'] ?? '');
+
+        if (!$id || mb_strlen($codigo, 'UTF-8') < 1 || mb_strlen($codigo, 'UTF-8') > 10 || mb_strlen($nombre, 'UTF-8') < 2) {
+            header('Location: index.php?tab=maestras&error=' . urlencode('Parámetros inválidos para edición de tipo de documento.'));
+            exit;
+        }
+
+        $stmtCheck = $pdo->prepare("SELECT id FROM tipos_documento WHERE codigo = :c AND id != :id");
+        $stmtCheck->execute([':c' => $codigo, ':id' => $id]);
+        if ($stmtCheck->fetch()) {
+            header('Location: index.php?tab=maestras&error=' . urlencode("El código de documento '{$codigo}' ya está en uso por otro registro."));
+            exit;
+        }
+
+        $stmtPrev = $pdo->prepare("SELECT codigo, nombre FROM tipos_documento WHERE id = :id");
+        $stmtPrev->execute([':id' => $id]);
+        $prevDoc = $stmtPrev->fetch(PDO::FETCH_ASSOC);
+
+        if (!$pdo->inTransaction()) {
+            $pdo->beginTransaction();
+        }
+
+        $stmtUpd = $pdo->prepare("UPDATE tipos_documento SET codigo = :c, nombre = :n WHERE id = :id");
+        $stmtUpd->execute([':c' => $codigo, ':n' => $nombre, ':id' => $id]);
+
+        registrarAuditoria($pdo, $usuarioSesionId, 'EDITAR_TIPO_DOCUMENTO', 'tipos_documento', $id, [
+            'evento' => 'Modificación de especificaciones de tipo de documento',
+            'anterior' => $prevDoc,
+            'nuevo' => ['codigo' => $codigo, 'nombre' => $nombre]
+        ]);
+
+        $pdo->commit();
+        header('Location: index.php?tab=maestras&msg=' . urlencode("Tipo de documento '{$codigo}' actualizado con éxito."));
+        exit;
+
+    case 'toggle_tipo_documento':
+        $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT) ?: filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+        $st = isset($_POST['estado']) ? (int) $_POST['estado'] : (isset($_GET['estado']) ? (int) $_GET['estado'] : null);
+
+        if (!$id || ($st !== 0 && $st !== 1)) {
+            header('Location: index.php?tab=maestras&error=' . urlencode('Parámetros inválidos para conmutar estado.'));
+            exit;
+        }
+
+        $stmtD = $pdo->prepare("SELECT codigo, nombre FROM tipos_documento WHERE id = :id");
+        $stmtD->execute([':id' => $id]);
+        $docInfo = $stmtD->fetch(PDO::FETCH_ASSOC);
+        $docNombre = $docInfo['nombre'] ?? "Documento #{$id}";
+        $docCodigo = $docInfo['codigo'] ?? '';
+
+        if (!$pdo->inTransaction()) {
+            $pdo->beginTransaction();
+        }
+
+        $pdo->prepare("UPDATE tipos_documento SET activo = :st WHERE id = :id")->execute([':st' => $st, ':id' => $id]);
+
+        registrarAuditoria($pdo, $usuarioSesionId, 'CONMUTAR_TIPO_DOCUMENTO', 'tipos_documento', $id, [
+            'evento' => 'Conmutación de vigencia de tipo de documento',
+            'codigo' => $docCodigo,
+            'nombre' => $docNombre,
+            'nuevo_estado' => $st
+        ]);
+
+        $pdo->commit();
+        header('Location: index.php?tab=maestras&msg=' . urlencode("Estado de documento '{$docCodigo}' actualizado."));
+        exit;
+
+    // =========================================================================
+    // 4. ATRIBUTOS FARMACOLÓGICOS (3FN - N:M)
+    // =========================================================================
+    case 'crear_atributo_farmacologico':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header('Location: index.php?tab=maestras');
+            exit;
+        }
+
+        $codigo = strtoupper(trim($_POST['codigo'] ?? ''));
+        $codigo = preg_replace('/[^A-Z0-9_]/', '', $codigo);
+        $nombre = trim($_POST['nombre'] ?? '');
+        $descripcion = trim($_POST['descripcion'] ?? '');
+        $icono = trim($_POST['icono'] ?? 'bi-tag');
+        $colorBadge = trim($_POST['color_badge'] ?? 'primary');
+
+        if (mb_strlen($codigo, 'UTF-8') < 2 || mb_strlen($nombre, 'UTF-8') < 2) {
+            header('Location: index.php?tab=maestras&error=' . urlencode('Código (mínimo 2 caracteres) y Denominación son obligatorios.'));
+            exit;
+        }
+
+        $stmtCheck = $pdo->prepare("SELECT id FROM atributos_farmacologicos WHERE codigo = :c");
+        $stmtCheck->execute([':c' => $codigo]);
+        if ($stmtCheck->fetch()) {
+            header('Location: index.php?tab=maestras&error=' . urlencode("El atributo '{$codigo}' ya se encuentra registrado."));
+            exit;
+        }
+
+        if (!$pdo->inTransaction()) {
+            $pdo->beginTransaction();
+        }
+
+        $stmtIns = $pdo->prepare("
+            INSERT INTO atributos_farmacologicos (codigo, nombre, descripcion, icono, color_badge, activo)
+            VALUES (:c, :n, :d, :ico, :color, 1)
+        ");
+        $stmtIns->execute([
+            ':c' => $codigo,
+            ':n' => $nombre,
+            ':d' => $descripcion !== '' ? $descripcion : null,
+            ':ico' => $icono !== '' ? $icono : 'bi-tag',
+            ':color' => $colorBadge !== '' ? $colorBadge : 'primary'
+        ]);
+        $nuevoId = (int) $pdo->lastInsertId();
+
+        registrarAuditoria($pdo, $usuarioSesionId, 'CREAR_ATRIBUTO_FARMACOLOGICO', 'atributos_farmacologicos', $nuevoId, [
+            'evento' => 'Alta de atributo farmacológico en catálogo 3FN',
+            'codigo' => $codigo,
+            'nombre' => $nombre,
+            'color_badge' => $colorBadge
+        ]);
+
+        $pdo->commit();
+        header('Location: index.php?tab=maestras&msg=' . urlencode("Atributo farmacológico '{$nombre}' incorporado exitosamente."));
+        exit;
+
+    case 'toggle_atributo_farmacologico':
+        $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT) ?: filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+        $st = isset($_POST['estado']) ? (int) $_POST['estado'] : (isset($_GET['estado']) ? (int) $_GET['estado'] : null);
+
+        if (!$id || ($st !== 0 && $st !== 1)) {
+            header('Location: index.php?tab=maestras&error=' . urlencode('Parámetros inválidos.'));
+            exit;
+        }
+
+        $stmtA = $pdo->prepare("SELECT codigo, nombre FROM atributos_farmacologicos WHERE id = :id");
+        $stmtA->execute([':id' => $id]);
+        $atrInfo = $stmtA->fetch(PDO::FETCH_ASSOC);
+        $atrNombre = $atrInfo['nombre'] ?? "Atributo #{$id}";
+
+        if (!$pdo->inTransaction()) {
+            $pdo->beginTransaction();
+        }
+
+        $pdo->prepare("UPDATE atributos_farmacologicos SET activo = :st WHERE id = :id")->execute([':st' => $st, ':id' => $id]);
+
+        registrarAuditoria($pdo, $usuarioSesionId, 'CONMUTAR_ATRIBUTO_FARMACOLOGICO', 'atributos_farmacologicos', $id, [
+            'evento' => 'Conmutación de vigencia de atributo farmacológico',
+            'nombre' => $atrNombre,
+            'nuevo_estado' => $st
+        ]);
+
+        $pdo->commit();
+        header('Location: index.php?tab=maestras&msg=' . urlencode("Estado de atributo '{$atrNombre}' actualizado."));
+        exit;
+
+    // =========================================================================
+    // 5. CLASIFICACIONES DE PATOLOGÍAS (3FN)
+    // =========================================================================
+    case 'crear_clasificacion_patologia':
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header('Location: index.php?tab=maestras');
+            exit;
+        }
+
+        $codigo = strtoupper(trim($_POST['codigo'] ?? ''));
+        $codigo = preg_replace('/[^A-Z0-9_]/', '', $codigo);
+        $nombre = trim($_POST['nombre'] ?? '');
+        $descripcion = trim($_POST['descripcion'] ?? '');
+        $esRecurrente = !empty($_POST['es_recurrente_mensual']) ? 1 : 0;
+
+        if (mb_strlen($codigo, 'UTF-8') < 2 || mb_strlen($nombre, 'UTF-8') < 2) {
+            header('Location: index.php?tab=maestras&error=' . urlencode('Código (mínimo 2 caracteres) y Denominación son obligatorios.'));
+            exit;
+        }
+
+        $stmtCheck = $pdo->prepare("SELECT id FROM clasificaciones_patologia WHERE codigo = :c");
+        $stmtCheck->execute([':c' => $codigo]);
+        if ($stmtCheck->fetch()) {
+            header('Location: index.php?tab=maestras&error=' . urlencode("La clasificación '{$codigo}' ya se encuentra registrada."));
+            exit;
+        }
+
+        if (!$pdo->inTransaction()) {
+            $pdo->beginTransaction();
+        }
+
+        $stmtIns = $pdo->prepare("
+            INSERT INTO clasificaciones_patologia (codigo, nombre, descripcion, es_recurrente_mensual, activo)
+            VALUES (:c, :n, :d, :rec, 1)
+        ");
+        $stmtIns->execute([
+            ':c' => $codigo,
+            ':n' => $nombre,
+            ':d' => $descripcion !== '' ? $descripcion : null,
+            ':rec' => $esRecurrente
+        ]);
+        $nuevoId = (int) $pdo->lastInsertId();
+
+        registrarAuditoria($pdo, $usuarioSesionId, 'CREAR_CLASIFICACION_PATOLOGIA', 'clasificaciones_patologia', $nuevoId, [
+            'evento' => 'Alta de clasificación nosológica de patología en 3FN',
+            'codigo' => $codigo,
+            'nombre' => $nombre,
+            'es_recurrente_mensual' => $esRecurrente
+        ]);
+
+        $pdo->commit();
+        header('Location: index.php?tab=maestras&msg=' . urlencode("Clasificación '{$nombre}' incorporada exitosamente."));
+        exit;
+
+    case 'toggle_clasificacion_patologia':
+        $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT) ?: filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+        $st = isset($_POST['estado']) ? (int) $_POST['estado'] : (isset($_GET['estado']) ? (int) $_GET['estado'] : null);
+
+        if (!$id || ($st !== 0 && $st !== 1)) {
+            header('Location: index.php?tab=maestras&error=' . urlencode('Parámetros inválidos.'));
+            exit;
+        }
+
+        $stmtCp = $pdo->prepare("SELECT codigo, nombre FROM clasificaciones_patologia WHERE id = :id");
+        $stmtCp->execute([':id' => $id]);
+        $cpInfo = $stmtCp->fetch(PDO::FETCH_ASSOC);
+        $cpNombre = $cpInfo['nombre'] ?? "Clasificación #{$id}";
+
+        if (!$pdo->inTransaction()) {
+            $pdo->beginTransaction();
+        }
+
+        $pdo->prepare("UPDATE clasificaciones_patologia SET activo = :st WHERE id = :id")->execute([':st' => $st, ':id' => $id]);
+
+        registrarAuditoria($pdo, $usuarioSesionId, 'CONMUTAR_CLASIFICACION_PATOLOGIA', 'clasificaciones_patologia', $id, [
+            'evento' => 'Conmutación de vigencia de clasificación de patología',
+            'nombre' => $cpNombre,
+            'nuevo_estado' => $st
+        ]);
+
+        $pdo->commit();
+        header('Location: index.php?tab=maestras&msg=' . urlencode("Estado de clasificación '{$cpNombre}' actualizado."));
         exit;
 
     default:

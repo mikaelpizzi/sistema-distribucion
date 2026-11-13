@@ -44,6 +44,15 @@ $stmtFrio = $pdo->prepare("
 $stmtFrio->execute([':cid' => $centroOperativoId]);
 $centroTieneCadenaFrio = ((int) $stmtFrio->fetchColumn()) > 0;
 
+$puedeRegistrarLote = tienePermiso('INV_REGISTRAR_LOTE') || esRol('rol_admin');
+$catalogoMedicamentosActivos = $pdo->query("
+    SELECT m.id, m.nombre_generico, m.concentracion, ff.nombre AS forma_nombre, m.requiere_cadena_frio
+    FROM medicamentos m
+    LEFT JOIN formas_farmaceuticas ff ON m.forma_farmaceutica_id = ff.id
+    WHERE m.activo = 1
+    ORDER BY m.nombre_generico ASC
+")->fetchAll(PDO::FETCH_ASSOC);
+
 $periodoActual = date('Y-m');
 
 // 2. Cuadro de Mando Superior (3 KPIs Institucionales)
@@ -164,6 +173,23 @@ if ($busquedaPaciente !== '') {
         $stmtRec->execute([':paciente_id' => $pacienteEncontrado['id']]);
         $recipesCrudos = $stmtRec->fetchAll(PDO::FETCH_ASSOC);
 
+        // Atributos Farmacológicos Normalizados (3FN - N:M) para los fármacos del paciente
+        $medIds = array_unique(array_filter(array_column($recipesCrudos, 'medicamento_id')));
+        $atributosPorMedicamento = [];
+        if (!empty($medIds)) {
+            $inClause = implode(',', array_map('intval', $medIds));
+            $stmtAtr = $pdo->query("
+                SELECT ma.medicamento_id, af.codigo, af.nombre, af.icono, af.color_badge
+                FROM medicamento_atributos ma
+                JOIN atributos_farmacologicos af ON ma.atributo_id = af.id
+                WHERE ma.medicamento_id IN ({$inClause}) AND af.activo = 1
+                ORDER BY af.id ASC
+            ");
+            while ($rowAtr = $stmtAtr->fetch(PDO::FETCH_ASSOC)) {
+                $atributosPorMedicamento[(int) $rowAtr['medicamento_id']][] = $rowAtr;
+            }
+        }
+
         foreach ($recipesCrudos as $rec) {
             // Comprobar si ya retiró este mes (uk_retiro_mensual)
             $stmtRetiro = $pdo->prepare("
@@ -212,6 +238,7 @@ if ($busquedaPaciente !== '') {
             $rec['lotes_fefo'] = $lotesDisponibles;
             $rec['stock_total_centro'] = $stockTotalAmbulatorio;
             $rec['lote_prioritario'] = !empty($lotesDisponibles) ? $lotesDisponibles[0] : null;
+            $rec['atributos_farmacologicos'] = $atributosPorMedicamento[(int) $rec['medicamento_id']] ?? [];
 
             $recipesPaciente[] = $rec;
         }
@@ -253,6 +280,9 @@ $ultimosDespachos = $stmtHist->fetchAll(PDO::FETCH_ASSOC);
                                 <div class="row align-items-center g-2">
                                     <div class="col-md-7">
                                         <div class="d-flex align-items-center gap-2 flex-wrap">
+                                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                                                <i class="bi bi-hospital me-1"></i> Jurisdicción Operativa
+                                            </span>
                                             <span
                                                 class="fw-bold text-dark fs-6"><?= htmlspecialchars($centroOperativo['nombre'] ?? 'Ambulatorio') ?></span>
                                             <span
@@ -276,7 +306,13 @@ $ultimosDespachos = $stmtHist->fetchAll(PDO::FETCH_ASSOC);
                                             <?= htmlspecialchars($centroOperativo['direccion'] ?? 'Dirección municipal') ?>
                                         </div>
                                     </div>
-                                    <div class="col-md-5 text-md-end">
+                                    <div class="col-md-5 d-flex align-items-center justify-content-md-end gap-2 flex-wrap">
+                                        <?php if ($puedeRegistrarLote): ?>
+                                            <button type="button" class="btn btn-success btn-sm fw-semibold shadow-sm text-nowrap"
+                                                data-bs-toggle="modal" data-bs-target="#modalEntradaLote">
+                                                <i class="bi bi-box-arrow-in-down me-1"></i> + Registrar Entrada de Lote
+                                            </button>
+                                        <?php endif; ?>
                                         <?php if ($puedeVerTodaLaRed): ?>
                                             <form method="GET" action="index.php"
                                                 class="d-inline-flex align-items-center gap-2 justify-content-md-end">
@@ -287,7 +323,7 @@ $ultimosDespachos = $stmtHist->fetchAll(PDO::FETCH_ASSOC);
                                                 <?php endif; ?>
                                                 <label class="form-label small text-secondary fw-semibold mb-0 text-nowrap">Cambiar Centro:</label>
                                                 <select name="centro_id" class="form-select form-select-sm"
-                                                    style="max-width: 260px;" onchange="this.form.submit()">
+                                                    style="max-width: 220px;" onchange="this.form.submit()">
                                                     <?php foreach ($catalogoCentros as $c): ?>
                                                         <option value="<?= (int) $c['id'] ?>" <?= ((int) $c['id'] === $centroOperativoId) ? 'selected' : '' ?>>
                                                             <?= htmlspecialchars($c['codigo_sicm']) ?> —
@@ -353,6 +389,36 @@ $ultimosDespachos = $stmtHist->fetchAll(PDO::FETCH_ASSOC);
                                             <?= number_format($kpiUnidadesEntregadas) ?></div>
                                         <span class="text-muted small" style="font-size: 0.70rem;">Total dosis físicas
                                             dispensadas</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- GUÍA VISUAL DE FLUJO DE ATENCIÓN Y DISPENSACIÓN -->
+                        <div class="card bg-white border shadow-sm mb-3">
+                            <div class="card-body py-2.5 px-3">
+                                <div class="row align-items-center g-2 text-center text-md-start">
+                                    <div class="col-12 col-md-auto text-muted small fw-semibold text-uppercase"
+                                        style="font-size: 0.72rem; letter-spacing: 0.04em;">
+                                        <i class="bi bi-diagram-3 text-primary me-1"></i> Flujo Asistencial:
+                                    </div>
+                                    <div class="col-12 col-md">
+                                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 small">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="badge bg-primary rounded-pill px-2 py-1">Paso 1</span>
+                                                <span class="fw-semibold text-dark">Localizar paciente por documento</span>
+                                            </div>
+                                            <i class="bi bi-chevron-right text-muted d-none d-lg-inline"></i>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle rounded-pill px-2 py-1">Paso 2</span>
+                                                <span class="fw-semibold text-dark">Validación automática de récipe y lote FEFO</span>
+                                            </div>
+                                            <i class="bi bi-chevron-right text-muted d-none d-lg-inline"></i>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1">Paso 3</span>
+                                                <span class="fw-semibold text-dark">Confirmación de entrega</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -439,6 +505,33 @@ $ultimosDespachos = $stmtHist->fetchAll(PDO::FETCH_ASSOC);
                                 <?php endif; ?>
                             </div>
                         </div>
+
+                        <?php if (!$pacienteEncontrado && $busquedaPaciente === ''): ?>
+                            <!-- MENSAJE DE BIENVENIDA Y PRUEBAS ASISTENCIALES RÁPIDAS -->
+                            <div class="card bg-white border shadow-sm mb-3">
+                                <div class="card-body p-4 text-center">
+                                    <div class="mx-auto mb-3 bg-primary-subtle text-primary rounded-circle d-flex align-items-center justify-content-center"
+                                        style="width: 52px; height: 52px;">
+                                        <i class="bi bi-person-vcard fs-3"></i>
+                                    </div>
+                                    <h6 class="fw-bold text-dark mb-1">Módulo de Dispensación Asistencial y Entrega FEFO</h6>
+                                    <p class="text-muted small mx-auto mb-3" style="max-width: 650px;">
+                                        Inicie la atención localizando al paciente por cédula o nombre en el buscador superior. El sistema validará en tiempo real la vigencia del récipe médico, el bloqueo de doble retiro mensual y la asignación automática del lote con fecha de caducidad más próxima (First Expired, First Out).
+                                    </p>
+                                    <div class="d-flex flex-wrap justify-content-center align-items-center gap-2 pt-2 border-top">
+                                        <span class="small text-secondary fw-semibold">Consultas de prueba inmediata:</span>
+                                        <a href="index.php?tab=despachos<?= $puedeVerTodaLaRed ? '&centro_id=' . (int) $centroOperativoId : '' ?>&q_paciente=14285714"
+                                            class="btn btn-outline-primary btn-sm py-1 px-2.5 font-monospace">
+                                            <i class="bi bi-search me-1"></i> 14285714 — Juan Morales
+                                        </a>
+                                        <a href="index.php?tab=despachos<?= $puedeVerTodaLaRed ? '&centro_id=' . (int) $centroOperativoId : '' ?>&q_paciente=11400219"
+                                            class="btn btn-outline-primary btn-sm py-1 px-2.5 font-monospace">
+                                            <i class="bi bi-search me-1"></i> 11400219 — Pedro Albarrán
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endif; ?>
 
                         <?php if ($pacienteEncontrado): ?>
                             <!-- FICHA CLÍNICA ASISTENCIAL DEL PACIENTE -->
@@ -586,6 +679,16 @@ $ultimosDespachos = $stmtHist->fetchAll(PDO::FETCH_ASSOC);
                                                                                     </span>
                                                                                 </div>
                                                                             <?php endif; ?>
+                                                                            <?php if (!empty($rec['atributos_farmacologicos'])): ?>
+                                                                                <div class="d-flex flex-wrap gap-1 mt-1.5">
+                                                                                    <?php foreach ($rec['atributos_farmacologicos'] as $atr): ?>
+                                                                                        <span class="badge bg-<?= htmlspecialchars($atr['color_badge']) ?>-subtle text-<?= htmlspecialchars($atr['color_badge']) ?> border border-<?= htmlspecialchars($atr['color_badge']) ?>-subtle"
+                                                                                            style="font-size: 0.68rem;">
+                                                                                            <i class="bi <?= htmlspecialchars($atr['icono']) ?> me-1"></i><?= htmlspecialchars($atr['nombre']) ?>
+                                                                                        </span>
+                                                                                    <?php endforeach; ?>
+                                                                                </div>
+                                                                            <?php endif; ?>
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -647,8 +750,7 @@ $ultimosDespachos = $stmtHist->fetchAll(PDO::FETCH_ASSOC);
                                                                             <div class="d-flex align-items-center gap-2 mb-1">
                                                                                 <span
                                                                                     class="badge bg-success-subtle text-success border border-success-subtle">
-                                                                                    <i class="bi bi-check-circle-fill me-1"></i> Habilitado para
-                                                                                    Entrega
+                                                                                    <i class="bi bi-check-circle-fill me-1"></i> Habilitado para Entrega
                                                                                 </span>
                                                                                 <span class="text-muted small">Periodo:
                                                                                     <?= htmlspecialchars($periodoActual) ?></span>
@@ -1020,6 +1122,131 @@ $ultimosDespachos = $stmtHist->fetchAll(PDO::FETCH_ASSOC);
                                 </div>
                             </div>
                         </div>
+
+                        <!-- MODAL DE RECEPCIÓN DE LOTE / ENTRADA DE STOCK -->
+                        <?php if ($puedeRegistrarLote): ?>
+                        <div class="modal fade" id="modalEntradaLote" tabindex="-1" aria-labelledby="modalEntradaLoteLabel" aria-hidden="true">
+                            <div class="modal-dialog modal-lg modal-dialog-centered">
+                                <div class="modal-content border-0 shadow">
+                                    <form action="procesar.php" method="POST" id="form-entrada-lote" novalidate>
+                                        <input type="hidden" name="csrf_token"
+                                            value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                        <input type="hidden" name="accion" value="registrar_entrada_lote">
+
+                                        <div class="modal-header bg-primary text-white py-2.5 px-3">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <i class="bi bi-box-seam-fill fs-5"></i>
+                                                <h6 class="modal-title fw-bold m-0" id="modalEntradaLoteLabel">
+                                                    Recepción de Lote — Entrada de Inventario Farmacéutico
+                                                </h6>
+                                            </div>
+                                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                                                aria-label="Cerrar"></button>
+                                        </div>
+
+                                        <div class="modal-body p-3">
+                                            <div class="row g-3">
+                                                <!-- Ambulatorio Destino -->
+                                                <div class="col-md-6">
+                                                    <label class="form-label small fw-semibold text-secondary mb-1">
+                                                        Ambulatorio Destino *
+                                                    </label>
+                                                    <?php if ($puedeVerTodaLaRed): ?>
+                                                        <select name="centro_salud_id" class="form-select form-select-sm" required>
+                                                            <?php foreach ($catalogoCentros as $c): ?>
+                                                                <option value="<?= (int) $c['id'] ?>" <?= ((int) $c['id'] === $centroOperativoId) ? 'selected' : '' ?>>
+                                                                    <?= htmlspecialchars($c['codigo_sicm']) ?> — <?= htmlspecialchars($c['nombre']) ?>
+                                                                </option>
+                                                            <?php endforeach; ?>
+                                                        </select>
+                                                    <?php else: ?>
+                                                        <input type="hidden" name="centro_salud_id" value="<?= (int) $centroOperativoId ?>">
+                                                        <input type="text" class="form-control form-control-sm bg-light"
+                                                            value="<?= htmlspecialchars($centroOperativo['nombre'] ?? '') ?>" readonly>
+                                                    <?php endif; ?>
+                                                    <div class="form-text" style="font-size: 0.70rem;">Sede donde se custodiará físicamente el lote.</div>
+                                                </div>
+
+                                                <!-- Fármaco del Vademécum -->
+                                                <div class="col-md-6">
+                                                    <label class="form-label small fw-semibold text-secondary mb-1">
+                                                        Fármaco (Vademécum Activo) *
+                                                    </label>
+                                                    <select name="medicamento_id" class="form-select form-select-sm" required>
+                                                        <option value="">-- Seleccionar Principio Activo --</option>
+                                                        <?php foreach ($catalogoMedicamentosActivos as $m): ?>
+                                                            <option value="<?= (int) $m['id'] ?>">
+                                                                <?= htmlspecialchars($m['nombre_generico']) ?> (<?= htmlspecialchars($m['concentracion']) ?>) — <?= htmlspecialchars($m['forma_nombre'] ?? '') ?>
+                                                                <?= ((int) $m['requiere_cadena_frio'] === 1) ? ' [Cadena de Frío]' : '' ?>
+                                                            </option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                    <div class="form-text" style="font-size: 0.70rem;">Catálogo oficial activo de medicamentos.</div>
+                                                </div>
+
+                                                <!-- Número de Lote -->
+                                                <div class="col-md-4">
+                                                    <label class="form-label small fw-semibold text-secondary mb-1">
+                                                        Número de Lote *
+                                                    </label>
+                                                    <input type="text" name="numero_lote" class="form-control form-control-sm font-monospace text-uppercase"
+                                                        placeholder="Ej: LOT-2026-X14" required minlength="2" maxlength="30">
+                                                    <div class="form-text" style="font-size: 0.70rem;">Identificador impreso en el empaque.</div>
+                                                </div>
+
+                                                <!-- Fecha de Caducidad -->
+                                                <div class="col-md-4">
+                                                    <label class="form-label small fw-semibold text-secondary mb-1">
+                                                        Fecha de Vencimiento *
+                                                    </label>
+                                                    <input type="date" name="fecha_vencimiento" class="form-control form-control-sm font-monospace"
+                                                        required min="<?= date('Y-m-d', strtotime('+1 day')) ?>" value="<?= date('Y-m-d', strtotime('+1 year')) ?>">
+                                                    <div class="form-text" style="font-size: 0.70rem;">Criterio primario para despacho FEFO.</div>
+                                                </div>
+
+                                                <!-- Cantidad Recibida -->
+                                                <div class="col-md-4">
+                                                    <label class="form-label small fw-semibold text-secondary mb-1">
+                                                        Cantidad Recibida (Unidades) *
+                                                    </label>
+                                                    <input type="number" name="cantidad" class="form-control form-control-sm font-monospace fw-bold"
+                                                        min="1" max="100000" value="100" required>
+                                                    <div class="form-text" style="font-size: 0.70rem;">Dosis o cajas físicas ingresadas.</div>
+                                                </div>
+
+                                                <!-- Laboratorio / Proveedor -->
+                                                <div class="col-md-6">
+                                                    <label class="form-label small fw-semibold text-secondary mb-1">
+                                                        Laboratorio / Proveedor Sanitario
+                                                    </label>
+                                                    <input type="text" name="laboratorio_proveedor" class="form-control form-control-sm"
+                                                        placeholder="Ej: Laboratorios Behrens / Proveeduría MPPS" maxlength="100">
+                                                </div>
+
+                                                <!-- Observaciones / Documento de Entrega -->
+                                                <div class="col-md-6">
+                                                    <label class="form-label small fw-semibold text-secondary mb-1">
+                                                        Acta / Guía de Despacho u Observación
+                                                    </label>
+                                                    <input type="text" name="observaciones" class="form-control form-control-sm"
+                                                        placeholder="Ej: Acta de Recepción N° 2026-048" maxlength="255">
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-between">
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">
+                                                <i class="bi bi-x-lg me-1"></i> Cancelar
+                                            </button>
+                                            <button type="submit" class="btn btn-primary btn-sm px-3 fw-semibold">
+                                                <i class="bi bi-box-arrow-in-down me-1"></i> Registrar Entrada de Lote
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
 
                         <!-- JAVASCRIPT DEL MÓDULO DE DISPENSACIÓN FEFO -->
                         <script src="public/js/despachos_fefo.js"></script>

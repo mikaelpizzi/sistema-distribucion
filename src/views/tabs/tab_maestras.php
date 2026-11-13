@@ -23,6 +23,34 @@ $todosRecursos = $pdo->query("
     ORDER BY r.id ASC
 ")->fetchAll();
 
+// Catálogo 3: Tipos de Documento de Identidad Oficiales (Configurables)
+$tiposDocumento = $pdo->query("
+    SELECT td.id, td.codigo, td.nombre, td.activo, COUNT(p.id) AS total_pacientes
+    FROM tipos_documento td
+    LEFT JOIN pacientes p ON p.tipo_documento_id = td.id
+    GROUP BY td.id, td.codigo, td.nombre, td.activo
+    ORDER BY td.id ASC
+")->fetchAll();
+
+// Catálogo 4: Atributos Farmacológicos Normalizados (3FN - N:M)
+$atributosFarmacologicos = $pdo->query("
+    SELECT af.id, af.codigo, af.nombre, af.descripcion, af.icono, af.color_badge, af.activo, COUNT(ma.medicamento_id) AS total_medicamentos
+    FROM atributos_farmacologicos af
+    LEFT JOIN medicamento_atributos ma ON ma.atributo_id = af.id
+    GROUP BY af.id, af.codigo, af.nombre, af.descripcion, af.icono, af.color_badge, af.activo
+    ORDER BY af.id ASC
+")->fetchAll();
+
+// Catálogo 5: Clasificaciones de Patologías (3FN)
+$clasificacionesPatologia = $pdo->query("
+    SELECT cp.id, cp.codigo, cp.nombre, cp.descripcion, cp.es_recurrente_mensual, cp.activo, COUNT(p.id) AS total_patologias
+    FROM clasificaciones_patologia cp
+    LEFT JOIN patologias p ON p.clasificacion_id = cp.id
+    GROUP BY cp.id, cp.codigo, cp.nombre, cp.descripcion, cp.es_recurrente_mensual, cp.activo
+    ORDER BY cp.id ASC
+")->fetchAll();
+
+
 // Gestión Dinámica de Roles RBAC y Matriz de Permisos en 3FN
 $todosRoles = $pdo->query("
     SELECT r.id, r.nombre, r.es_personalizado, r.descripcion, 
@@ -574,6 +602,385 @@ foreach ($permisosCatalogo as $p) {
                                                                 class="btn btn-outline-secondary btn-sm py-0 px-2"
                                                                 style="font-size: 0.72rem;">
                                                                 <?= (int) $r['activo'] === 1 ? 'Desactivar' : 'Activar' ?>
+                                                            </button>
+                                                        </form>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Catálogo 3: Tipos de Documento de Identidad Oficiales -->
+                        <div class="col-12 mb-4">
+                            <div class="card-sicm">
+                                <div class="card-header-sicm d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span class="fw-bold">Tipos de Documento de Identidad</span>
+                                        <span class="code-tag ms-2">tipos_documento</span>
+                                    </div>
+                                </div>
+                                <div class="px-3 pt-2 pb-1 text-muted small" style="font-size: 0.75rem;">
+                                    Catálogo institucional configurable para los documentos de identidad admitidos en el padrón de pacientes (V, E, P, DNI, RUT, Cédula Extranjera).
+                                </div>
+                                <div class="p-3 bg-light border-top border-bottom">
+                                    <form action="procesar.php" method="POST" class="row g-2 align-items-end">
+                                        <input type="hidden" name="csrf_token"
+                                            value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                        <input type="hidden" name="accion" value="crear_tipo_documento">
+                                        <div class="col-md-3">
+                                            <label class="form-label small fw-semibold mb-1">Código Oficial</label>
+                                            <input type="text" name="codigo"
+                                                class="form-control form-control-sm text-uppercase font-monospace"
+                                                placeholder="Ej: DNI, RUT" required maxlength="10">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label small fw-semibold mb-1">Denominación del Documento</label>
+                                            <input type="text" name="nombre" class="form-control form-control-sm"
+                                                placeholder="Ej: Documento Nacional de Identidad" required maxlength="40">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <button type="submit" class="btn btn-primary btn-sm w-100 fw-semibold">
+                                                + Registrar Tipo
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-sm table-sicm mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th style="width: 45px;">ID</th>
+                                                <th style="width: 90px;">Código</th>
+                                                <th>Denominación Oficial</th>
+                                                <th style="width: 140px;">Pacientes Registrados</th>
+                                                <th style="width: 80px;">Estado</th>
+                                                <th style="width: 140px;" class="text-end pe-3">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($tiposDocumento as $td): ?>
+                                                <tr>
+                                                    <td class="text-muted fw-bold">#<?= (int) $td['id'] ?></td>
+                                                    <td><span class="badge bg-light text-dark border font-monospace"><?= htmlspecialchars($td['codigo']) ?></span></td>
+                                                    <td class="fw-semibold text-dark"><?= htmlspecialchars($td['nombre']) ?></td>
+                                                    <td>
+                                                        <?php if ((int) $td['total_pacientes'] > 0): ?>
+                                                            <span class="badge bg-light text-primary border"
+                                                                title="Beneficiarios empadronados con este tipo de documento">
+                                                                <?= (int) $td['total_pacientes'] ?> <?= (int) $td['total_pacientes'] === 1 ? 'paciente' : 'pacientes' ?>
+                                                            </span>
+                                                        <?php else: ?>
+                                                            <span class="text-muted small" style="font-size: 0.72rem;">0 pacientes</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php if ((int) $td['activo'] === 1): ?>
+                                                            <span class="badge badge-status-active">Activo</span>
+                                                        <?php else: ?>
+                                                            <span class="badge badge-status-inactive">Inactivo</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td class="text-end pe-3">
+                                                        <button type="button" class="btn btn-outline-primary btn-sm py-0 px-2 me-1"
+                                                            style="font-size: 0.72rem;" data-bs-toggle="modal"
+                                                            data-bs-target="#modalEditDoc<?= (int) $td['id'] ?>">
+                                                            <i class="bi bi-pencil me-1"></i>Editar
+                                                        </button>
+                                                        <form method="POST" action="procesar.php" class="d-inline"
+                                                            onsubmit="return confirm('¿Confirma cambiar el estado de este tipo de documento?');">
+                                                            <input type="hidden" name="csrf_token"
+                                                                value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                                            <input type="hidden" name="accion" value="toggle_tipo_documento">
+                                                            <input type="hidden" name="id" value="<?= (int) $td['id'] ?>">
+                                                            <input type="hidden" name="estado"
+                                                                value="<?= (int) $td['activo'] === 1 ? '0' : '1' ?>">
+                                                            <button type="submit"
+                                                                class="btn btn-outline-secondary btn-sm py-0 px-2"
+                                                                style="font-size: 0.72rem;">
+                                                                <?= (int) $td['activo'] === 1 ? 'Desactivar' : 'Activar' ?>
+                                                            </button>
+                                                        </form>
+                                                    </td>
+                                                </tr>
+
+                                                <!-- Modal Edición Tipo Documento -->
+                                                <div class="modal fade" id="modalEditDoc<?= (int) $td['id'] ?>" tabindex="-1"
+                                                    aria-hidden="true">
+                                                    <div class="modal-dialog modal-dialog-centered">
+                                                        <div class="modal-content border-0 shadow">
+                                                            <form action="procesar.php" method="POST">
+                                                                <input type="hidden" name="csrf_token"
+                                                                    value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                                                <input type="hidden" name="accion" value="editar_tipo_documento">
+                                                                <input type="hidden" name="id" value="<?= (int) $td['id'] ?>">
+                                                                <div class="modal-header bg-light py-2 px-3 border-bottom">
+                                                                    <h6 class="modal-title fw-bold">Editar Tipo de Documento #<?= (int) $td['id'] ?></h6>
+                                                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                                </div>
+                                                                <div class="modal-body p-3">
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label small fw-semibold mb-1">Código Oficial *</label>
+                                                                        <input type="text" name="codigo" class="form-control form-control-sm text-uppercase font-monospace"
+                                                                            value="<?= htmlspecialchars($td['codigo']) ?>" required maxlength="10">
+                                                                    </div>
+                                                                    <div class="mb-2">
+                                                                        <label class="form-label small fw-semibold mb-1">Denominación *</label>
+                                                                        <input type="text" name="nombre" class="form-control form-control-sm"
+                                                                            value="<?= htmlspecialchars($td['nombre']) ?>" required maxlength="40">
+                                                                    </div>
+                                                                </div>
+                                                                <div class="modal-footer bg-light py-2 px-3 border-top d-flex justify-content-between">
+                                                                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
+                                                                    <button type="submit" class="btn btn-primary btn-sm px-3 fw-semibold">Guardar Cambios</button>
+                                                                </div>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Catálogo 4: Atributos Farmacológicos Normalizados (3FN - N:M) -->
+                        <div class="col-12 mb-4">
+                            <div class="card-sicm">
+                                <div class="card-header-sicm d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span class="fw-bold">Atributos Farmacológicos Normalizados</span>
+                                        <span class="code-tag ms-2">atributos_farmacologicos</span>
+                                    </div>
+                                </div>
+                                <div class="px-3 pt-2 pb-1 text-muted small" style="font-size: 0.75rem;">
+                                    Catálogo de condiciones técnicas de almacenamiento, custodia legal y manejo clínico de medicamentos en relación N:M.
+                                </div>
+                                <div class="p-3 bg-light border-top border-bottom">
+                                    <form action="procesar.php" method="POST" class="row g-2 align-items-end">
+                                        <input type="hidden" name="csrf_token"
+                                            value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                        <input type="hidden" name="accion" value="crear_atributo_farmacologico">
+                                        <div class="col-md-3">
+                                            <label class="form-label small fw-semibold mb-1">Código Único</label>
+                                            <input type="text" name="codigo"
+                                                class="form-control form-control-sm text-uppercase font-monospace"
+                                                placeholder="Ej: FOTOSENSIBLE" required maxlength="30">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label small fw-semibold mb-1">Denominación del Atributo</label>
+                                            <input type="text" name="nombre" class="form-control form-control-sm"
+                                                placeholder="Ej: Proteger de la Luz Solar" required maxlength="80">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label small fw-semibold mb-1">Color / Distintivo</label>
+                                            <select name="color_badge" class="form-select form-select-sm">
+                                                <option value="primary">Azul (Institucional)</option>
+                                                <option value="info">Celeste (Cadena de Frío)</option>
+                                                <option value="warning">Ámbar (Precaución)</option>
+                                                <option value="danger">Rojo (Control Estricto)</option>
+                                                <option value="dark">Oscuro (Reserva)</option>
+                                                <option value="secondary">Gris (Genérico)</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <button type="submit" class="btn btn-primary btn-sm w-100 fw-semibold">
+                                                + Agregar
+                                            </button>
+                                        </div>
+                                        <div class="col-12 mt-2">
+                                            <label class="form-label small fw-semibold mb-1">Descripción / Norma Técnica</label>
+                                            <input type="text" name="descripcion" class="form-control form-control-sm"
+                                                placeholder="Ej: Almacenar en envase opaco protegido de fuentes de radiación solar directa" maxlength="255">
+                                        </div>
+                                    </form>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-sm table-sicm mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th style="width: 45px;">ID</th>
+                                                <th style="width: 130px;">Código</th>
+                                                <th>Atributo Clínico</th>
+                                                <th style="width: 140px;">Distintivo Visual</th>
+                                                <th style="width: 130px;">Fármacos Vinculados</th>
+                                                <th style="width: 80px;">Estado</th>
+                                                <th style="width: 85px;" class="text-end pe-3">Acción</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($atributosFarmacologicos as $af): ?>
+                                                <tr>
+                                                    <td class="text-muted fw-bold">#<?= (int) $af['id'] ?></td>
+                                                    <td><span class="code-tag"><?= htmlspecialchars($af['codigo']) ?></span></td>
+                                                    <td>
+                                                        <div class="fw-semibold text-dark"><?= htmlspecialchars($af['nombre']) ?></div>
+                                                        <?php if (!empty($af['descripcion'])): ?>
+                                                            <div class="text-muted small" style="font-size: 0.70rem;"><?= htmlspecialchars($af['descripcion']) ?></div>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <span class="badge bg-<?= htmlspecialchars($af['color_badge']) ?>-subtle text-<?= htmlspecialchars($af['color_badge']) ?> border border-<?= htmlspecialchars($af['color_badge']) ?>-subtle">
+                                                            <i class="bi <?= htmlspecialchars($af['icono']) ?> me-1"></i><?= htmlspecialchars($af['nombre']) ?>
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <?php if ((int) $af['total_medicamentos'] > 0): ?>
+                                                            <span class="badge bg-light text-primary border"
+                                                                title="Medicamentos con este atributo asignado">
+                                                                <?= (int) $af['total_medicamentos'] ?> <?= (int) $af['total_medicamentos'] === 1 ? 'fármaco' : 'fármacos' ?>
+                                                            </span>
+                                                        <?php else: ?>
+                                                            <span class="text-muted small" style="font-size: 0.72rem;">0 fármacos</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php if ((int) $af['activo'] === 1): ?>
+                                                            <span class="badge badge-status-active">Activo</span>
+                                                        <?php else: ?>
+                                                            <span class="badge badge-status-inactive">Inactivo</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td class="text-end pe-3">
+                                                        <form method="POST" action="procesar.php" class="d-inline"
+                                                            onsubmit="return confirm('¿Confirma cambiar el estado de este atributo farmacológico?');">
+                                                            <input type="hidden" name="csrf_token"
+                                                                value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                                            <input type="hidden" name="accion" value="toggle_atributo_farmacologico">
+                                                            <input type="hidden" name="id" value="<?= (int) $af['id'] ?>">
+                                                            <input type="hidden" name="estado"
+                                                                value="<?= (int) $af['activo'] === 1 ? '0' : '1' ?>">
+                                                            <button type="submit"
+                                                                class="btn btn-outline-secondary btn-sm py-0 px-2"
+                                                                style="font-size: 0.72rem;">
+                                                                <?= (int) $af['activo'] === 1 ? 'Desactivar' : 'Activar' ?>
+                                                            </button>
+                                                        </form>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Catálogo 5: Clasificaciones de Patologías (3FN) -->
+                        <div class="col-12 mb-4">
+                            <div class="card-sicm">
+                                <div class="card-header-sicm d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span class="fw-bold">Clasificaciones de Patologías</span>
+                                        <span class="code-tag ms-2">clasificaciones_patologia</span>
+                                    </div>
+                                </div>
+                                <div class="px-3 pt-2 pb-1 text-muted small" style="font-size: 0.75rem;">
+                                    Categorización clínica de diagnósticos nosológicos y criterio de elegibilidad para dotaciones recurrentes de récipe médico.
+                                </div>
+                                <div class="p-3 bg-light border-top border-bottom">
+                                    <form action="procesar.php" method="POST" class="row g-2 align-items-end">
+                                        <input type="hidden" name="csrf_token"
+                                            value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                        <input type="hidden" name="accion" value="crear_clasificacion_patologia">
+                                        <div class="col-md-3">
+                                            <label class="form-label small fw-semibold mb-1">Código Único</label>
+                                            <input type="text" name="codigo"
+                                                class="form-control form-control-sm text-uppercase font-monospace"
+                                                placeholder="Ej: EPIDEMIOLOGICA" required maxlength="30">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label small fw-semibold mb-1">Denominación</label>
+                                            <input type="text" name="nombre" class="form-control form-control-sm"
+                                                placeholder="Ej: Vigilancia Epidemiológica" required maxlength="80">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <div class="form-check pt-2">
+                                                <input class="form-check-input" type="checkbox" name="es_recurrente_mensual" value="1" id="checkRecurrente">
+                                                <label class="form-check-label small fw-semibold text-dark" for="checkRecurrente">
+                                                    Dotación Mensual Continua
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-2">
+                                            <button type="submit" class="btn btn-primary btn-sm w-100 fw-semibold">
+                                                + Agregar
+                                            </button>
+                                        </div>
+                                        <div class="col-12 mt-2">
+                                            <label class="form-label small fw-semibold mb-1">Descripción Clínica</label>
+                                            <input type="text" name="descripcion" class="form-control form-control-sm"
+                                                placeholder="Ej: Patología sujeta a cerco epidemiológico y seguimiento estricto de casos" maxlength="255">
+                                        </div>
+                                    </form>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-hover table-sm table-sicm mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th style="width: 45px;">ID</th>
+                                                <th style="width: 120px;">Código</th>
+                                                <th>Clasificación Diagnóstica</th>
+                                                <th style="width: 130px;">Dotación Continua</th>
+                                                <th style="width: 130px;">Patologías Asociadas</th>
+                                                <th style="width: 80px;">Estado</th>
+                                                <th style="width: 85px;" class="text-end pe-3">Acción</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <?php foreach ($clasificacionesPatologia as $cp): ?>
+                                                <tr>
+                                                    <td class="text-muted fw-bold">#<?= (int) $cp['id'] ?></td>
+                                                    <td><span class="code-tag"><?= htmlspecialchars($cp['codigo']) ?></span></td>
+                                                    <td>
+                                                        <div class="fw-semibold text-dark"><?= htmlspecialchars($cp['nombre']) ?></div>
+                                                        <?php if (!empty($cp['descripcion'])): ?>
+                                                            <div class="text-muted small" style="font-size: 0.70rem;"><?= htmlspecialchars($cp['descripcion']) ?></div>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php if ((int) $cp['es_recurrente_mensual'] === 1): ?>
+                                                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                                                                <i class="bi bi-arrow-repeat me-1"></i>Recurrente
+                                                            </span>
+                                                        <?php else: ?>
+                                                            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">
+                                                                Tratamiento Puntual
+                                                            </span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php if ((int) $cp['total_patologias'] > 0): ?>
+                                                            <span class="badge bg-light text-primary border"
+                                                                title="Patologías con esta clasificación">
+                                                                <?= (int) $cp['total_patologias'] ?> <?= (int) $cp['total_patologias'] === 1 ? 'patología' : 'patologías' ?>
+                                                            </span>
+                                                        <?php else: ?>
+                                                            <span class="text-muted small" style="font-size: 0.72rem;">0 patologías</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php if ((int) $cp['activo'] === 1): ?>
+                                                            <span class="badge badge-status-active">Activo</span>
+                                                        <?php else: ?>
+                                                            <span class="badge badge-status-inactive">Inactivo</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td class="text-end pe-3">
+                                                        <form method="POST" action="procesar.php" class="d-inline"
+                                                            onsubmit="return confirm('¿Confirma cambiar el estado de esta clasificación?');">
+                                                            <input type="hidden" name="csrf_token"
+                                                                value="<?= htmlspecialchars(obtenerCsrfToken(), ENT_QUOTES, 'UTF-8') ?>">
+                                                            <input type="hidden" name="accion" value="toggle_clasificacion_patologia">
+                                                            <input type="hidden" name="id" value="<?= (int) $cp['id'] ?>">
+                                                            <input type="hidden" name="estado"
+                                                                value="<?= (int) $cp['activo'] === 1 ? '0' : '1' ?>">
+                                                            <button type="submit"
+                                                                class="btn btn-outline-secondary btn-sm py-0 px-2"
+                                                                style="font-size: 0.72rem;">
+                                                                <?= (int) $cp['activo'] === 1 ? 'Desactivar' : 'Activar' ?>
                                                             </button>
                                                         </form>
                                                     </td>

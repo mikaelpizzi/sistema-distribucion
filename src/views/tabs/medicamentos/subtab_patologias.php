@@ -37,16 +37,17 @@ declare(strict_types=1);
                     </div>
 
                     <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" name="cronica" value="1"
-                                id="checkCronica" checked>
-                            <label class="form-check-label small fw-semibold text-dark"
-                                for="checkCronica">
-                                Enfermedad Crónica No Transmisible
-                            </label>
-                        </div>
-                        <div class="text-muted" style="font-size: 0.70rem;">
-                            Indica patología elegible para récipe de suministro continuo mensual.
+                        <label class="form-label-sicm">Clasificación Nosológica (3FN) <span class="text-danger">*</span></label>
+                        <select name="clasificacion_id" class="form-select form-select-sm" required>
+                            <option value="">-- Seleccionar Clasificación --</option>
+                            <?php foreach ($clasificacionesPatologiaCatalogo as $cl): ?>
+                                <option value="<?= (int) $cl['id'] ?>" <?= ((int) $cl['id'] === 1 ? 'selected' : '') ?>>
+                                    <?= htmlspecialchars($cl['nombre']) ?> (<?= ((int) $cl['es_recurrente_mensual'] === 1) ? 'Dotación Mensual' : 'Tratamiento Puntual' ?>)
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="form-text" style="font-size: 0.70rem;">
+                            Define el régimen de récipe médico y la vigencia asistencial en 3FN.
                         </div>
                     </div>
 
@@ -122,7 +123,12 @@ declare(strict_types=1);
                                         <?php endif; ?>
                                     </td>
                                     <td class="text-center">
-                                        <?php if ((int) $pat['cronica'] === 1): ?>
+                                        <?php if (!empty($pat['clasificacion_nombre'])): ?>
+                                            <span class="badge <?= ((int) ($pat['es_recurrente_mensual'] ?? 0) === 1) ? 'bg-primary-subtle text-primary border border-primary-subtle' : 'bg-warning-subtle text-warning-emphasis border border-warning-subtle' ?>"
+                                                style="font-size: 0.72rem;">
+                                                <?= htmlspecialchars($pat['clasificacion_nombre']) ?>
+                                            </span>
+                                        <?php elseif ((int) $pat['cronica'] === 1): ?>
                                             <span
                                                 class="badge bg-primary-subtle text-primary border border-primary-subtle"
                                                 style="font-size: 0.72rem;">

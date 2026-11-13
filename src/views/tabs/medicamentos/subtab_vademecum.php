@@ -76,19 +76,35 @@ declare(strict_types=1);
                     </div>
 
                     <div class="p-2.5 bg-light border rounded">
-                        <div class="form-check form-switch mb-0">
-                            <input class="form-check-input" type="checkbox" role="switch"
-                                id="switchCadenaFrio" name="requiere_cadena_frio" value="1"
-                                <?= ($medicamentoEdicion && (int) $medicamentoEdicion['requiere_cadena_frio'] === 1) ? 'checked' : '' ?>>
-                            <label class="form-check-label small fw-semibold text-dark"
-                                for="switchCadenaFrio">
-                                <i class="bi bi-snow2 text-info me-1"></i> Requiere Cadena de Frío
-                                Estricta
-                            </label>
+                        <label class="form-label-sicm mb-1 fw-bold text-dark">
+                            <i class="bi bi-tags-fill text-primary me-1"></i> Atributos Farmacológicos Normalizados (3FN)
+                        </label>
+                        <div class="text-muted mb-2" style="font-size: 0.70rem;">
+                            Condiciones de custodia técnica, cadena de frío y fiscalización clínica aplicables a este principio activo:
                         </div>
-                        <div class="text-muted mt-1" style="font-size: 0.69rem; line-height: 1.3;">
-                            Refrigeración clínica continua entre <strong>2°C y 8°C</strong>. Su
-                            dispensación exige ambulatorios con equipo de frío certificado.
+                        <div class="row g-2">
+                            <?php foreach ($todosAtributosFarmacologicos as $atr): ?>
+                                <?php
+                                $isAtrChecked = in_array((int) $atr['id'], array_map('intval', $atributosEdicionIds), true);
+                                ?>
+                                <div class="col-md-6">
+                                    <div class="form-check p-2 bg-white border rounded h-100">
+                                        <input class="form-check-input" type="checkbox" name="atributos[]"
+                                            value="<?= (int) $atr['id'] ?>" id="atr_med_<?= (int) $atr['id'] ?>"
+                                            <?= $isAtrChecked ? 'checked' : '' ?>>
+                                        <label class="form-check-label small" for="atr_med_<?= (int) $atr['id'] ?>">
+                                            <span class="badge bg-<?= htmlspecialchars($atr['color_badge']) ?>-subtle text-<?= htmlspecialchars($atr['color_badge']) ?> border border-<?= htmlspecialchars($atr['color_badge']) ?>-subtle">
+                                                <i class="bi <?= htmlspecialchars($atr['icono']) ?> me-1"></i><?= htmlspecialchars($atr['nombre']) ?>
+                                            </span>
+                                            <?php if (!empty($atr['descripcion'])): ?>
+                                                <div class="text-muted mt-1" style="font-size: 0.68rem; line-height: 1.2;">
+                                                    <?= htmlspecialchars($atr['descripcion']) ?>
+                                                </div>
+                                            <?php endif; ?>
+                                        </label>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
                         </div>
                     </div>
                 </div>
@@ -166,7 +182,7 @@ declare(strict_types=1);
                             <th>Nombre Genérico</th>
                             <th>Concentración</th>
                             <th>Forma Farmacéutica</th>
-                            <th>Cadena de Frío</th>
+                            <th>Atributos Farmacológicos</th>
                             <th class="text-center" style="width: 85px;">Stock Mín.</th>
                             <th class="text-center" style="width: 95px;">Estado</th>
                             <th class="text-end" style="width: 190px;">Acciones</th>
@@ -201,14 +217,19 @@ declare(strict_types=1);
                                             class="text-secondary"><?= htmlspecialchars($med['forma_nombre']) ?></span>
                                     </td>
                                     <td>
-                                        <?php if ((int) $med['requiere_cadena_frio'] === 1): ?>
-                                            <span class="badge bg-info text-dark" style="font-size: 0.72rem;">
-                                                <i class="bi bi-snow2 me-1"></i>❄️ Refrigerado (2-8°C)
-                                            </span>
+                                        <?php if (!empty($med['atributos'])): ?>
+                                            <div class="d-flex flex-wrap gap-1">
+                                                <?php foreach ($med['atributos'] as $atr): ?>
+                                                    <span class="badge bg-<?= htmlspecialchars($atr['color_badge']) ?>-subtle text-<?= htmlspecialchars($atr['color_badge']) ?> border border-<?= htmlspecialchars($atr['color_badge']) ?>-subtle"
+                                                        style="font-size: 0.70rem;">
+                                                        <i class="bi <?= htmlspecialchars($atr['icono']) ?> me-1"></i><?= htmlspecialchars($atr['nombre']) ?>
+                                                    </span>
+                                                <?php endforeach; ?>
+                                            </div>
                                         <?php else: ?>
                                             <span class="badge bg-light text-secondary border"
-                                                style="font-size: 0.72rem;">
-                                                Ambiente
+                                                style="font-size: 0.70rem;">
+                                                Estándar / Ambiente
                                             </span>
                                         <?php endif; ?>
                                     </td>

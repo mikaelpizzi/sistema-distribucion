@@ -7,7 +7,8 @@ $moduloNombre = 'Padrón de Pacientes';
 $seccionNombre = 'Gestión Clínica';
 
 // 1. Catálogos Normalizados de Tipos de Documento y Vías de Contacto (Cero Hardcoding)
-$catalogoTiposDoc = $pdo->query("SELECT * FROM tipos_documento ORDER BY id ASC")->fetchAll(PDO::FETCH_ASSOC);
+$catalogoTiposDoc = $pdo->query("SELECT * FROM tipos_documento WHERE activo = 1 ORDER BY id ASC")->fetchAll(PDO::FETCH_ASSOC);
+$todosTiposDocFiltro = $pdo->query("SELECT * FROM tipos_documento ORDER BY id ASC")->fetchAll(PDO::FETCH_ASSOC);
 $catalogoTiposContacto = $pdo->query("SELECT * FROM tipos_contacto ORDER BY id ASC")->fetchAll(PDO::FETCH_ASSOC);
 
 // 2. Métricas del Padrón Municipal (KPIs Institucionales)
@@ -104,6 +105,24 @@ if (!empty($_GET['editar_id']) || !empty($_GET['editar'])) {
         $stmtCEd = $pdo->prepare("SELECT * FROM paciente_contactos WHERE paciente_id = :id ORDER BY es_principal DESC, id ASC");
         $stmtCEd->execute([':id' => $edId]);
         $contactosEdicion = $stmtCEd->fetchAll(PDO::FETCH_ASSOC);
+
+        // Asegurar que el tipo de doc del paciente en edición esté presente aunque esté inactivo
+        $tipoDocIdPac = (int) $pacienteEdicion['tipo_documento_id'];
+        $estaEnLista = false;
+        foreach ($catalogoTiposDoc as $tdItem) {
+            if ((int) $tdItem['id'] === $tipoDocIdPac) {
+                $estaEnLista = true;
+                break;
+            }
+        }
+        if (!$estaEnLista) {
+            $stmtDocInact = $pdo->prepare("SELECT * FROM tipos_documento WHERE id = :id");
+            $stmtDocInact->execute([':id' => $tipoDocIdPac]);
+            $docInact = $stmtDocInact->fetch(PDO::FETCH_ASSOC);
+            if ($docInact) {
+                $catalogoTiposDoc[] = $docInact;
+            }
+        }
     }
 }
 ?>
@@ -373,7 +392,7 @@ if (!empty($_GET['editar_id']) || !empty($_GET['editar'])) {
                                     <div class="col-md-4">
                                         <select name="tipo_doc" class="form-select form-select-sm">
                                             <option value="todos">Todos los tipos de documento</option>
-                                            <?php foreach ($catalogoTiposDoc as $td): ?>
+                                            <?php foreach ($todosTiposDocFiltro as $td): ?>
                                                 <option value="<?= (int) $td['id'] ?>"
                                                     <?= ((string) $filtroTipoDoc === (string) $td['id'] || $filtroTipoDoc === $td['codigo']) ? 'selected' : '' ?>>
                                                     <?= htmlspecialchars($td['codigo']) ?> -
