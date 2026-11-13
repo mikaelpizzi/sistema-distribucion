@@ -2,21 +2,29 @@
             aria-labelledby="sidebarMenuLabel">
             <!-- Encabezado del Sidebar: Identidad Institucional -->
             <div class="sicm-sidebar-header d-flex align-items-center justify-content-between">
-                <a href="index.php" class="sicm-sidebar-brand">
+                <a href="index.php" class="sicm-sidebar-brand flex-grow-1" style="min-width: 0;">
                     <?php if (!empty($configInst['logotipo_ruta'])): ?>
                         <img src="<?= htmlspecialchars($configInst['logotipo_ruta']) ?>" alt="Logo"
-                            class="sicm-sidebar-logo">
+                            class="sicm-sidebar-logo flex-shrink-0">
                     <?php else: ?>
                         <div class="d-inline-flex align-items-center justify-content-center rounded bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25"
-                            style="width: 36px; height: 36px; flex-shrink: 0;">
+                            style="width: 38px; height: 38px; flex-shrink: 0;">
                             <i class="bi bi-shield-plus fs-5 text-primary"></i>
                         </div>
                     <?php endif; ?>
                     <div class="d-flex flex-column text-truncate" style="min-width: 0;">
-                        <span class="brand-title text-truncate"
-                            style="font-size: 0.95rem; line-height: 1.25;"><?= htmlspecialchars($configInst['siglas_sistema']) ?></span>
-                        <span class="text-muted text-truncate" style="font-size: 0.68rem; line-height: 1.25;"
-                            title="<?= htmlspecialchars($configInst['ente_rector']) ?>"><?= htmlspecialchars($configInst['ente_rector']) ?></span>
+                        <span class="brand-title fw-bold text-dark text-truncate"
+                            style="font-size: 1.05rem; line-height: 1.2; letter-spacing: 0.02em;">
+                            <?= htmlspecialchars($configInst['siglas_sistema']) ?>
+                        </span>
+                        <span class="text-secondary fw-semibold text-truncate" style="font-size: 0.72rem; line-height: 1.25;"
+                            title="<?= htmlspecialchars($configInst['nombre_sistema']) ?>">
+                            <?= htmlspecialchars($configInst['nombre_sistema']) ?>
+                        </span>
+                        <span class="text-muted text-truncate" style="font-size: 0.65rem; line-height: 1.25;"
+                            title="<?= htmlspecialchars($configInst['ente_rector']) ?> • <?= htmlspecialchars($configInst['municipio']) ?>">
+                            <?= htmlspecialchars($configInst['ente_rector']) ?> &bull; <?= htmlspecialchars($configInst['municipio']) ?>
+                        </span>
                     </div>
                 </a>
                 <button type="button" class="btn-close d-lg-none" data-bs-dismiss="offcanvas"

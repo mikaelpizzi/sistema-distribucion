@@ -84,8 +84,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($configInst['siglas_sistema']) ?> - <?= htmlspecialchars($configInst['nombre_sistema']) ?></title>
     <link rel="icon" type="<?= !empty($configInst['logotipo_ruta']) && file_exists(__DIR__ . '/' . $configInst['logotipo_ruta']) ? (str_ends_with(strtolower($configInst['logotipo_ruta']), '.svg') ? 'image/svg+xml' : 'image/png') : 'image/svg+xml' ?>" href="<?= !empty($configInst['logotipo_ruta']) && file_exists(__DIR__ . '/' . $configInst['logotipo_ruta']) ? htmlspecialchars($configInst['logotipo_ruta']) : 'public/img/favicon.svg' ?>">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="public/vendor/bootstrap-icons/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="public/css/auth.css?v=<?= filemtime(__DIR__ . '/public/css/auth.css') ?>">
 </head>
 <body class="auth-layout">

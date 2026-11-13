@@ -16,8 +16,8 @@ $faviconMime = str_ends_with(strtolower($faviconRuta), '.svg') ? 'image/svg+xml'
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($configInst['siglas_sistema']) ?> - <?= htmlspecialchars($configInst['nombre_sistema']) ?></title>
     <link rel="icon" type="<?= $faviconMime ?>" href="<?= htmlspecialchars($faviconRuta) ?>">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link href="public/vendor/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="public/vendor/bootstrap-icons/font/bootstrap-icons.min.css">
     <link href="public/css/app.css?v=<?= filemtime(__DIR__ . '/../../public/css/app.css') ?>" rel="stylesheet">
 </head>
 

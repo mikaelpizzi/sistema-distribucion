@@ -122,10 +122,16 @@ switch ($accion) {
         $rutaFinalLogo = $actual['logotipo_ruta'];
 
         if ($eliminarLogo) {
+            if (!empty($actual['logotipo_ruta']) && str_starts_with($actual['logotipo_ruta'], 'public/img/logo_institucional_')) {
+                $archivoAnterior = __DIR__ . '/../' . $actual['logotipo_ruta'];
+                if (file_exists($archivoAnterior)) {
+                    @unlink($archivoAnterior);
+                }
+            }
             $rutaFinalLogo = null;
         }
 
-        // Procesar carga de archivo de imagen si fue suministrado
+        // Procesar carga de archivo de imagen (Drag & Drop / Selector de Archivos)
         if (isset($_FILES['logotipo_archivo']) && $_FILES['logotipo_archivo']['error'] === UPLOAD_ERR_OK) {
             $file = $_FILES['logotipo_archivo'];
             $maxBytes = 2 * 1024 * 1024; // 2 MB
@@ -144,7 +150,7 @@ switch ($accion) {
             ];
 
             if (!isset($permitidos[$mime])) {
-                header('Location: index.php?tab=configuracion&error=' . urlencode('Formato de imagen no permitido. Admite PNG, JPG, SVG y WEBP.'));
+                header('Location: index.php?tab=configuracion&error=' . urlencode('Formato de imagen no permitido. Admite exclusivamente PNG, JPG, SVG y WEBP.'));
                 exit;
             }
 
@@ -154,12 +160,21 @@ switch ($accion) {
             }
 
             $ext = $permitidos[$mime];
-            $destName = 'logo_institucional_' . time() . '.' . $ext;
+            $destName = 'logo_institucional_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
             $destPath = $uploadDir . '/' . $destName;
 
             if (move_uploaded_file($file['tmp_name'], $destPath)) {
+                // Si existía un logo previo personalizado generado por la app, limpiarlo
+                if (!empty($actual['logotipo_ruta']) && str_starts_with($actual['logotipo_ruta'], 'public/img/logo_institucional_')) {
+                    $archivoAnterior = __DIR__ . '/../' . $actual['logotipo_ruta'];
+                    if (file_exists($archivoAnterior)) {
+                        @unlink($archivoAnterior);
+                    }
+                }
                 $rutaFinalLogo = 'public/img/' . $destName;
-                $archivoSubidoRuta = $destPath;
+            } else {
+                header('Location: index.php?tab=configuracion&error=' . urlencode('Error interno al almacenar el archivo de logotipo en el servidor.'));
+                exit;
             }
         } elseif (!empty($logotipoRuta)) {
             $rutaFinalLogo = $logotipoRuta;

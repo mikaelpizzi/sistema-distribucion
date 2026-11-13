@@ -81,7 +81,7 @@ $seccionNombre = 'Configuración';
                                                     value="<?= htmlspecialchars($configInst['municipio']) ?>" required
                                                     maxlength="100" placeholder="Ej: Municipio Autónomo Baruta">
                                                 <div class="form-text" style="font-size: 0.74rem;">Jurisdicción geográfica
-                                                    administrativa.</div>
+                                                    administrativa. Se refleja en membretes institucionales, barra lateral y pantallas de autenticación.</div>
                                             </div>
                                         </div>
 
@@ -147,23 +147,39 @@ $seccionNombre = 'Configuración';
                                                 <?php endif; ?>
                                             </div>
                                             <div class="col-md-8">
-                                                <div class="mb-3">
-                                                    <label for="logotipo_archivo"
-                                                        class="form-label fw-semibold small">Cargar Archivo de
-                                                        Logotipo</label>
-                                                    <input type="file" class="form-control form-control-sm"
-                                                        id="logotipo_archivo" name="logotipo_archivo"
-                                                        accept="image/png,image/jpeg,image/svg+xml,image/webp">
-                                                    <div class="form-text" style="font-size: 0.74rem;">Formatos aceptados:
-                                                        PNG, JPG, SVG o WEBP (máx. 2 MB). Se recomienda transparencia.</div>
-                                                </div>
-                                                <div>
-                                                    <label for="logotipo_ruta" class="form-label fw-semibold small">O Ruta
-                                                        Relativa Existente</label>
-                                                    <input type="text" class="form-control form-control-sm font-monospace"
-                                                        id="logotipo_ruta" name="logotipo_ruta"
-                                                        value="<?= htmlspecialchars($configInst['logotipo_ruta'] ?? '') ?>"
-                                                        placeholder="public/img/logo.png">
+                                                <label class="form-label fw-semibold small mb-1">Cargar o Reemplazar Logotipo</label>
+                                                <!-- Input de archivo oculto -->
+                                                <input type="file" class="d-none" id="logotipo_archivo" name="logotipo_archivo"
+                                                    accept="image/png,image/jpeg,image/svg+xml,image/webp">
+
+                                                <!-- Zona Drag & Drop -->
+                                                <div id="dropzone-logo" class="border border-2 border-dashed rounded-3 p-4 text-center bg-light bg-opacity-50"
+                                                    style="border-color: #cbd5e1 !important; cursor: pointer; transition: all 0.2s ease-in-out;">
+                                                    <div id="dropzone-content-default">
+                                                        <i class="bi bi-cloud-arrow-up text-primary fs-1 d-block mb-1"></i>
+                                                        <span class="fw-semibold text-dark d-block mb-1" style="font-size: 0.875rem;">
+                                                            Arrastra y suelta el logotipo aquí, o haz clic para seleccionarlo
+                                                        </span>
+                                                        <span class="text-muted d-block" style="font-size: 0.74rem;">
+                                                            Formatos permitidos: PNG, JPG, SVG o WEBP (máximo 2 MB). Se sugiere transparencia.
+                                                        </span>
+                                                    </div>
+
+                                                    <!-- Previsualización dinámica de archivo seleccionado -->
+                                                    <div id="dropzone-preview" class="d-none">
+                                                        <div class="d-flex align-items-center justify-content-center gap-3 flex-wrap">
+                                                            <img id="preview-img" src="" alt="Previsualización" class="img-fluid rounded border bg-white p-1"
+                                                                style="max-height: 75px; max-width: 120px; object-fit: contain;">
+                                                            <div class="text-start">
+                                                                <div id="preview-filename" class="fw-semibold text-dark text-truncate" style="max-width: 220px; font-size: 0.85rem;"></div>
+                                                                <div id="preview-filesize" class="text-muted font-monospace" style="font-size: 0.72rem;"></div>
+                                                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle mt-1" style="font-size: 0.68rem;">Listo para guardar</span>
+                                                            </div>
+                                                            <button type="button" class="btn btn-outline-danger btn-sm ms-2" id="btn-cancelar-archivo" title="Cancelar selección">
+                                                                <i class="bi bi-trash3 me-1"></i> Quitar
+                                                            </button>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -184,3 +200,114 @@ $seccionNombre = 'Configuración';
                             </div>
                         </div>
                     </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const dropzone = document.getElementById('dropzone-logo');
+    const fileInput = document.getElementById('logotipo_archivo');
+    const contentDefault = document.getElementById('dropzone-content-default');
+    const contentPreview = document.getElementById('dropzone-preview');
+    const previewImg = document.getElementById('preview-img');
+    const previewFilename = document.getElementById('preview-filename');
+    const previewFilesize = document.getElementById('preview-filesize');
+    const btnCancelar = document.getElementById('btn-cancelar-archivo');
+    const eliminarLogoCheck = document.getElementById('eliminar_logo');
+
+    if (!dropzone || !fileInput) return;
+
+    // Abrir selector de archivos al hacer clic en la zona
+    dropzone.addEventListener('click', (e) => {
+        if (e.target.closest('#btn-cancelar-archivo')) return;
+        fileInput.click();
+    });
+
+    // Eventos Drag & Drop con feedback visual
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropzone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.classList.add('bg-primary-subtle');
+            dropzone.style.borderColor = '#0d6efd';
+        }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropzone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropzone.classList.remove('bg-primary-subtle');
+            dropzone.style.borderColor = '#cbd5e1';
+        }, false);
+    });
+
+    dropzone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files && files.length > 0) {
+            fileInput.files = files;
+            mostrarPrevisualizacion(files[0]);
+        }
+    });
+
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files && fileInput.files.length > 0) {
+            mostrarPrevisualizacion(fileInput.files[0]);
+        }
+    });
+
+    function mostrarPrevisualizacion(file) {
+        const tiposPermitidos = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp'];
+        if (!tiposPermitidos.includes(file.type)) {
+            alert('Formato no permitido. Por favor seleccione un archivo PNG, JPG, SVG o WEBP.');
+            limpiarSeleccion();
+            return;
+        }
+
+        if (file.size > 2 * 1024 * 1024) {
+            alert('El archivo seleccionado supera el límite de 2 MB.');
+            limpiarSeleccion();
+            return;
+        }
+
+        if (eliminarLogoCheck) {
+            eliminarLogoCheck.checked = false;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            previewImg.src = e.target.result;
+            previewFilename.textContent = file.name;
+            const sizeKB = file.size / 1024;
+            previewFilesize.textContent = sizeKB > 1024 ? (sizeKB / 1024).toFixed(2) + ' MB' : sizeKB.toFixed(1) + ' KB';
+            contentDefault.classList.add('d-none');
+            contentPreview.classList.remove('d-none');
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function limpiarSeleccion() {
+        fileInput.value = '';
+        previewImg.src = '';
+        previewFilename.textContent = '';
+        previewFilesize.textContent = '';
+        contentPreview.classList.add('d-none');
+        contentDefault.classList.remove('d-none');
+    }
+
+    if (btnCancelar) {
+        btnCancelar.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            limpiarSeleccion();
+        });
+    }
+
+    if (eliminarLogoCheck) {
+        eliminarLogoCheck.addEventListener('change', () => {
+            if (eliminarLogoCheck.checked) {
+                limpiarSeleccion();
+            }
+        });
+    }
+});
+</script>

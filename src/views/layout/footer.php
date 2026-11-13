@@ -9,7 +9,7 @@ declare(strict_types=1);
 
     <!-- Scripts Globales de la Plataforma -->
     <script src="public/js/validaciones.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="public/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
