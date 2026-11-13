@@ -409,6 +409,40 @@ body {
     border: 1px solid #cbd5e1;
 }
 
+/* Badges de Vías de Contacto en Ficha Clínica Asistencial */
+.badge-contacto-ficha {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.4rem;
+    max-width: 100%;
+    white-space: normal !important;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    font-size: 0.72rem;
+    line-height: 1.35;
+    padding: 0.3rem 0.55rem;
+    border-radius: 6px;
+    font-weight: 500;
+    text-align: left;
+    box-sizing: border-box;
+}
+
+.badge-contacto-ficha .badge-contacto-label {
+    font-weight: 600;
+}
+
+.badge-contacto-ficha .badge-contacto-valor {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.badge-contacto-ficha .badge-contacto-titular {
+    font-size: 0.68rem;
+    font-weight: normal;
+    word-break: break-word;
+}
+
 /* Botones de Filtro */
 .btn-filter-group .btn {
     font-size: 0.8rem;

@@ -552,11 +552,11 @@ $ultimosDespachos = $stmtHist->fetchAll(PDO::FETCH_ASSOC);
                                     </a>
                                 </div>
                                 <div class="card-body p-3">
-                                    <div class="row g-3 small">
-                                        <div class="col-md-4">
+                                    <div class="row g-3 small align-items-start">
+                                        <div class="col-12 col-md-4 col-lg-3" style="min-width: 0;">
                                             <span class="text-muted fw-semibold d-block">Nombre del Paciente:</span>
                                             <span
-                                                class="fs-6 fw-bold text-dark"><?= htmlspecialchars($pacienteEncontrado['nombre_completo']) ?></span>
+                                                class="fs-6 fw-bold text-dark d-block text-truncate" title="<?= htmlspecialchars($pacienteEncontrado['nombre_completo']) ?>"><?= htmlspecialchars($pacienteEncontrado['nombre_completo']) ?></span>
                                             <div class="text-muted" style="font-size: 0.72rem;">
                                                 <?php if (!empty($pacienteEncontrado['fecha_nacimiento'])): ?>
                                                     Nacimiento: <?= date('d/m/Y', strtotime($pacienteEncontrado['fecha_nacimiento'])) ?>
@@ -564,32 +564,45 @@ $ultimosDespachos = $stmtHist->fetchAll(PDO::FETCH_ASSOC);
                                                 <?php endif; ?>
                                             </div>
                                         </div>
-                                        <div class="col-md-4">
+                                        <div class="col-12 col-md-4 col-lg-4" style="min-width: 0;">
                                             <span class="text-muted fw-semibold d-block">Dirección de Residencia:</span>
                                             <span
-                                                class="text-dark"><?= htmlspecialchars($pacienteEncontrado['direccion_residencia'] ?: 'No registrada') ?></span>
+                                                class="text-dark d-block" style="word-break: break-word;"><?= htmlspecialchars($pacienteEncontrado['direccion_residencia'] ?: 'No registrada') ?></span>
                                         </div>
-                                        <div class="col-md-4">
+                                        <div class="col-12 col-md-4 col-lg-5" style="min-width: 0;">
                                             <span class="text-muted fw-semibold d-block mb-1">Vías de Contacto:</span>
                                             <?php if (empty($contactosPaciente)): ?>
                                                 <span class="text-muted font-italic">Sin contactos registrados</span>
                                             <?php else: ?>
-                                                <div class="d-flex flex-wrap gap-1">
+                                                <div class="d-flex flex-column gap-1.5 w-100" style="min-width: 0;">
                                                     <?php foreach ($contactosPaciente as $c): ?>
                                                         <?php
                                                         $isPri = ((int) $c['es_principal'] === 1);
-                                                        $isEmg = ($c['tipo_contacto_codigo'] === 'CONTACTO_EMERGENCIA' || (!empty($c['nombre_contacto_emergencia']) && $c['nombre_contacto_emergencia'] !== 'Personal'));
+                                                        $titularEmergencia = trim($c['nombre_contacto_emergencia'] ?? '');
+                                                        $esTitularRelevante = !empty($titularEmergencia)
+                                                            && !in_array(mb_strtolower($titularEmergencia), ['paciente directo', 'personal', 'personal movil', 'titular', 'propio', 'directo']);
+                                                        $isEmg = ($c['tipo_contacto_codigo'] === 'CONTACTO_EMERGENCIA' || $esTitularRelevante);
+                                                        $isWp = ($c['tipo_contacto_codigo'] === 'WHATSAPP');
                                                         $bClass = $isPri ? 'bg-primary-subtle text-primary border-primary-subtle' : ($isEmg ? 'bg-danger-subtle text-danger border-danger-subtle' : 'bg-light text-secondary border');
+                                                        $icon = $isPri ? 'bi-star-fill text-primary' : ($isEmg ? 'bi-shield-exclamation text-danger' : ($isWp ? 'bi-whatsapp text-success' : 'bi-telephone'));
+
+                                                        // Simplificación estética de etiquetas para evitar desbordamiento
+                                                        $tipoMap = [
+                                                            'TEL_MOVIL' => 'Móvil Personal',
+                                                            'TEL_FIJO' => 'Fijo / Habitación',
+                                                            'WHATSAPP' => 'WhatsApp',
+                                                            'EMAIL_ALTERNO' => 'Correo',
+                                                            'CONTACTO_EMERGENCIA' => 'Emergencia',
+                                                        ];
+                                                        $tipoLabel = $tipoMap[$c['tipo_contacto_codigo'] ?? ''] ?? $c['tipo_contacto_nombre'];
                                                         ?>
                                                         <span
-                                                            class="badge <?= $bClass ?> d-inline-flex align-items-center gap-1 font-monospace"
-                                                            style="font-size: 0.72rem;">
-                                                            <i
-                                                                class="bi <?= $isPri ? 'bi-star-fill text-primary' : ($isEmg ? 'bi-shield-exclamation text-danger' : 'bi-telephone') ?>"></i>
-                                                            <?= htmlspecialchars($c['tipo_contacto_nombre']) ?>:
-                                                            <?= htmlspecialchars($c['valor']) ?>
-                                                            <?php if (!empty($c['nombre_contacto_emergencia']) && $c['nombre_contacto_emergencia'] !== 'Personal'): ?>
-                                                                (<?= htmlspecialchars($c['nombre_contacto_emergencia']) ?>)
+                                                            class="badge <?= $bClass ?> badge-contacto-ficha">
+                                                            <i class="bi <?= $icon ?> flex-shrink-0"></i>
+                                                            <span class="badge-contacto-label"><?= htmlspecialchars($tipoLabel) ?>:</span>
+                                                            <span class="badge-contacto-valor font-monospace"><?= htmlspecialchars($c['valor']) ?></span>
+                                                            <?php if ($esTitularRelevante): ?>
+                                                                <span class="badge-contacto-titular text-muted">(<?= htmlspecialchars($titularEmergencia) ?>)</span>
                                                             <?php endif; ?>
                                                         </span>
                                                     <?php endforeach; ?>
