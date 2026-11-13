@@ -136,7 +136,7 @@ if (!empty($_GET['editar_id']) || !empty($_GET['editar'])) {
                                         style="font-size: 0.72rem; letter-spacing: 0.04em;">Con Vías de Contacto</span>
                                     <div class="fs-4 fw-bold text-dark font-monospace">
                                         <?= number_format($kpiConContactos) ?></div>
-                                    <span class="text-muted small" style="font-size: 0.70rem;">Normalizados en 1FN</span>
+                                    <span class="text-muted small" style="font-size: 0.70rem;">Con canales registrados</span>
                                 </div>
                             </div>
                         </div>

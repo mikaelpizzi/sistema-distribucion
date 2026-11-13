@@ -37,8 +37,6 @@
                                 <i class="bi bi-people nav-icon"></i>
                                 <span class="text-truncate">Pacientes</span>
                             </span>
-                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle"
-                                style="font-size: 0.65rem;">1FN</span>
                         </a>
                     <?php endif; ?>
                     <?php if (tienePermiso('RECIPES_VER') && esModuloActivo('recipes')): ?>
@@ -48,8 +46,6 @@
                                 <i class="bi bi-file-earmark-medical nav-icon"></i>
                                 <span class="text-truncate">Récipes Médicos</span>
                             </span>
-                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle"
-                                style="font-size: 0.65rem;">Clínico</span>
                         </a>
                     <?php endif; ?>
                     <?php if (tienePermiso('DESP_VER') && esModuloActivo('despachos')): ?>
@@ -59,8 +55,6 @@
                                 <i class="bi bi-box-seam nav-icon"></i>
                                 <span class="text-truncate">Dispensación FEFO</span>
                             </span>
-                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle"
-                                style="font-size: 0.65rem;">Clínico</span>
                         </a>
                     <?php endif; ?>
                 <?php endif; ?>
@@ -137,12 +131,21 @@
 
             <!-- Pie del Sidebar Institucional (Sticky Bottom) -->
             <div class="sicm-sidebar-footer">
+                <?php
+                $rolNombreKey = (string)($usuario['rol_nombre'] ?? '');
+                $rolLabel = match ($rolNombreKey) {
+                    'rol_admin' => 'Administrador Central',
+                    'rol_farmaceuta' => 'Farmacéutico Operador',
+                    'rol_auditor' => 'Auditor Sanitario',
+                    default => ucwords(str_replace(['rol_', '_'], ['', ' '], $rolNombreKey ?: 'Operador'))
+                };
+                ?>
                 <div class="sidebar-user-card">
                     <div class="user-name text-truncate"><?= htmlspecialchars($usuario['nombre']) ?></div>
-                    <div class="user-role text-truncate"><?= htmlspecialchars($usuario['rol_nombre']) ?></div>
+                    <div class="user-role text-truncate"><?= htmlspecialchars($rolLabel) ?></div>
                     <div class="user-center text-truncate">
                         <i
-                            class="bi bi-geo-alt-fill me-1"></i><?= htmlspecialchars($puedeVerTodaLaRed ? 'Supervisión Central Red' : ($usuario['centro_nombre'] ?? 'Red Municipal')) ?>
+                            class="bi bi-geo-alt-fill me-1"></i><?= htmlspecialchars($puedeVerTodaLaRed ? 'Sede Central Municipal' : ($usuario['centro_nombre'] ?? 'Red Municipal')) ?>
                     </div>
                 </div>
 

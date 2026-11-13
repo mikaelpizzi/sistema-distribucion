@@ -173,27 +173,16 @@ $seccionNombre = 'Configuración';
                                             </div>
                                         </div>
 
-                                        <!-- Barra de Acciones y Trazabilidad -->
+                                        <!-- Barra de Acciones -->
                                         <div
-                                            class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center pt-3 border-top gap-3">
-                                            <div class="small text-muted">
-                                                <i class="bi bi-clock-history me-1"></i>
-                                                <?php if (!empty($configInst['updated_at'])): ?>
-                                                    Última sincronización:
-                                                    <strong><?= htmlspecialchars($configInst['updated_at']) ?></strong>
-                                                <?php else: ?>
-                                                    Configuración canónica por defecto
-                                                <?php endif; ?>
-                                            </div>
-                                            <div class="d-flex gap-2">
-                                                <a href="index.php?tab=centros"
-                                                    class="btn btn-outline-secondary btn-sm px-3">
-                                                    Cancelar
-                                                </a>
-                                                <button type="submit" class="btn btn-primary btn-sm px-4 fw-semibold">
-                                                    <i class="bi bi-check-circle-fill me-1"></i> Guardar Cambios
-                                                </button>
-                                            </div>
+                                            class="d-flex flex-column flex-sm-row justify-content-end align-items-sm-center pt-3 border-top gap-2">
+                                            <a href="index.php?tab=centros"
+                                                class="btn btn-outline-secondary btn-sm px-3">
+                                                Cancelar
+                                            </a>
+                                            <button type="submit" class="btn btn-primary btn-sm px-4 fw-semibold">
+                                                <i class="bi bi-check-circle-fill me-1"></i> Guardar Cambios
+                                            </button>
                                         </div>
                                     </form>
                                 </div>

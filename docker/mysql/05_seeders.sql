@@ -127,7 +127,7 @@ ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), descripcion = VALUES(descripcio
 
 -- 1.10 Catálogo Clínico Parametrizable: Patologías Crónicas (3FN)
 INSERT INTO patologias (id, codigo_cie10, nombre, cronica, descripcion, activo) VALUES
-(1, 'I10', 'Hipertensión Arterial Primaria (Esencial)', 1, 'Presión arterial sistólica >= 140 mmHg y/o diastólica >= 90 mmHg de etiología primaria', 1),
+(1, 'I10', 'Hipertensión Arterial Primaria', 1, 'Presión arterial sistólica >= 140 mmHg y/o diastólica >= 90 mmHg de etiología primaria', 1),
 (2, 'E11', 'Diabetes Mellitus Tipo 2', 1, 'Alteración metabólica de hiperglucemia crónica no dependiente primariamente de insulina', 1),
 (3, 'E10', 'Diabetes Mellitus Tipo 1', 1, 'Destrucción autoinmune de células beta pancreáticas con requerimiento estricto de insulina', 1),
 (4, 'J45', 'Asma Bronquial Crónica', 1, 'Inflamación crónica de vías respiratorias con episodios recurrentes de broncoespasmo', 1),

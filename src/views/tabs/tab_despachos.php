@@ -370,8 +370,6 @@ $ultimosDespachos = $stmtHist->fetchAll(PDO::FETCH_ASSOC);
                                     <i class="bi bi-search text-primary fs-5"></i>
                                     <h6 class="fw-bold m-0 text-dark">Búsqueda Asistencial de Paciente</h6>
                                 </div>
-                                <span class="text-muted small">Validación de récipe médico y control contra doble retiro
-                                    mensual</span>
                             </div>
                             <div class="card-body p-3">
                                 <form method="GET" action="index.php" class="row g-2 align-items-center">

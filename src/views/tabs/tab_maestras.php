@@ -81,7 +81,7 @@ foreach ($permisosCatalogo as $p) {
                                 <div
                                     class="card-header-sicm d-flex flex-wrap justify-content-between align-items-center gap-2">
                                     <div class="d-flex align-items-center gap-2">
-                                        <span class="fw-bold">Roles Operativos y Matriz de Permisos RBAC</span>
+                                        <span class="fw-bold">Roles Operativos y Matriz de Permisos</span>
                                         <span class="code-tag">roles</span>
                                         <span class="code-tag">rol_permisos</span>
                                     </div>
@@ -92,9 +92,7 @@ foreach ($permisosCatalogo as $p) {
                                     </button>
                                 </div>
                                 <div class="px-3 pt-2 pb-1 text-muted small" style="font-size: 0.75rem;">
-                                    Control de Acceso Basado en Roles (RBAC) normalizado en Tercera Forma Normal (3FN).
-                                    Parametrización en caliente de perfiles institucionales y asignación granular sobre los
-                                    24 permisos atómicos de la red asistencial.
+                                    Administración de perfiles institucionales y asignación de permisos para los operadores de la red de salud municipal.
                                 </div>
 
                                 <!-- Formulario Colapsable: Registrar Nuevo Rol -->
@@ -335,8 +333,7 @@ foreach ($permisosCatalogo as $p) {
 
                                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                                     <span class="small fw-bold text-dark">
-                                                        <i class="bi bi-grid-3x3-gap-fill text-muted me-1"></i>Permisos
-                                                        Asignados (RBAC en 3FN)
+                                                        <i class="bi bi-grid-3x3-gap-fill text-muted me-1"></i>Permisos Asignados al Perfil
                                                     </span>
                                                     <div class="d-flex gap-2">
                                                         <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2"
