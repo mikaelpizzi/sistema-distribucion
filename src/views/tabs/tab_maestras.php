@@ -89,14 +89,81 @@ foreach ($permisosCatalogo as $p) {
                                 </div>
                                 <p class="text-muted small mb-0">
                                     Gestión y parametrización de catálogos maestros del sistema. Permite incorporar y
-                                    mantener las
-                                    clasificaciones de ambulatorios y el equipamiento operativo de la red de salud
-                                    municipal.
+                                    mantener las clasificaciones de ambulatorios y el equipamiento operativo de la red de salud municipal.
                                 </p>
                             </div>
                             <a href="index.php?tab=centros"
-                                class="btn btn-outline-primary btn-sm py-1 px-3 text-nowrap">Volver a
-                                Ambulatorios</a>
+                                class="btn btn-outline-primary btn-sm py-1 px-3 text-nowrap">Volver a Ambulatorios</a>
+                        </div>
+                    </div>
+
+                    <!-- Estilos para Navegación Rápida y Scroll Offset -->
+                    <style>
+                        .sec-catalogo {
+                            scroll-margin-top: 125px;
+                        }
+                        #nav-catalogos-maestros .nav-link {
+                            font-size: 0.78rem;
+                            color: #495057;
+                            background-color: #f8f9fa;
+                            border: 1px solid #e2e8f0;
+                            border-radius: 6px;
+                            white-space: nowrap;
+                            transition: all 0.15s ease-in-out;
+                        }
+                        #nav-catalogos-maestros .nav-link:hover {
+                            background-color: #e2e8f0;
+                            color: #0d6efd;
+                            border-color: #cbd5e1;
+                        }
+                        #nav-catalogos-maestros .nav-link.active {
+                            background-color: #0d6efd;
+                            color: #ffffff;
+                            border-color: #0d6efd;
+                            font-weight: 600;
+                        }
+                    </style>
+
+                    <!-- Barra de Navegación Rápida por Catálogos -->
+                    <div class="card border mb-3 sticky-top shadow-sm" style="top: 54px; z-index: 1000; background-color: rgba(255, 255, 255, 0.98); backdrop-filter: blur(6px);">
+                        <div class="card-body py-2 px-3">
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                <span class="small fw-semibold text-secondary text-uppercase" style="font-size: 0.72rem; letter-spacing: 0.5px;">
+                                    <i class="bi bi-compass me-1"></i>Navegación Rápida:
+                                </span>
+                                <ul class="nav nav-pills gap-1 flex-nowrap overflow-x-auto" id="nav-catalogos-maestros">
+                                    <li class="nav-item">
+                                        <a class="nav-link py-1 px-2.5 small fw-medium active" href="#sec-roles">
+                                            <i class="bi bi-shield-lock me-1"></i>Roles y Permisos
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link py-1 px-2.5 small fw-medium" href="#sec-tipos-centro">
+                                            <i class="bi bi-hospital me-1"></i>Tipos de Centro
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link py-1 px-2.5 small fw-medium" href="#sec-equipamiento">
+                                            <i class="bi bi-tools me-1"></i>Equipamiento
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link py-1 px-2.5 small fw-medium" href="#sec-documentos">
+                                            <i class="bi bi-card-heading me-1"></i>Documentos de Identidad
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link py-1 px-2.5 small fw-medium" href="#sec-atributos">
+                                            <i class="bi bi-tags me-1"></i>Atributos Farmacológicos
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link py-1 px-2.5 small fw-medium" href="#sec-patologias">
+                                            <i class="bi bi-clipboard2-pulse me-1"></i>Clasificaciones de Patologías
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
 
@@ -104,14 +171,13 @@ foreach ($permisosCatalogo as $p) {
                         <!-- ========================================================== -->
                         <!-- ROLES OPERATIVOS Y MATRIZ DE PERMISOS RBAC (PARAMETRIZABLE) -->
                         <!-- ========================================================== -->
-                        <div class="col-12 mb-4">
+                        <div class="col-12 mb-4 sec-catalogo" id="sec-roles">
                             <div class="card-sicm">
                                 <div
                                     class="card-header-sicm d-flex flex-wrap justify-content-between align-items-center gap-2">
                                     <div class="d-flex align-items-center gap-2">
                                         <span class="fw-bold">Roles Operativos y Matriz de Permisos</span>
-                                        <span class="code-tag">roles</span>
-                                        <span class="code-tag">rol_permisos</span>
+                                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle small"><?= count($todosRoles) ?> roles definidos</span>
                                     </div>
                                     <button class="btn btn-primary btn-sm py-1 px-3 fw-semibold" type="button"
                                         data-bs-toggle="collapse" data-bs-target="#collapseNuevoRol" aria-expanded="false"
@@ -173,7 +239,7 @@ foreach ($permisosCatalogo as $p) {
                                                 class="card-header bg-white py-2 px-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
                                                 <div class="small fw-bold text-dark">
                                                     <i class="bi bi-grid-3x3-gap-fill text-warning me-1"></i>Asignación de
-                                                    Permisos Atómicos por Módulo (24 Permisos en 3FN)
+                                                    Permisos por Módulo (<?= count($permisosCatalogo) ?> Permisos Disponibles)
                                                 </div>
                                                 <div class="d-flex gap-2">
                                                     <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2"
@@ -421,12 +487,12 @@ foreach ($permisosCatalogo as $p) {
                         <?php endforeach; ?>
 
                         <!-- Catálogo 1: Tipos de Ambulatorio -->
-                        <div class="col-12 mb-4">
+                        <div class="col-12 mb-4 sec-catalogo" id="sec-tipos-centro">
                             <div class="card-sicm">
                                 <div class="card-header-sicm d-flex justify-content-between align-items-center">
-                                    <div>
+                                    <div class="d-flex align-items-center gap-2">
                                         <span class="fw-bold">Tipos de Centro de Salud</span>
-                                        <span class="code-tag ms-2">tipos_centro_salud</span>
+                                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle small"><?= count($tiposCentro) ?> tipos</span>
                                     </div>
                                 </div>
                                 <div class="px-3 pt-2 pb-1 text-muted small" style="font-size: 0.75rem;">
@@ -517,12 +583,12 @@ foreach ($permisosCatalogo as $p) {
                         </div>
 
                         <!-- Catálogo 2: Equipamiento Médico N:M -->
-                        <div class="col-12 mb-4">
+                        <div class="col-12 mb-4 sec-catalogo" id="sec-equipamiento">
                             <div class="card-sicm">
                                 <div class="card-header-sicm d-flex justify-content-between align-items-center">
-                                    <div>
+                                    <div class="d-flex align-items-center gap-2">
                                         <span class="fw-bold">Equipamiento y Capacidades</span>
-                                        <span class="code-tag ms-2">recursos_operativos</span>
+                                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle small"><?= count($todosRecursos) ?> capacidades</span>
                                     </div>
                                 </div>
                                 <div class="px-3 pt-2 pb-1 text-muted small" style="font-size: 0.75rem;">
@@ -614,12 +680,12 @@ foreach ($permisosCatalogo as $p) {
                         </div>
 
                         <!-- Catálogo 3: Tipos de Documento de Identidad Oficiales -->
-                        <div class="col-12 mb-4">
+                        <div class="col-12 mb-4 sec-catalogo" id="sec-documentos">
                             <div class="card-sicm">
                                 <div class="card-header-sicm d-flex justify-content-between align-items-center">
-                                    <div>
+                                    <div class="d-flex align-items-center gap-2">
                                         <span class="fw-bold">Tipos de Documento de Identidad</span>
-                                        <span class="code-tag ms-2">tipos_documento</span>
+                                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle small"><?= count($tiposDocumento) ?> tipos</span>
                                     </div>
                                 </div>
                                 <div class="px-3 pt-2 pb-1 text-muted small" style="font-size: 0.75rem;">
@@ -747,13 +813,13 @@ foreach ($permisosCatalogo as $p) {
                             </div>
                         </div>
 
-                        <!-- Catálogo 4: Atributos Farmacológicos Normalizados (3FN - N:M) -->
-                        <div class="col-12 mb-4">
+                        <!-- Catálogo 4: Atributos Farmacológicos -->
+                        <div class="col-12 mb-4 sec-catalogo" id="sec-atributos">
                             <div class="card-sicm">
                                 <div class="card-header-sicm d-flex justify-content-between align-items-center">
-                                    <div>
+                                    <div class="d-flex align-items-center gap-2">
                                         <span class="fw-bold">Atributos Farmacológicos</span>
-                                        <span class="code-tag ms-2">atributos_farmacologicos</span>
+                                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle small"><?= count($atributosFarmacologicos) ?> atributos</span>
                                     </div>
                                 </div>
                                 <div class="px-3 pt-2 pb-1 text-muted small" style="font-size: 0.75rem;">
@@ -868,13 +934,13 @@ foreach ($permisosCatalogo as $p) {
                             </div>
                         </div>
 
-                        <!-- Catálogo 5: Clasificaciones de Patologías (3FN) -->
-                        <div class="col-12 mb-4">
+                        <!-- Catálogo 5: Clasificaciones de Patologías -->
+                        <div class="col-12 mb-4 sec-catalogo" id="sec-patologias">
                             <div class="card-sicm">
                                 <div class="card-header-sicm d-flex justify-content-between align-items-center">
-                                    <div>
+                                    <div class="d-flex align-items-center gap-2">
                                         <span class="fw-bold">Clasificaciones de Patologías</span>
-                                        <span class="code-tag ms-2">clasificaciones_patologia</span>
+                                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle small"><?= count($clasificacionesPatologia) ?> clasificaciones</span>
                                     </div>
                                 </div>
                                 <div class="px-3 pt-2 pb-1 text-muted small" style="font-size: 0.75rem;">
@@ -993,3 +1059,37 @@ foreach ($permisosCatalogo as $p) {
                         </div>
                     </div>
 <script src="public/js/permisos_matrix.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const navLinks = document.querySelectorAll('#nav-catalogos-maestros .nav-link');
+    navLinks.forEach(link => {
+        link.addEventListener('click', function () {
+            navLinks.forEach(l => l.classList.remove('active'));
+            this.classList.add('active');
+        });
+    });
+
+    // Sincronizar pill activo al hacer scroll
+    const secciones = document.querySelectorAll('.sec-catalogo');
+    if ('IntersectionObserver' in window && secciones.length > 0) {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const id = entry.target.getAttribute('id');
+                    navLinks.forEach(link => {
+                        if (link.getAttribute('href') === '#' + id) {
+                            navLinks.forEach(l => l.classList.remove('active'));
+                            link.classList.add('active');
+                        }
+                    });
+                }
+            });
+        }, {
+            rootMargin: '-100px 0px -70% 0px',
+            threshold: 0
+        });
+
+        secciones.forEach(sec => observer.observe(sec));
+    }
+});
+</script>
