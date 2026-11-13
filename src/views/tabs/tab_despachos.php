@@ -3,7 +3,7 @@
 // SICM | Módulo Autosuficiente: Dispensación Asistencial FEFO
 declare(strict_types=1);
 
-$moduloNombre = 'Dispensación FEFO';
+$moduloNombre = 'Dispensación';
 $seccionNombre = 'Gestión Clínica';
 
 // 1. Catálogo de Centros de Salud y Control de Jurisdicción
@@ -253,10 +253,6 @@ $ultimosDespachos = $stmtHist->fetchAll(PDO::FETCH_ASSOC);
                                 <div class="row align-items-center g-2">
                                     <div class="col-md-7">
                                         <div class="d-flex align-items-center gap-2 flex-wrap">
-                                            <span
-                                                class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1">
-                                                <i class="bi bi-geo-alt-fill me-1"></i> Jurisdicción Operativa
-                                            </span>
                                             <span
                                                 class="fw-bold text-dark fs-6"><?= htmlspecialchars($centroOperativo['nombre'] ?? 'Ambulatorio') ?></span>
                                             <span

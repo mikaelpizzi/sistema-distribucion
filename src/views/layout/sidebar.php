@@ -53,7 +53,7 @@
                             class="sidebar-nav-item <?= $tabActiva === 'despachos' ? 'active' : '' ?>">
                             <span class="d-flex align-items-center gap-2 text-truncate">
                                 <i class="bi bi-box-seam nav-icon"></i>
-                                <span class="text-truncate">Dispensación FEFO</span>
+                                <span class="text-truncate">Dispensación</span>
                             </span>
                         </a>
                     <?php endif; ?>

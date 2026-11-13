@@ -103,7 +103,7 @@ def main():
         'medicamentos': 'Vademécum',
         'pacientes': 'Padrón de Pacientes',
         'recipes': 'Récipes Médicos',
-        'despachos': 'Dispensación FEFO',
+        'despachos': 'Dispensación',
         'maestras': 'Catálogos Maestros',
         'usuarios': 'Operadores',
         'auditoria': 'Auditoría Forense',
@@ -148,7 +148,7 @@ def main():
         print("\n--- Fase 3: Restauración de Feature-Flag: Reactivando 'despachos' ---")
         status, body, _ = client.get('/index.php?tab=despachos')
         assert status == 200, "Error cargando despachos reactivado"
-        assert 'Dispensación FEFO' in body, "Error: despachos reactivado no muestra Dispensación FEFO"
+        assert 'Dispensación' in body, "Error: despachos reactivado no muestra Dispensación"
         assert 'href="index.php?tab=despachos"' in body, "El enlace a despachos no reapareció en el sidebar"
         print("  ✓ Módulo 'despachos' reactivado satisfactoriamente (HTTP 200 y presente en sidebar)")
 

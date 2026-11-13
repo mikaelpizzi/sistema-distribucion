@@ -17,13 +17,8 @@ $seccionNombre = 'Configuración';
                                 <div class="card-header-sicm d-flex justify-content-between align-items-center">
                                     <div class="d-flex align-items-center gap-2">
                                         <i class="bi bi-building-gear text-primary fs-5"></i>
-                                        <span>Identidad Institucional y Parametrización Central (White-labeling)</span>
+                                        <span>Identidad Institucional y Configuración de Red</span>
                                     </div>
-                                    <span
-                                        class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace"
-                                        style="font-size: 0.72rem;">
-                                        Parámetro Único #1
-                                    </span>
                                 </div>
                                 <div class="card-body p-3 p-md-4">
                                     <p class="text-muted small mb-4">
