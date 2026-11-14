@@ -97,6 +97,14 @@ function tienePermiso(string $permiso): bool
 }
 
 /**
+ * Valida si el rol del usuario autenticado coincide con el nombre de rol especificado.
+ */
+function esRol(string $nombreRol): bool
+{
+    return isset($_SESSION['rol_nombre']) && $_SESSION['rol_nombre'] === $nombreRol;
+}
+
+/**
  * Determina si el usuario tiene alcance para supervisar todos los ambulatorios de la red.
  */
 function puedeSupervisarTodaLaRed(): bool

@@ -16,7 +16,7 @@ curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_POST, true);
 curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
     'email' => 'admin@salud.prueba.ve',
-    'password' => 'admin123'
+    'password' => 'prueba123'
 ]));
 curl_setopt($ch, CURLOPT_COOKIEJAR, $cookieJar);
 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
@@ -110,7 +110,7 @@ curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_POST, true);
 curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
     'email' => 'farmacia.llano@salud.prueba.ve',
-    'password' => 'farmacia123'
+    'password' => 'prueba123'
 ]));
 curl_setopt($ch, CURLOPT_COOKIEJAR, $cookieJar);
 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);

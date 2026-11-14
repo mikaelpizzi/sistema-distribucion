@@ -353,9 +353,9 @@ Si el sistema fue inicializado con los datos de prueba (o mediante `05_seeders.s
 
 | Perfil / Rol | Correo Institucional | Contraseña | Alcance y Jurisdicción (RBAC) |
 | :--- | :--- | :--- | :--- |
-| **Administrador Central** | `admin@salud.prueba.ve` | `admin123` | **Acceso Global Irrestricto (24/24 permisos):** Configuración de identidad, gestión de ambulatorios, vademécum, operadores, matriz de roles dinámicos, auditoría y respaldos calientes. |
-| **Farmaceuta Operador** | `farmacia.llano@salud.prueba.ve` | `farmacia123` | **Acceso Operativo Asistencial:** Circunscrito estrictamente al Ambulatorio El Llano. Padrón de pacientes, emisión de récipes y dispensación FEFO. Bloqueo total de módulos administrativos y auditoría. |
-| **Auditor Sanitario** | `auditor@salud.prueba.ve` | `auditor123` | **Supervisión Global en Modo Fiscalización:** Jurisdicción intercentros sobre toda la red. Consulta de padrón, vademécum y nómina. Acceso total a la consola forense WORM, deltas celda por celda y exportación pericial en CSV. Botones de mutación y dispensación inhabilitados. |
+| **Administrador Central** | `admin@salud.prueba.ve` | `prueba123` | **Acceso Global Irrestricto (24/24 permisos):** Configuración de identidad, gestión de ambulatorios, vademécum, operadores, matriz de roles dinámicos, auditoría y respaldos calientes. |
+| **Farmaceuta Operador** | `farmacia.llano@salud.prueba.ve` | `prueba123` | **Acceso Operativo Asistencial:** Circunscrito estrictamente al Ambulatorio El Llano. Padrón de pacientes, emisión de récipes y dispensación FEFO. Bloqueo total de módulos administrativos y auditoría. |
+| **Auditor Sanitario** | `auditor@salud.prueba.ve` | `prueba123` | **Supervisión Global en Modo Fiscalización:** Jurisdicción intercentros sobre toda la red. Consulta de padrón, vademécum y nómina. Acceso total a la consola forense WORM, deltas celda por celda y exportación pericial en CSV. Botones de mutación y dispensación inhabilitados. |
 
 ---
 

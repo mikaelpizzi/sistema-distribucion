@@ -78,7 +78,7 @@ def test_admin():
     print("TEST 1: Administrador Central (admin@salud.prueba.ve)")
     print("=" * 60)
     c = SicmClient()
-    ok = c.login("admin@salud.prueba.ve", "admin123")
+    ok = c.login("admin@salud.prueba.ve", "prueba123")
     assert ok, "Fallo inicio de sesión de Administrador"
     print("✓ Login exitoso como Administrador")
 
@@ -116,7 +116,7 @@ def test_farmaceuta():
     print("TEST 2: Farmaceuta Sectorial (farmacia.llano@salud.prueba.ve)")
     print("=" * 60)
     c = SicmClient()
-    ok = c.login("farmacia.llano@salud.prueba.ve", "farmacia123")
+    ok = c.login("farmacia.llano@salud.prueba.ve", "prueba123")
     assert ok, "Fallo inicio de sesión de Farmaceuta"
     print("✓ Login exitoso como Farmaceuta")
 
@@ -171,7 +171,7 @@ def test_auditor():
     print("TEST 3: Auditor Sanitario (auditor@salud.prueba.ve)")
     print("=" * 60)
     c = SicmClient()
-    ok = c.login("auditor@salud.prueba.ve", "auditor123")
+    ok = c.login("auditor@salud.prueba.ve", "prueba123")
     assert ok, "Fallo inicio de sesión de Auditor"
     print("✓ Login exitoso como Auditor Sanitario")
 

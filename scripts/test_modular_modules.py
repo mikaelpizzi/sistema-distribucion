@@ -93,7 +93,7 @@ def main():
     print("=" * 60)
 
     client = SicmClient()
-    ok = client.login("admin@salud.prueba.ve", "admin123")
+    ok = client.login("admin@salud.prueba.ve", "prueba123")
     assert ok, "Fallo inicio de sesión de Administrador"
     print("✓ Login exitoso como Administrador")
 

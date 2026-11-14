@@ -185,10 +185,14 @@ ON DUPLICATE KEY UPDATE operativo = VALUES(operativo), detalle_capacidad = VALUE
 -- 3. USUARIOS INICIALES (RBAC)
 -- ============================================================================
 INSERT INTO usuarios (id, nombre, email, password_hash, rol_id, centro_salud_id, activo) VALUES 
-(1, 'Administrador Municipal', 'admin@salud.prueba.ve', SHA2('admin123', 256), 1, NULL, 1),
-(2, 'Lcda. Elena Farmaceuta', 'farmacia.llano@salud.prueba.ve', SHA2('farmacia123', 256), 2, 1, 1),
-(3, 'Dr. Andrés Auditor', 'auditor@salud.prueba.ve', SHA2('auditor123', 256), 3, NULL, 1)
-ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), email = VALUES(email), rol_id = VALUES(rol_id);
+(1, 'Administrador Municipal', 'admin@salud.prueba.ve', SHA2('prueba123', 256), 1, NULL, 1),
+(2, 'Lcda. Elena Farmaceuta', 'farmacia.llano@salud.prueba.ve', SHA2('prueba123', 256), 2, 1, 1),
+(3, 'Dr. Andrés Auditor', 'auditor@salud.prueba.ve', SHA2('prueba123', 256), 3, NULL, 1)
+ON DUPLICATE KEY UPDATE 
+    nombre = VALUES(nombre), 
+    email = VALUES(email), 
+    password_hash = VALUES(password_hash),
+    rol_id = VALUES(rol_id);
 
 -- ============================================================================
 -- 4. CATÁLOGO DE MEDICAMENTOS (VADEMÉCUM CANÓNICO)
