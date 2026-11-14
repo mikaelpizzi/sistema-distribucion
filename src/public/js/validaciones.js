@@ -202,6 +202,120 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // =========================================================================
+    // 4. VALIDACIÓN PREVENTIVA DE FORMULARIO DE PACIENTES Y VÍAS DE CONTACTO (1FN)
+    // =========================================================================
+    const formPaciente = document.getElementById('form-paciente');
+    if (formPaciente) {
+        formPaciente.addEventListener('submit', (e) => {
+            const erroresP = [];
+
+            const cedula = document.getElementById('paciente_cedula');
+            const nombre = document.getElementById('paciente_nombre');
+            const tipoDoc = document.getElementById('paciente_tipo_doc');
+            const fechaNac = document.getElementById('paciente_fecha_nac');
+
+            if (!tipoDoc || !tipoDoc.value || parseInt(tipoDoc.value, 10) <= 0) {
+                erroresP.push("Debe seleccionar un tipo de documento de identidad válido.");
+                tipoDoc?.classList.add('is-invalid');
+            } else {
+                tipoDoc?.classList.remove('is-invalid');
+            }
+
+            const cedulaVal = cedula ? cedula.value.trim() : '';
+            if (!/^[0-9]{5,12}$/.test(cedulaVal)) {
+                erroresP.push("La cédula o documento debe contener únicamente entre 5 y 12 dígitos numéricos.");
+                cedula?.classList.add('is-invalid');
+            } else {
+                cedula?.classList.remove('is-invalid');
+            }
+
+            const nombreVal = nombre ? nombre.value.trim() : '';
+            if (nombreVal.length < 3) {
+                erroresP.push("El nombre completo del paciente debe contener al menos 3 caracteres.");
+                nombre?.classList.add('is-invalid');
+            } else {
+                nombre?.classList.remove('is-invalid');
+            }
+
+            if (fechaNac && fechaNac.value) {
+                const hoyStr = new Date().toISOString().split('T')[0];
+                if (fechaNac.value > hoyStr) {
+                    erroresP.push("La fecha de nacimiento no puede ser una fecha futura.");
+                    fechaNac.classList.add('is-invalid');
+                } else {
+                    fechaNac.classList.remove('is-invalid');
+                }
+            }
+
+            // Validación de vías de contacto (1FN)
+            const filasContacto = formPaciente.querySelectorAll('.fila-contacto');
+            filasContacto.forEach((fila, idx) => {
+                const select = fila.querySelector('select[name="contactos_tipo[]"]');
+                const inputVal = fila.querySelector('input[name="contactos_valor[]"]');
+                if (!inputVal) return;
+
+                const val = inputVal.value.trim();
+                if (val === '') {
+                    inputVal.classList.remove('is-invalid');
+                    return;
+                }
+
+                const opt = select ? select.options[select.selectedIndex] : null;
+                const codigo = opt ? (opt.dataset.codigo || opt.getAttribute('data-codigo') || '').toUpperCase() : '';
+                const texto = opt ? opt.textContent.toUpperCase() : '';
+                const esEmail = (select && String(select.value) === '4') || codigo === 'EMAIL_ALTERNO' || codigo.includes('EMAIL') || texto.includes('CORREO');
+
+                if (esEmail) {
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (!emailRegex.test(val)) {
+                        erroresP.push(`El correo electrónico '${val}' (vía de contacto #${idx + 1}) tiene un formato inválido.`);
+                        inputVal.classList.add('is-invalid');
+                    } else {
+                        inputVal.classList.remove('is-invalid');
+                    }
+                } else {
+                    const digits = val.replace(/\D/g, '');
+                    if (digits.length < 10 || digits.length > 11) {
+                        erroresP.push(`El número telefónico '${val}' (vía de contacto #${idx + 1}) debe contener entre 10 y 11 dígitos numéricos.`);
+                        inputVal.classList.add('is-invalid');
+                    } else {
+                        inputVal.classList.remove('is-invalid');
+                    }
+                }
+            });
+
+            if (erroresP.length > 0) {
+                e.preventDefault();
+                let contenedor = document.getElementById('alerta-paciente-js');
+                if (!contenedor) {
+                    contenedor = document.createElement('div');
+                    contenedor.id = 'alerta-paciente-js';
+                    const modalBody = formPaciente.querySelector('.modal-body');
+                    if (modalBody) {
+                        modalBody.prepend(contenedor);
+                    }
+                }
+                contenedor.innerHTML = `
+                    <div class="alert alert-danger alert-dismissible fade show shadow-sm py-2 mb-2" role="alert">
+                        <strong>Validación de Paciente (JS):</strong>
+                        <ul class="mb-0 mt-1 ps-3">
+                            ${erroresP.map(err => `<li>${err}</li>`).join('')}
+                        </ul>
+                        <button type="button" class="btn-close py-2" data-bs-dismiss="alert"></button>
+                    </div>
+                `;
+                contenedor.classList.remove('d-none');
+                contenedor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else {
+                const contenedor = document.getElementById('alerta-paciente-js');
+                if (contenedor) {
+                    contenedor.classList.add('d-none');
+                }
+            }
+        });
+    }
+
+    // =========================================================================
     // 5. VALIDACIÓN Y COHERENCIA DE FECHAS EN RÉCIPES MÉDICOS
     // =========================================================================
     const emisionInput     = document.getElementById('recipe_fecha_emision');

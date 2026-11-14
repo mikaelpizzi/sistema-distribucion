@@ -68,10 +68,46 @@ switch ($accion) {
             exit;
         }
 
-        // Catálogo de tipos de contacto válidos
-        $tiposValidos = $pdo->query("SELECT id FROM tipos_contacto")->fetchAll(PDO::FETCH_COLUMN);
-        $setTiposValidos = array_map('intval', $tiposValidos);
+        // Catálogo de tipos de contacto válidos y mapa id => código
+        $stmtTc = $pdo->query("SELECT id, codigo, nombre FROM tipos_contacto");
+        $catalogoTc = $stmtTc->fetchAll(PDO::FETCH_ASSOC);
+        $setTiposValidos = [];
+        $mapTiposCodigo = [];
+        foreach ($catalogoTc as $tcRow) {
+            $tid = (int) $tcRow['id'];
+            $setTiposValidos[] = $tid;
+            $mapTiposCodigo[$tid] = strtoupper((string) ($tcRow['codigo'] ?? ''));
+        }
         $tipoDefecto = !empty($setTiposValidos) ? $setTiposValidos[0] : 2;
+
+        // Función de validación y normalización estricta de vías de contacto
+        $normalizarContacto = function (int $tipoId, string $val) use ($mapTiposCodigo, $id): string {
+            $codigo = $mapTiposCodigo[$tipoId] ?? '';
+            $esEmail = ($tipoId === 4 || $codigo === 'EMAIL_ALTERNO' || strpos($codigo, 'EMAIL') !== false);
+            $redirUrl = 'index.php?tab=pacientes' . ($id !== null ? '&editar_id=' . $id : '');
+
+            if ($esEmail) {
+                if (!filter_var($val, FILTER_VALIDATE_EMAIL)) {
+                    header("Location: {$redirUrl}&error=" . urlencode("El correo electrónico '{$val}' tiene un formato inválido."));
+                    exit;
+                }
+                return mb_strtolower(trim($val), 'UTF-8');
+            }
+
+            // Vía telefónica (TEL_FIJO, TEL_MOVIL, WHATSAPP, CONTACTO_EMERGENCIA)
+            $digits = preg_replace('/\D/', '', $val);
+            $len = strlen($digits);
+            if ($len < 10 || $len > 11) {
+                header("Location: {$redirUrl}&error=" . urlencode("El número telefónico '{$val}' debe contener entre 10 y 11 dígitos numéricos."));
+                exit;
+            }
+
+            if ($len === 11 && $digits[0] === '0') {
+                return substr($digits, 0, 4) . '-' . substr($digits, 4);
+            }
+
+            return $digits;
+        };
 
         // Procesar arreglo dinámico de contactos (1FN)
         $contactosTipo = (array) ($_POST['contactos_tipo'] ?? []);
@@ -94,6 +130,8 @@ switch ($accion) {
                 $rawTipo = $tipoDefecto;
             }
 
+            $valorNormalizado = $normalizarContacto($rawTipo, $rawVal);
+
             $rawDet = isset($contactosDetalle[$i]) ? trim((string) $contactosDetalle[$i]) : '';
             $esPrincipal = ($i === $principalIdx) ? 1 : 0;
             if ($esPrincipal === 1) {
@@ -102,7 +140,7 @@ switch ($accion) {
 
             $contactosAInsertar[] = [
                 'tipo_id' => $rawTipo,
-                'valor' => mb_substr($rawVal, 0, 120, 'UTF-8'),
+                'valor' => mb_substr($valorNormalizado, 0, 120, 'UTF-8'),
                 'detalle' => $rawDet !== '' ? mb_substr($rawDet, 0, 100, 'UTF-8') : null,
                 'es_principal' => $esPrincipal
             ];
@@ -121,6 +159,7 @@ switch ($accion) {
                 if (!in_array($rawTipo, $setTiposValidos, true)) {
                     $rawTipo = $tipoDefecto;
                 }
+                $valorNormalizado = $normalizarContacto($rawTipo, $rawVal);
                 $rawDet = trim((string) ($c['detalle'] ?? ($c['nombre_contacto_emergencia'] ?? '')));
                 $esPrincipal = !empty($c['es_principal']) ? 1 : 0;
                 if ($esPrincipal === 1) {
@@ -128,7 +167,7 @@ switch ($accion) {
                 }
                 $contactosAInsertar[] = [
                     'tipo_id' => $rawTipo,
-                    'valor' => mb_substr($rawVal, 0, 120, 'UTF-8'),
+                    'valor' => mb_substr($valorNormalizado, 0, 120, 'UTF-8'),
                     'detalle' => $rawDet !== '' ? mb_substr($rawDet, 0, 100, 'UTF-8') : null,
                     'es_principal' => $esPrincipal
                 ];
@@ -138,18 +177,22 @@ switch ($accion) {
         // Compatibilidad hacia atrás si se envían los campos individuales tradicionales
         if (empty($contactosAInsertar) && (!empty($_POST['telefono_principal']) || !empty($_POST['contacto_emergencia_telefono']))) {
             if (!empty($_POST['telefono_principal'])) {
+                $tId = (int) ($_POST['tipo_contacto_principal_id'] ?? 2);
+                $valNorm = $normalizarContacto($tId, trim($_POST['telefono_principal']));
                 $contactosAInsertar[] = [
-                    'tipo_id' => (int) ($_POST['tipo_contacto_principal_id'] ?? 2),
-                    'valor' => mb_substr(trim($_POST['telefono_principal']), 0, 120, 'UTF-8'),
+                    'tipo_id' => $tId,
+                    'valor' => mb_substr($valNorm, 0, 120, 'UTF-8'),
                     'detalle' => 'Paciente Directo',
                     'es_principal' => 1
                 ];
                 $huboPrincipal = true;
             }
             if (!empty($_POST['contacto_emergencia_telefono'])) {
+                $tId = (int) ($_POST['tipo_contacto_emergencia_id'] ?? 5);
+                $valNorm = $normalizarContacto($tId, trim($_POST['contacto_emergencia_telefono']));
                 $contactosAInsertar[] = [
-                    'tipo_id' => (int) ($_POST['tipo_contacto_emergencia_id'] ?? 5),
-                    'valor' => mb_substr(trim($_POST['contacto_emergencia_telefono']), 0, 120, 'UTF-8'),
+                    'tipo_id' => $tId,
+                    'valor' => mb_substr($valNorm, 0, 120, 'UTF-8'),
                     'detalle' => trim($_POST['contacto_emergencia_nombre'] ?? '') ?: 'Contacto de Emergencia',
                     'es_principal' => empty($contactosAInsertar) ? 1 : 0
                 ];

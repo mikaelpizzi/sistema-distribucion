@@ -279,7 +279,7 @@ if (!empty($_GET['editar_id']) || !empty($_GET['editar'])) {
                                                                 <select name="contactos_tipo[]" class="form-select form-select-sm"
                                                                     required style="font-size: 0.78rem;">
                                                                     <?php foreach ($catalogoTiposContacto as $tc): ?>
-                                                                        <option value="<?= (int) $tc['id'] ?>" <?= ((int) $contacto['tipo_contacto_id'] === (int) $tc['id']) ? 'selected' : '' ?>>
+                                                                        <option value="<?= (int) $tc['id'] ?>" data-codigo="<?= htmlspecialchars($tc['codigo']) ?>" <?= ((int) $contacto['tipo_contacto_id'] === (int) $tc['id']) ? 'selected' : '' ?>>
                                                                             <?= htmlspecialchars($tc['nombre']) ?>
                                                                         </option>
                                                                     <?php endforeach; ?>
@@ -315,7 +315,7 @@ if (!empty($_GET['editar_id']) || !empty($_GET['editar'])) {
                                                             <select name="contactos_tipo[]" class="form-select form-select-sm"
                                                                 required style="font-size: 0.78rem;">
                                                                 <?php foreach ($catalogoTiposContacto as $tc): ?>
-                                                                    <option value="<?= (int) $tc['id'] ?>"
+                                                                    <option value="<?= (int) $tc['id'] ?>" data-codigo="<?= htmlspecialchars($tc['codigo']) ?>"
                                                                         <?= ($tc['codigo'] === 'TEL_MOVIL' || strpos($tc['nombre'], 'Celular') !== false) ? 'selected' : '' ?>>
                                                                         <?= htmlspecialchars($tc['nombre']) ?>
                                                                     </option>
