@@ -145,7 +145,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'La contraseña debe contener al menos una letra minúscula (a-z).';
         } elseif (!preg_match('/[0-9]/', $password)) {
             $error = 'La contraseña debe contener al menos un número (0-9).';
-            $error = 'La contraseña debe contener al menos una letra minúscula (a-z).';
         } elseif (!preg_match('/[!@#$%^&*()_+\-=\[\]{};\':"\\|,.<>\/?]/', $password)) {
             $error = 'La contraseña debe contener al menos un símbolo especial (!@#$%...).';
         } elseif ($password !== $confirm) {

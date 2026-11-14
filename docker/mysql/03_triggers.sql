@@ -293,7 +293,46 @@ BEGIN
 
         IF v_tipo_id IS NOT NULL THEN
             INSERT INTO telefonos_centro_salud (centro_salud_id, tipo_contacto_id, numero, es_principal, observaciones)
-            VALUES (NEW.id, v_tipo_id, NEW.telefono_principal, 1, 'Teléfono Principal de Contacto');
+            VALUES (NEW.id, v_tipo_id, TRIM(NEW.telefono_principal), 1, 'Teléfono Principal de Contacto');
+        END IF;
+    END IF;
+END$$
+
+DROP TRIGGER IF EXISTS trg_centros_salud_sync_telefono_update$$
+CREATE TRIGGER trg_centros_salud_sync_telefono_update
+AFTER UPDATE ON centros_salud
+FOR EACH ROW
+BEGIN
+    DECLARE v_tipo_id INT;
+    DECLARE v_tel_id INT;
+
+    -- Solo sincronizar si el teléfono principal fue modificado
+    IF NOT (OLD.telefono_principal <=> NEW.telefono_principal) THEN
+        IF NEW.telefono_principal IS NOT NULL AND TRIM(NEW.telefono_principal) <> '' THEN
+            SELECT id INTO v_tel_id
+            FROM telefonos_centro_salud
+            WHERE centro_salud_id = NEW.id AND es_principal = 1
+            LIMIT 1;
+
+            IF v_tel_id IS NOT NULL THEN
+                UPDATE telefonos_centro_salud
+                SET numero = TRIM(NEW.telefono_principal)
+                WHERE id = v_tel_id;
+            ELSE
+                SELECT id INTO v_tipo_id 
+                FROM tipos_contacto 
+                WHERE codigo IN ('TEL_FIJO', 'TEL_MOVIL') 
+                ORDER BY id ASC 
+                LIMIT 1;
+
+                IF v_tipo_id IS NOT NULL THEN
+                    INSERT INTO telefonos_centro_salud (centro_salud_id, tipo_contacto_id, numero, es_principal, observaciones)
+                    VALUES (NEW.id, v_tipo_id, TRIM(NEW.telefono_principal), 1, 'Teléfono Principal de Contacto');
+                END IF;
+            END IF;
+        ELSE
+            DELETE FROM telefonos_centro_salud 
+            WHERE centro_salud_id = NEW.id AND es_principal = 1;
         END IF;
     END IF;
 END$$
@@ -503,6 +542,47 @@ BEGIN
     IF NOT (OLD.activo <=> NEW.activo) THEN
         INSERT INTO logs_cambios_campos (tabla_nombre, registro_id, campo_modificado, valor_anterior, valor_nuevo, usuario_app_id, db_user, connection_id, ip_origen, created_at)
         VALUES ('tratamientos_autorizados', NEW.id, 'activo', CAST(OLD.activo AS CHAR), CAST(NEW.activo AS CHAR), @app_user_id, CURRENT_USER(), CONNECTION_ID(), v_ip, NOW());
+    END IF;
+END$$
+
+-- 8.16 Auditoría Delta Celda por Celda en Usuarios (Protección Criptográfica y RBAC)
+DROP TRIGGER IF EXISTS trg_usuarios_audit_delta$$
+CREATE TRIGGER trg_usuarios_audit_delta
+AFTER UPDATE ON usuarios
+FOR EACH ROW
+BEGIN
+    DECLARE v_ip VARCHAR(45);
+    SET v_ip = COALESCE(@app_client_ip, 'CONSOLA_DIRECTA');
+
+    IF NOT (OLD.nombre <=> NEW.nombre) THEN
+        INSERT INTO logs_cambios_campos (tabla_nombre, registro_id, campo_modificado, valor_anterior, valor_nuevo, usuario_app_id, db_user, connection_id, ip_origen, created_at)
+        VALUES ('usuarios', NEW.id, 'nombre', OLD.nombre, NEW.nombre, @app_user_id, CURRENT_USER(), CONNECTION_ID(), v_ip, NOW());
+    END IF;
+
+    IF NOT (OLD.email <=> NEW.email) THEN
+        INSERT INTO logs_cambios_campos (tabla_nombre, registro_id, campo_modificado, valor_anterior, valor_nuevo, usuario_app_id, db_user, connection_id, ip_origen, created_at)
+        VALUES ('usuarios', NEW.id, 'email', OLD.email, NEW.email, @app_user_id, CURRENT_USER(), CONNECTION_ID(), v_ip, NOW());
+    END IF;
+
+    IF NOT (OLD.rol_id <=> NEW.rol_id) THEN
+        INSERT INTO logs_cambios_campos (tabla_nombre, registro_id, campo_modificado, valor_anterior, valor_nuevo, usuario_app_id, db_user, connection_id, ip_origen, created_at)
+        VALUES ('usuarios', NEW.id, 'rol_id', CAST(OLD.rol_id AS CHAR), CAST(NEW.rol_id AS CHAR), @app_user_id, CURRENT_USER(), CONNECTION_ID(), v_ip, NOW());
+    END IF;
+
+    IF NOT (OLD.centro_salud_id <=> NEW.centro_salud_id) THEN
+        INSERT INTO logs_cambios_campos (tabla_nombre, registro_id, campo_modificado, valor_anterior, valor_nuevo, usuario_app_id, db_user, connection_id, ip_origen, created_at)
+        VALUES ('usuarios', NEW.id, 'centro_salud_id', CAST(OLD.centro_salud_id AS CHAR), CAST(NEW.centro_salud_id AS CHAR), @app_user_id, CURRENT_USER(), CONNECTION_ID(), v_ip, NOW());
+    END IF;
+
+    IF NOT (OLD.activo <=> NEW.activo) THEN
+        INSERT INTO logs_cambios_campos (tabla_nombre, registro_id, campo_modificado, valor_anterior, valor_nuevo, usuario_app_id, db_user, connection_id, ip_origen, created_at)
+        VALUES ('usuarios', NEW.id, 'activo', CAST(OLD.activo AS CHAR), CAST(NEW.activo AS CHAR), @app_user_id, CURRENT_USER(), CONNECTION_ID(), v_ip, NOW());
+    END IF;
+
+    -- Auditoría segura de credenciales: registrar cambio sin exponer el hash sensible
+    IF NOT (OLD.password_hash <=> NEW.password_hash) THEN
+        INSERT INTO logs_cambios_campos (tabla_nombre, registro_id, campo_modificado, valor_anterior, valor_nuevo, usuario_app_id, db_user, connection_id, ip_origen, created_at)
+        VALUES ('usuarios', NEW.id, 'password_hash', '[PROTEGIDO]', '[PASSWORD_MODIFICADO]', @app_user_id, CURRENT_USER(), CONNECTION_ID(), v_ip, NOW());
     END IF;
 END$$
 
