@@ -28,6 +28,11 @@ Este documento contiene las reglas de operación técnica, de control de version
   - `docker compose down -v` (destruye los volúmenes con los datos de MariaDB).
 * Si una edición genera un error o conflicto, debe resolverse de forma quirúrgica sobre el archivo o utilizando archivos temporales de respaldo (`.bak`), **jamás revirtiendo a ciegas con Git**.
 
+### C. Estrategia de Ramificación (GitFlow)
+* **`main`:** Línea base estable e intacta del sistema. Reservada para versiones consolidadas.
+* **`develop`:** Espacio de trabajo activo para todo nuevo desarrollo, pruebas y mejoras continuas. Todas las tareas de programación, refactorización y nuevas características deben ejecutarse en esta rama.
+* **`release/*` (ej. `release/entrega-2`):** Ramas aisladas dedicadas a la preparación, estabilización y entrega formal de hitos evaluativos específicos sin alterar el flujo continuo de `develop`.
+
 ---
 
 ## 2. Protocolo de Trabajo Concurrente con Subagentes (`self`)
