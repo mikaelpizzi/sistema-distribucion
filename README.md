@@ -2,6 +2,10 @@
 
 A relational, 3NF-normalized pharmaceutical inventory and dispensation platform designed for municipal public health networks. Built with engine-level integrity guarantees, strict ACID transaction boundaries, and audit immutability in MariaDB.
 
+<p align="center">
+  <img src="src/public/img/DB_distribution_system.svg" alt="System Architecture and Transaction Lifecycle" width="100%">
+</p>
+
 ---
 
 ## Architecture & Core Guarantees
